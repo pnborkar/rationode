@@ -346,7 +346,7 @@ class Sim:
         rec["churn"] = churn
         if churn:
             return [f.subscription_event(self.ids, "canceled", self.later(t, 10, 45), c, reason="customer_request")]
-        if c.monthly and self.rng.random() < self.w.MONTHLY_RENEWAL_IF_NO_CHURN:
+        if force.get("renew") or (c.monthly and self.rng.random() < self.w.MONTHLY_RENEWAL_IF_NO_CHURN):
             return [f.subscription_event(self.ids, "renewed", self.later(t, 25, 35), c)]
         return []
 

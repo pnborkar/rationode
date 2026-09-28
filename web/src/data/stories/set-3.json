@@ -1,0 +1,795 @@
+{
+ "set": 3,
+ "key": "mei",
+ "scenario_id": "story:mei",
+ "title": "The pause that saved a customer",
+ "point": "The newer pause_subscription option (still PROPOSED in the schema registry) showing up in fresh events.",
+ "customer": {
+  "name": "Mei Tanaka",
+  "email": "mei.tanaka.set3@example.com",
+  "plan": "monthly_49",
+  "tenure_months": 38
+ },
+ "phases": [
+  {
+   "name": "events",
+   "events": [
+    {
+     "event_id": "subevt_PAR6YMjqo6Xb3v",
+     "source_system": "subscriptions",
+     "event_type": "subscription.created",
+     "occurred_at": "2023-04-14T10:00:00Z",
+     "payload": {
+      "subscription_id": "sub_dAFFdA8RuRyJha",
+      "stripe_customer_id": "cus_UiiU2l1mvNjFAg",
+      "email": "mei.tanaka.set3@example.com",
+      "plan": "monthly_49",
+      "started_at": "2023-04-14T10:00:00Z"
+     }
+    },
+    {
+     "event_id": "scr_4tca2g0V3XkKsg",
+     "source_system": "fraudguard",
+     "event_type": "charge.screened",
+     "occurred_at": "2026-06-14T16:54:58Z",
+     "payload": {
+      "screening_id": "scr_uscf8ruWnyf86D",
+      "charge_ref": "ch_Cd9MoFXDRaXJwz",
+      "customer_email": "mei.tanaka.set3@example.com",
+      "amount": 49.0,
+      "currency": "usd",
+      "plan": "monthly_49",
+      "is_renewal": true,
+      "risk_score": 15,
+      "country_match": true,
+      "card_age_days": 706,
+      "decision": "approve",
+      "rule_id": "R-APPROVE-LE75",
+      "screened_at": "2026-06-14T16:54:58Z"
+     }
+    },
+    {
+     "event_id": "evt_x8uodYp4vR2jTZ",
+     "source_system": "stripe",
+     "event_type": "charge.succeeded",
+     "occurred_at": "2026-06-14T16:55:00Z",
+     "payload": {
+      "id": "evt_x8uodYp4vR2jTZ",
+      "object": "event",
+      "api_version": "2026-06-30",
+      "type": "charge.succeeded",
+      "created": 1781456100,
+      "livemode": false,
+      "data": {
+       "object": {
+        "id": "ch_Cd9MoFXDRaXJwz",
+        "object": "charge",
+        "amount": 4900,
+        "currency": "usd",
+        "customer": "cus_UiiU2l1mvNjFAg",
+        "billing_details": {
+         "email": "mei.tanaka.set3@example.com",
+         "name": "Mei Tanaka"
+        },
+        "metadata": {
+         "plan": "monthly_49",
+         "subscription_id": "sub_dAFFdA8RuRyJha"
+        },
+        "status": "succeeded",
+        "created": 1781456100
+       }
+      }
+     }
+    },
+    {
+     "event_id": "zdevt_liMHc1NMR9btP4",
+     "source_system": "zendesk",
+     "event_type": "ticket.created",
+     "occurred_at": "2026-06-18T16:00:00Z",
+     "payload": {
+      "type": "ticket.created",
+      "ticket": {
+       "id": "400001",
+       "subject": "I can't justify paying this much anymore",
+       "description": "I can't justify paying this much anymore. Is there anything you can do?",
+       "requester": {
+        "email": "mei.tanaka.set3@example.com",
+        "name": "Mei Tanaka"
+       },
+       "via": {
+        "channel": "chat"
+       },
+       "tags": [
+        "too_expensive"
+       ],
+       "status": "new",
+       "custom_fields": [
+        {
+         "id": "stripe_charge_id",
+         "value": "ch_Cd9MoFXDRaXJwz"
+        }
+       ],
+       "created_at": "2026-06-18T16:00:00Z"
+      }
+     }
+    },
+    {
+     "event_id": "call_QYhjZ4xABlGL9W",
+     "source_system": "mcp_gateway",
+     "event_type": "tool_call",
+     "occurred_at": "2026-06-18T16:02:26Z",
+     "payload": {
+      "call_id": "call_QYhjZ4xABlGL9W",
+      "session_id": "sess_e1Vb6G3tYikHRy",
+      "agent_id": "streamly-support-agent",
+      "agent_version": "v2",
+      "server": "streamly-ops",
+      "tool": "get_customer",
+      "arguments": {
+       "ticket_id": "400001"
+      },
+      "result": {
+       "customer_email": "mei.tanaka.set3@example.com",
+       "tenure_months": 38,
+       "plan": "monthly_49",
+       "prior_refunds_90d": 0,
+       "subscription_status": "active",
+       "charge_id": "ch_Cd9MoFXDRaXJwz",
+       "charge_amount_usd": 49.0
+      },
+      "called_at": "2026-06-18T16:02:26Z"
+     }
+    },
+    {
+     "event_id": "call_tU1tSJugZNa20v",
+     "source_system": "mcp_gateway",
+     "event_type": "tool_call",
+     "occurred_at": "2026-06-18T16:05:07Z",
+     "payload": {
+      "call_id": "call_tU1tSJugZNa20v",
+      "session_id": "sess_e1Vb6G3tYikHRy",
+      "agent_id": "streamly-support-agent",
+      "agent_version": "v2",
+      "server": "streamly-ops",
+      "tool": "propose_resolution",
+      "arguments": {
+       "ticket_id": "400001",
+       "option": "pause_subscription",
+       "amount_usd": 0.0,
+       "rationale": "Offer a pause instead of a refund; customer finds the price too high right now."
+      },
+      "result": {
+       "status": "pending_review"
+      },
+      "called_at": "2026-06-18T16:05:07Z"
+     }
+    },
+    {
+     "event_id": "zdevt_e1SHHENaC7qejN",
+     "source_system": "zendesk",
+     "event_type": "macro.applied",
+     "occurred_at": "2026-06-19T01:51:05Z",
+     "payload": {
+      "type": "macro.applied",
+      "ticket_id": "400001",
+      "macro": {
+       "id": 28591,
+       "title": "Pause subscription"
+      },
+      "actor": {
+       "id": "zd_b01",
+       "name": "Kofi Patel",
+       "group": "Team B",
+       "role": "agent"
+      },
+      "applied_at": "2026-06-19T01:51:05Z"
+     }
+    },
+    {
+     "event_id": "subevt_ly1ltcW6iJwNRg",
+     "source_system": "subscriptions",
+     "event_type": "subscription.paused",
+     "occurred_at": "2026-06-19T01:53:05Z",
+     "payload": {
+      "subscription_id": "sub_dAFFdA8RuRyJha",
+      "stripe_customer_id": "cus_UiiU2l1mvNjFAg",
+      "plan": "monthly_49",
+      "at": "2026-06-19T01:53:05Z"
+     }
+    },
+    {
+     "event_id": "zdevt_LMeBsW1dAHf9aN",
+     "source_system": "zendesk",
+     "event_type": "ticket.updated",
+     "occurred_at": "2026-06-19T01:54:05Z",
+     "payload": {
+      "type": "ticket.updated",
+      "ticket_id": "400001",
+      "changes": {
+       "status": {
+        "from": "open",
+        "to": "solved"
+       }
+      },
+      "actor": {
+       "id": "zd_b01"
+      },
+      "updated_at": "2026-06-19T01:54:05Z"
+     }
+    }
+   ],
+   "rows": {
+    "events": [
+     {
+      "event_id": "story:mei|subevt_PAR6YMjqo6Xb3v",
+      "source_system": "subscriptions",
+      "event_type": "subscription.created",
+      "occurred_at": "2023-04-14T10:00:00Z",
+      "payload_json": "{\"subscription_id\":\"sub_dAFFdA8RuRyJha\",\"stripe_customer_id\":\"cus_UiiU2l1mvNjFAg\",\"email\":\"mei.tanaka.set3@example.com\",\"plan\":\"monthly_49\",\"started_at\":\"2023-04-14T10:00:00Z\"}",
+      "charge_id": null,
+      "ticket_id": null,
+      "dispute_id": null,
+      "stripe_customer_id": "cus_UiiU2l1mvNjFAg",
+      "email": "mei.tanaka.set3@example.com",
+      "scenario_id": "story:mei"
+     },
+     {
+      "event_id": "story:mei|scr_4tca2g0V3XkKsg",
+      "source_system": "fraudguard",
+      "event_type": "charge.screened",
+      "occurred_at": "2026-06-14T16:54:58Z",
+      "payload_json": "{\"screening_id\":\"scr_uscf8ruWnyf86D\",\"charge_ref\":\"ch_Cd9MoFXDRaXJwz\",\"customer_email\":\"mei.tanaka.set3@example.com\",\"amount\":49.0,\"currency\":\"usd\",\"plan\":\"monthly_49\",\"is_renewal\":true,\"risk_score\":15,\"country_match\":true,\"card_age_days\":706,\"decision\":\"approve\",\"rule_id\":\"R-APPROVE-LE75\",\"screened_at\":\"2026-06-14T16:54:58Z\"}",
+      "charge_id": "ch_Cd9MoFXDRaXJwz",
+      "ticket_id": null,
+      "dispute_id": null,
+      "stripe_customer_id": null,
+      "email": "mei.tanaka.set3@example.com",
+      "scenario_id": "story:mei"
+     },
+     {
+      "event_id": "story:mei|evt_x8uodYp4vR2jTZ",
+      "source_system": "stripe",
+      "event_type": "charge.succeeded",
+      "occurred_at": "2026-06-14T16:55:00Z",
+      "payload_json": "{\"id\":\"evt_x8uodYp4vR2jTZ\",\"object\":\"event\",\"api_version\":\"2026-06-30\",\"type\":\"charge.succeeded\",\"created\":1781456100,\"livemode\":false,\"data\":{\"object\":{\"id\":\"ch_Cd9MoFXDRaXJwz\",\"object\":\"charge\",\"amount\":4900,\"currency\":\"usd\",\"customer\":\"cus_UiiU2l1mvNjFAg\",\"billing_details\":{\"email\":\"mei.tanaka.set3@example.com\",\"name\":\"Mei Tanaka\"},\"metadata\":{\"plan\":\"monthly_49\",\"subscription_id\":\"sub_dAFFdA8RuRyJha\"},\"status\":\"succeeded\",\"created\":1781456100}}}",
+      "charge_id": "ch_Cd9MoFXDRaXJwz",
+      "ticket_id": null,
+      "dispute_id": null,
+      "stripe_customer_id": "cus_UiiU2l1mvNjFAg",
+      "email": "mei.tanaka.set3@example.com",
+      "scenario_id": "story:mei"
+     },
+     {
+      "event_id": "story:mei|zdevt_liMHc1NMR9btP4",
+      "source_system": "zendesk",
+      "event_type": "ticket.created",
+      "occurred_at": "2026-06-18T16:00:00Z",
+      "payload_json": "{\"type\":\"ticket.created\",\"ticket\":{\"id\":\"400001\",\"subject\":\"I can't justify paying this much anymore\",\"description\":\"I can't justify paying this much anymore. Is there anything you can do?\",\"requester\":{\"email\":\"mei.tanaka.set3@example.com\",\"name\":\"Mei Tanaka\"},\"via\":{\"channel\":\"chat\"},\"tags\":[\"too_expensive\"],\"status\":\"new\",\"custom_fields\":[{\"id\":\"stripe_charge_id\",\"value\":\"ch_Cd9MoFXDRaXJwz\"}],\"created_at\":\"2026-06-18T16:00:00Z\"}}",
+      "charge_id": "ch_Cd9MoFXDRaXJwz",
+      "ticket_id": "400001",
+      "dispute_id": null,
+      "stripe_customer_id": null,
+      "email": "mei.tanaka.set3@example.com",
+      "scenario_id": "story:mei"
+     },
+     {
+      "event_id": "story:mei|call_QYhjZ4xABlGL9W",
+      "source_system": "mcp_gateway",
+      "event_type": "tool_call",
+      "occurred_at": "2026-06-18T16:02:26Z",
+      "payload_json": "{\"call_id\":\"call_QYhjZ4xABlGL9W\",\"session_id\":\"sess_e1Vb6G3tYikHRy\",\"agent_id\":\"streamly-support-agent\",\"agent_version\":\"v2\",\"server\":\"streamly-ops\",\"tool\":\"get_customer\",\"arguments\":{\"ticket_id\":\"400001\"},\"result\":{\"customer_email\":\"mei.tanaka.set3@example.com\",\"tenure_months\":38,\"plan\":\"monthly_49\",\"prior_refunds_90d\":0,\"subscription_status\":\"active\",\"charge_id\":\"ch_Cd9MoFXDRaXJwz\",\"charge_amount_usd\":49.0},\"called_at\":\"2026-06-18T16:02:26Z\"}",
+      "charge_id": "ch_Cd9MoFXDRaXJwz",
+      "ticket_id": "400001",
+      "dispute_id": null,
+      "stripe_customer_id": null,
+      "email": "mei.tanaka.set3@example.com",
+      "scenario_id": "story:mei"
+     },
+     {
+      "event_id": "story:mei|call_tU1tSJugZNa20v",
+      "source_system": "mcp_gateway",
+      "event_type": "tool_call",
+      "occurred_at": "2026-06-18T16:05:07Z",
+      "payload_json": "{\"call_id\":\"call_tU1tSJugZNa20v\",\"session_id\":\"sess_e1Vb6G3tYikHRy\",\"agent_id\":\"streamly-support-agent\",\"agent_version\":\"v2\",\"server\":\"streamly-ops\",\"tool\":\"propose_resolution\",\"arguments\":{\"ticket_id\":\"400001\",\"option\":\"pause_subscription\",\"amount_usd\":0.0,\"rationale\":\"Offer a pause instead of a refund; customer finds the price too high right now.\"},\"result\":{\"status\":\"pending_review\"},\"called_at\":\"2026-06-18T16:05:07Z\"}",
+      "charge_id": null,
+      "ticket_id": "400001",
+      "dispute_id": null,
+      "stripe_customer_id": null,
+      "email": null,
+      "scenario_id": "story:mei"
+     },
+     {
+      "event_id": "story:mei|zdevt_e1SHHENaC7qejN",
+      "source_system": "zendesk",
+      "event_type": "macro.applied",
+      "occurred_at": "2026-06-19T01:51:05Z",
+      "payload_json": "{\"type\":\"macro.applied\",\"ticket_id\":\"400001\",\"macro\":{\"id\":28591,\"title\":\"Pause subscription\"},\"actor\":{\"id\":\"zd_b01\",\"name\":\"Kofi Patel\",\"group\":\"Team B\",\"role\":\"agent\"},\"applied_at\":\"2026-06-19T01:51:05Z\"}",
+      "charge_id": null,
+      "ticket_id": "400001",
+      "dispute_id": null,
+      "stripe_customer_id": null,
+      "email": null,
+      "scenario_id": "story:mei"
+     },
+     {
+      "event_id": "story:mei|subevt_ly1ltcW6iJwNRg",
+      "source_system": "subscriptions",
+      "event_type": "subscription.paused",
+      "occurred_at": "2026-06-19T01:53:05Z",
+      "payload_json": "{\"subscription_id\":\"sub_dAFFdA8RuRyJha\",\"stripe_customer_id\":\"cus_UiiU2l1mvNjFAg\",\"plan\":\"monthly_49\",\"at\":\"2026-06-19T01:53:05Z\"}",
+      "charge_id": null,
+      "ticket_id": null,
+      "dispute_id": null,
+      "stripe_customer_id": "cus_UiiU2l1mvNjFAg",
+      "email": null,
+      "scenario_id": "story:mei"
+     },
+     {
+      "event_id": "story:mei|zdevt_LMeBsW1dAHf9aN",
+      "source_system": "zendesk",
+      "event_type": "ticket.updated",
+      "occurred_at": "2026-06-19T01:54:05Z",
+      "payload_json": "{\"type\":\"ticket.updated\",\"ticket_id\":\"400001\",\"changes\":{\"status\":{\"from\":\"open\",\"to\":\"solved\"}},\"actor\":{\"id\":\"zd_b01\"},\"updated_at\":\"2026-06-19T01:54:05Z\"}",
+      "charge_id": null,
+      "ticket_id": "400001",
+      "dispute_id": null,
+      "stripe_customer_id": null,
+      "email": null,
+      "scenario_id": "story:mei"
+     }
+    ],
+    "entities": [
+     {
+      "entity_id": "story:mei|stripe:cus_UiiU2l1mvNjFAg",
+      "label": "Customer",
+      "source_system": "stripe",
+      "source_key": "cus_UiiU2l1mvNjFAg",
+      "props": {
+       "email": "mei.tanaka.set3@example.com",
+       "name": "Mei Tanaka"
+      },
+      "scenario_id": "story:mei"
+     },
+     {
+      "entity_id": "story:mei|stripe:ch_Cd9MoFXDRaXJwz",
+      "label": "Charge",
+      "source_system": "stripe",
+      "source_key": "ch_Cd9MoFXDRaXJwz",
+      "props": {
+       "amount_usd": 49.0,
+       "plan": "monthly_49"
+      },
+      "scenario_id": "story:mei"
+     },
+     {
+      "entity_id": "story:mei|zendesk:ticket:400001",
+      "label": "Ticket",
+      "source_system": "zendesk",
+      "source_key": "ticket:400001",
+      "props": {
+       "category": "too_expensive",
+       "channel": "chat",
+       "subject": "I can't justify paying this much anymore"
+      },
+      "scenario_id": "story:mei"
+     },
+     {
+      "entity_id": "story:mei|zendesk:user:mei.tanaka.set3@example.com",
+      "label": "Customer",
+      "source_system": "zendesk",
+      "source_key": "user:mei.tanaka.set3@example.com",
+      "props": {
+       "email": "mei.tanaka.set3@example.com",
+       "name": "Mei Tanaka"
+      },
+      "scenario_id": "story:mei"
+     }
+    ],
+    "same_as": [
+     {
+      "from": "story:mei|zendesk:user:mei.tanaka.set3@example.com",
+      "to": "story:mei|stripe:cus_UiiU2l1mvNjFAg",
+      "confidence": 0.98,
+      "method": "EMAIL"
+     }
+    ],
+    "actors": [
+     {
+      "actor_id": "story:mei|system:fraudguard",
+      "kind": "SYSTEM",
+      "version": "rules-2026.1",
+      "name": "FraudGuard rules",
+      "team": null,
+      "scenario_id": "story:mei"
+     },
+     {
+      "actor_id": "story:mei|agent:streamly-support-agent:v2",
+      "kind": "AI_AGENT",
+      "version": "v2",
+      "name": "Streamly support agent v2",
+      "team": null,
+      "scenario_id": "story:mei"
+     },
+     {
+      "actor_id": "story:mei|zendesk:zd_b01",
+      "kind": "HUMAN",
+      "version": null,
+      "name": "Kofi Patel",
+      "team": "Team B",
+      "scenario_id": "story:mei"
+     }
+    ],
+    "decisions": [
+     {
+      "decision_id": "story:mei|dec:scr_4tca2g0V3XkKsg",
+      "decision_type": "charge.fraud_screen",
+      "stage": "FINAL",
+      "decided_at": "2026-06-14T16:54:58Z",
+      "detection_method": "RULE",
+      "detection_confidence": 1.0,
+      "source_system": "fraudguard",
+      "scenario_id": "story:mei"
+     },
+     {
+      "decision_id": "story:mei|dec:call_tU1tSJugZNa20v",
+      "decision_type": "support.complaint_resolution",
+      "stage": "PROPOSAL",
+      "decided_at": "2026-06-18T16:05:07Z",
+      "detection_method": "RULE",
+      "detection_confidence": 1.0,
+      "source_system": "mcp_gateway",
+      "scenario_id": "story:mei"
+     },
+     {
+      "decision_id": "story:mei|dec:zdevt_e1SHHENaC7qejN",
+      "decision_type": "support.complaint_resolution",
+      "stage": "FINAL",
+      "decided_at": "2026-06-19T01:51:05Z",
+      "detection_method": "RULE",
+      "detection_confidence": 1.0,
+      "source_system": "zendesk",
+      "scenario_id": "story:mei"
+     }
+    ],
+    "contexts": [
+     {
+      "context_id": "story:mei|ctx:scr_4tca2g0V3XkKsg",
+      "decision_id": "story:mei|dec:scr_4tca2g0V3XkKsg",
+      "attrs": {
+       "charge.risk_score": 15,
+       "charge.plan": "monthly_49",
+       "charge.is_renewal": true,
+       "charge.country_match": true,
+       "charge.card_age_days": 706
+      },
+      "summary_text": "Charge screening: renewal on monthly_49, $49, risk score 15, card age 706 days, country matches.",
+      "scenario_id": "story:mei"
+     },
+     {
+      "context_id": "story:mei|ctx:call_tU1tSJugZNa20v",
+      "decision_id": "story:mei|dec:call_tU1tSJugZNa20v",
+      "attrs": {
+       "support.tenure_months": 38,
+       "support.plan": "monthly_49",
+       "support.amount_usd": 49.0,
+       "support.complaint_category": "too_expensive",
+       "support.prior_refunds_90d": 0,
+       "support.channel": "chat"
+      },
+      "summary_text": "Complaint (too_expensive) via chat: customer tenure 38 months on monthly_49, $49 charge, 0 refunds in last 90 days. AI v2 proposed pause_subscription.",
+      "scenario_id": "story:mei"
+     },
+     {
+      "context_id": "story:mei|ctx:zdevt_e1SHHENaC7qejN",
+      "decision_id": "story:mei|dec:zdevt_e1SHHENaC7qejN",
+      "attrs": {
+       "support.tenure_months": 38,
+       "support.plan": "monthly_49",
+       "support.amount_usd": 49.0,
+       "support.complaint_category": "too_expensive",
+       "support.prior_refunds_90d": 0,
+       "support.channel": "chat"
+      },
+      "summary_text": "Complaint (too_expensive) via chat: customer tenure 38 months on monthly_49, $49 charge, 0 refunds in last 90 days. Team B rep chose pause_subscription.",
+      "scenario_id": "story:mei"
+     }
+    ],
+    "considered": [
+     {
+      "decision_id": "story:mei|dec:scr_4tca2g0V3XkKsg",
+      "decision_type": "charge.fraud_screen",
+      "option_key": "approve",
+      "status": "CHOSEN",
+      "amount_usd": null
+     },
+     {
+      "decision_id": "story:mei|dec:scr_4tca2g0V3XkKsg",
+      "decision_type": "charge.fraud_screen",
+      "option_key": "decline",
+      "status": "AVAILABLE",
+      "amount_usd": null
+     },
+     {
+      "decision_id": "story:mei|dec:scr_4tca2g0V3XkKsg",
+      "decision_type": "charge.fraud_screen",
+      "option_key": "review",
+      "status": "AVAILABLE",
+      "amount_usd": null
+     },
+     {
+      "decision_id": "story:mei|dec:call_tU1tSJugZNa20v",
+      "decision_type": "support.complaint_resolution",
+      "option_key": "pause_subscription",
+      "status": "PROPOSED",
+      "amount_usd": 0.0
+     },
+     {
+      "decision_id": "story:mei|dec:call_tU1tSJugZNa20v",
+      "decision_type": "support.complaint_resolution",
+      "option_key": "deny",
+      "status": "AVAILABLE",
+      "amount_usd": null
+     },
+     {
+      "decision_id": "story:mei|dec:call_tU1tSJugZNa20v",
+      "decision_type": "support.complaint_resolution",
+      "option_key": "full_refund",
+      "status": "AVAILABLE",
+      "amount_usd": null
+     },
+     {
+      "decision_id": "story:mei|dec:call_tU1tSJugZNa20v",
+      "decision_type": "support.complaint_resolution",
+      "option_key": "partial_refund",
+      "status": "AVAILABLE",
+      "amount_usd": null
+     },
+     {
+      "decision_id": "story:mei|dec:call_tU1tSJugZNa20v",
+      "decision_type": "support.complaint_resolution",
+      "option_key": "voucher",
+      "status": "AVAILABLE",
+      "amount_usd": null
+     },
+     {
+      "decision_id": "story:mei|dec:zdevt_e1SHHENaC7qejN",
+      "decision_type": "support.complaint_resolution",
+      "option_key": "pause_subscription",
+      "status": "CHOSEN",
+      "amount_usd": 0.0
+     },
+     {
+      "decision_id": "story:mei|dec:zdevt_e1SHHENaC7qejN",
+      "decision_type": "support.complaint_resolution",
+      "option_key": "deny",
+      "status": "AVAILABLE",
+      "amount_usd": null
+     },
+     {
+      "decision_id": "story:mei|dec:zdevt_e1SHHENaC7qejN",
+      "decision_type": "support.complaint_resolution",
+      "option_key": "full_refund",
+      "status": "AVAILABLE",
+      "amount_usd": null
+     },
+     {
+      "decision_id": "story:mei|dec:zdevt_e1SHHENaC7qejN",
+      "decision_type": "support.complaint_resolution",
+      "option_key": "partial_refund",
+      "status": "AVAILABLE",
+      "amount_usd": null
+     },
+     {
+      "decision_id": "story:mei|dec:zdevt_e1SHHENaC7qejN",
+      "decision_type": "support.complaint_resolution",
+      "option_key": "voucher",
+      "status": "AVAILABLE",
+      "amount_usd": null
+     }
+    ],
+    "made_by": [
+     {
+      "decision_id": "story:mei|dec:scr_4tca2g0V3XkKsg",
+      "actor_id": "story:mei|system:fraudguard",
+      "role": "DECIDER"
+     },
+     {
+      "decision_id": "story:mei|dec:call_tU1tSJugZNa20v",
+      "actor_id": "story:mei|agent:streamly-support-agent:v2",
+      "role": "PROPOSER"
+     },
+     {
+      "decision_id": "story:mei|dec:zdevt_e1SHHENaC7qejN",
+      "actor_id": "story:mei|zendesk:zd_b01",
+      "role": "DECIDER"
+     }
+    ],
+    "about": [
+     {
+      "decision_id": "story:mei|dec:scr_4tca2g0V3XkKsg",
+      "entity_id": "story:mei|stripe:ch_Cd9MoFXDRaXJwz"
+     },
+     {
+      "decision_id": "story:mei|dec:scr_4tca2g0V3XkKsg",
+      "entity_id": "story:mei|stripe:cus_UiiU2l1mvNjFAg"
+     },
+     {
+      "decision_id": "story:mei|dec:call_tU1tSJugZNa20v",
+      "entity_id": "story:mei|zendesk:ticket:400001"
+     },
+     {
+      "decision_id": "story:mei|dec:call_tU1tSJugZNa20v",
+      "entity_id": "story:mei|stripe:ch_Cd9MoFXDRaXJwz"
+     },
+     {
+      "decision_id": "story:mei|dec:call_tU1tSJugZNa20v",
+      "entity_id": "story:mei|stripe:cus_UiiU2l1mvNjFAg"
+     },
+     {
+      "decision_id": "story:mei|dec:zdevt_e1SHHENaC7qejN",
+      "entity_id": "story:mei|zendesk:ticket:400001"
+     },
+     {
+      "decision_id": "story:mei|dec:zdevt_e1SHHENaC7qejN",
+      "entity_id": "story:mei|stripe:ch_Cd9MoFXDRaXJwz"
+     },
+     {
+      "decision_id": "story:mei|dec:zdevt_e1SHHENaC7qejN",
+      "entity_id": "story:mei|stripe:cus_UiiU2l1mvNjFAg"
+     }
+    ],
+    "preceded_by": [
+     {
+      "from": "story:mei|dec:call_tU1tSJugZNa20v",
+      "to": "story:mei|dec:scr_4tca2g0V3XkKsg"
+     },
+     {
+      "from": "story:mei|dec:zdevt_e1SHHENaC7qejN",
+      "to": "story:mei|dec:call_tU1tSJugZNa20v"
+     }
+    ],
+    "overrides": [],
+    "under_policy": [
+     {
+      "decision_id": "story:mei|dec:scr_4tca2g0V3XkKsg",
+      "policy_id": "fraud-screening",
+      "version": "2025.1"
+     },
+     {
+      "decision_id": "story:mei|dec:call_tU1tSJugZNa20v",
+      "policy_id": "streamly-refunds",
+      "version": "2025.1"
+     },
+     {
+      "decision_id": "story:mei|dec:zdevt_e1SHHENaC7qejN",
+      "policy_id": "streamly-refunds",
+      "version": "2025.1"
+     }
+    ],
+    "evidenced_by": [
+     {
+      "node_id": "story:mei|dec:scr_4tca2g0V3XkKsg",
+      "kind": "Decision",
+      "event_id": "story:mei|scr_4tca2g0V3XkKsg"
+     },
+     {
+      "node_id": "story:mei|dec:call_tU1tSJugZNa20v",
+      "kind": "Decision",
+      "event_id": "story:mei|zdevt_liMHc1NMR9btP4"
+     },
+     {
+      "node_id": "story:mei|dec:call_tU1tSJugZNa20v",
+      "kind": "Decision",
+      "event_id": "story:mei|call_QYhjZ4xABlGL9W"
+     },
+     {
+      "node_id": "story:mei|dec:call_tU1tSJugZNa20v",
+      "kind": "Decision",
+      "event_id": "story:mei|call_tU1tSJugZNa20v"
+     },
+     {
+      "node_id": "story:mei|dec:zdevt_e1SHHENaC7qejN",
+      "kind": "Decision",
+      "event_id": "story:mei|zdevt_e1SHHENaC7qejN"
+     }
+    ],
+    "outcomes": [],
+    "led_to": [],
+    "schema_proposals": []
+   }
+  },
+  {
+   "name": "60 days later",
+   "events": [
+    {
+     "event_id": "subevt_pyeBLzU3p3Mj8K",
+     "source_system": "subscriptions",
+     "event_type": "subscription.renewed",
+     "occurred_at": "2026-07-20T20:49:31Z",
+     "payload": {
+      "subscription_id": "sub_dAFFdA8RuRyJha",
+      "stripe_customer_id": "cus_UiiU2l1mvNjFAg",
+      "plan": "monthly_49",
+      "at": "2026-07-20T20:49:31Z"
+     }
+    }
+   ],
+   "rows": {
+    "events": [
+     {
+      "event_id": "story:mei|subevt_pyeBLzU3p3Mj8K",
+      "source_system": "subscriptions",
+      "event_type": "subscription.renewed",
+      "occurred_at": "2026-07-20T20:49:31Z",
+      "payload_json": "{\"subscription_id\":\"sub_dAFFdA8RuRyJha\",\"stripe_customer_id\":\"cus_UiiU2l1mvNjFAg\",\"plan\":\"monthly_49\",\"at\":\"2026-07-20T20:49:31Z\"}",
+      "charge_id": null,
+      "ticket_id": null,
+      "dispute_id": null,
+      "stripe_customer_id": "cus_UiiU2l1mvNjFAg",
+      "email": null,
+      "scenario_id": "story:mei"
+     }
+    ],
+    "entities": [],
+    "same_as": [],
+    "actors": [],
+    "decisions": [],
+    "contexts": [],
+    "considered": [],
+    "made_by": [],
+    "about": [],
+    "preceded_by": [],
+    "overrides": [],
+    "under_policy": [],
+    "evidenced_by": [
+     {
+      "node_id": "story:mei|out:subevt_pyeBLzU3p3Mj8K",
+      "kind": "Outcome",
+      "event_id": "story:mei|subevt_pyeBLzU3p3Mj8K"
+     }
+    ],
+    "outcomes": [
+     {
+      "outcome_id": "story:mei|out:subevt_pyeBLzU3p3Mj8K",
+      "outcome_type": "renewal",
+      "occurred_at": "2026-07-20T20:49:31Z",
+      "value_usd": null,
+      "scenario_id": "story:mei"
+     }
+    ],
+    "led_to": [
+     {
+      "decision_id": "story:mei|dec:zdevt_e1SHHENaC7qejN",
+      "outcome_id": "story:mei|out:subevt_pyeBLzU3p3Mj8K",
+      "confidence": 1.0,
+      "attribution_method": "SAME_ENTITY_WINDOW",
+      "window_days": 400
+     }
+    ],
+    "schema_proposals": []
+   }
+  }
+ ],
+ "became": {
+  "subevt_PAR6YMjqo6Xb3v": [],
+  "scr_4tca2g0V3XkKsg": [
+   "Decision \u00b7 fraud screen \u00b7 final: approve \u00b7 by FraudGuard rules"
+  ],
+  "evt_x8uodYp4vR2jTZ": [],
+  "zdevt_liMHc1NMR9btP4": [
+   "Identity \u00b7 Zendesk requester SAME_AS Stripe customer (email match)"
+  ],
+  "call_QYhjZ4xABlGL9W": [],
+  "call_tU1tSJugZNa20v": [
+   "Decision \u00b7 complaint resolution \u00b7 proposal: pause subscription \u00b7 by AI v2"
+  ],
+  "zdevt_e1SHHENaC7qejN": [
+   "Decision \u00b7 complaint resolution \u00b7 final: pause subscription \u00b7 by Kofi Patel (Team B)"
+  ],
+  "subevt_ly1ltcW6iJwNRg": [],
+  "zdevt_LMeBsW1dAHf9aN": [],
+  "subevt_pyeBLzU3p3Mj8K": [
+   "Outcome \u00b7 renewal"
+  ]
+ }
+}

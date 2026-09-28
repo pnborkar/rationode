@@ -1,0 +1,730 @@
+{
+ "set": 4,
+ "key": "omar",
+ "scenario_id": "story:omar",
+ "title": "The fraud that slipped through",
+ "point": "The fraud tool approved a risk-70 signup (its review threshold is 75); the charge came back as unauthorized.",
+ "customer": {
+  "name": "Omar Haddad",
+  "email": "omar.haddad.set4@example.com",
+  "plan": "annual_480",
+  "tenure_months": 0
+ },
+ "phases": [
+  {
+   "name": "events",
+   "events": [
+    {
+     "event_id": "scr_GEWYAoZOVvKdUb",
+     "source_system": "fraudguard",
+     "event_type": "charge.screened",
+     "occurred_at": "2026-06-20T05:11:58Z",
+     "payload": {
+      "screening_id": "scr_jNFsvLVyp8qYFl",
+      "charge_ref": "ch_ggf1ZEu2VBw9aQ",
+      "customer_email": "omar.haddad.set4@example.com",
+      "amount": 480.0,
+      "currency": "usd",
+      "plan": "annual_480",
+      "is_renewal": false,
+      "risk_score": 70,
+      "country_match": false,
+      "card_age_days": 10,
+      "decision": "approve",
+      "rule_id": "R-APPROVE-LE75",
+      "screened_at": "2026-06-20T05:11:58Z"
+     }
+    },
+    {
+     "event_id": "evt_po8cvfCeikoFsO",
+     "source_system": "stripe",
+     "event_type": "charge.succeeded",
+     "occurred_at": "2026-06-20T05:12:00Z",
+     "payload": {
+      "id": "evt_po8cvfCeikoFsO",
+      "object": "event",
+      "api_version": "2026-06-30",
+      "type": "charge.succeeded",
+      "created": 1781932320,
+      "livemode": false,
+      "data": {
+       "object": {
+        "id": "ch_ggf1ZEu2VBw9aQ",
+        "object": "charge",
+        "amount": 48000,
+        "currency": "usd",
+        "customer": "cus_iDTbj4HILjBySE",
+        "billing_details": {
+         "email": "omar.haddad.set4@example.com",
+         "name": "Omar Haddad"
+        },
+        "metadata": {
+         "plan": "annual_480",
+         "subscription_id": "sub_O4EXI7Dp6UiwEd"
+        },
+        "status": "succeeded",
+        "created": 1781932320
+       }
+      }
+     }
+    },
+    {
+     "event_id": "subevt_Tc1EEmlRuvJqcN",
+     "source_system": "subscriptions",
+     "event_type": "subscription.created",
+     "occurred_at": "2026-06-20T10:00:00Z",
+     "payload": {
+      "subscription_id": "sub_O4EXI7Dp6UiwEd",
+      "stripe_customer_id": "cus_iDTbj4HILjBySE",
+      "email": "omar.haddad.set4@example.com",
+      "plan": "annual_480",
+      "started_at": "2026-06-20T10:00:00Z"
+     }
+    },
+    {
+     "event_id": "evt_nOoEzbxf05aOkx",
+     "source_system": "stripe",
+     "event_type": "charge.dispute.created",
+     "occurred_at": "2026-07-16T04:35:23Z",
+     "payload": {
+      "id": "evt_nOoEzbxf05aOkx",
+      "object": "event",
+      "api_version": "2026-06-30",
+      "type": "charge.dispute.created",
+      "created": 1784176523,
+      "livemode": false,
+      "data": {
+       "object": {
+        "id": "dp_ESIPLeHw9FWPwW",
+        "object": "dispute",
+        "amount": 48000,
+        "currency": "usd",
+        "charge": "ch_ggf1ZEu2VBw9aQ",
+        "reason": "fraudulent",
+        "status": "needs_response",
+        "balance_transactions": [
+         {
+          "type": "adjustment",
+          "fee": 1500,
+          "description": "Dispute fee"
+         }
+        ],
+        "created": 1784176523
+       }
+      }
+     }
+    },
+    {
+     "event_id": "call_UoUnJoy3lBB6vb",
+     "source_system": "mcp_gateway",
+     "event_type": "tool_call",
+     "occurred_at": "2026-07-17T11:51:44Z",
+     "payload": {
+      "call_id": "call_UoUnJoy3lBB6vb",
+      "session_id": "sess_QTy3GQRTz1iswn",
+      "agent_id": "streamly-support-agent",
+      "agent_version": "v2",
+      "server": "streamly-ops",
+      "tool": "get_dispute_evidence",
+      "arguments": {
+       "dispute_id": "dp_ESIPLeHw9FWPwW"
+      },
+      "result": {
+       "dispute_id": "dp_ESIPLeHw9FWPwW",
+       "charge_id": "ch_ggf1ZEu2VBw9aQ",
+       "category": "unauthorized",
+       "amount_usd": 480.0,
+       "customer_email": "omar.haddad.set4@example.com",
+       "customer_tenure_months": 0,
+       "prior_complaint": false,
+       "available_evidence": [
+        "tos_acceptance",
+        "cancellation_emails"
+       ]
+      },
+      "called_at": "2026-07-17T11:51:44Z"
+     }
+    },
+    {
+     "event_id": "call_EIXhQg3B37RZmH",
+     "source_system": "mcp_gateway",
+     "event_type": "tool_call",
+     "occurred_at": "2026-07-17T12:00:08Z",
+     "payload": {
+      "call_id": "call_EIXhQg3B37RZmH",
+      "session_id": "sess_QTy3GQRTz1iswn",
+      "agent_id": "streamly-support-agent",
+      "agent_version": "v2",
+      "server": "streamly-ops",
+      "tool": "respond_to_dispute",
+      "arguments": {
+       "dispute_id": "dp_ESIPLeHw9FWPwW",
+       "action": "contest",
+       "evidence": [
+        "tos_acceptance"
+       ],
+       "rationale": "Contest with available evidence."
+      },
+      "result": {
+       "status": "submitted"
+      },
+      "called_at": "2026-07-17T12:00:08Z"
+     }
+    }
+   ],
+   "rows": {
+    "events": [
+     {
+      "event_id": "story:omar|scr_GEWYAoZOVvKdUb",
+      "source_system": "fraudguard",
+      "event_type": "charge.screened",
+      "occurred_at": "2026-06-20T05:11:58Z",
+      "payload_json": "{\"screening_id\":\"scr_jNFsvLVyp8qYFl\",\"charge_ref\":\"ch_ggf1ZEu2VBw9aQ\",\"customer_email\":\"omar.haddad.set4@example.com\",\"amount\":480.0,\"currency\":\"usd\",\"plan\":\"annual_480\",\"is_renewal\":false,\"risk_score\":70,\"country_match\":false,\"card_age_days\":10,\"decision\":\"approve\",\"rule_id\":\"R-APPROVE-LE75\",\"screened_at\":\"2026-06-20T05:11:58Z\"}",
+      "charge_id": "ch_ggf1ZEu2VBw9aQ",
+      "ticket_id": null,
+      "dispute_id": null,
+      "stripe_customer_id": null,
+      "email": "omar.haddad.set4@example.com",
+      "scenario_id": "story:omar"
+     },
+     {
+      "event_id": "story:omar|evt_po8cvfCeikoFsO",
+      "source_system": "stripe",
+      "event_type": "charge.succeeded",
+      "occurred_at": "2026-06-20T05:12:00Z",
+      "payload_json": "{\"id\":\"evt_po8cvfCeikoFsO\",\"object\":\"event\",\"api_version\":\"2026-06-30\",\"type\":\"charge.succeeded\",\"created\":1781932320,\"livemode\":false,\"data\":{\"object\":{\"id\":\"ch_ggf1ZEu2VBw9aQ\",\"object\":\"charge\",\"amount\":48000,\"currency\":\"usd\",\"customer\":\"cus_iDTbj4HILjBySE\",\"billing_details\":{\"email\":\"omar.haddad.set4@example.com\",\"name\":\"Omar Haddad\"},\"metadata\":{\"plan\":\"annual_480\",\"subscription_id\":\"sub_O4EXI7Dp6UiwEd\"},\"status\":\"succeeded\",\"created\":1781932320}}}",
+      "charge_id": "ch_ggf1ZEu2VBw9aQ",
+      "ticket_id": null,
+      "dispute_id": null,
+      "stripe_customer_id": "cus_iDTbj4HILjBySE",
+      "email": "omar.haddad.set4@example.com",
+      "scenario_id": "story:omar"
+     },
+     {
+      "event_id": "story:omar|subevt_Tc1EEmlRuvJqcN",
+      "source_system": "subscriptions",
+      "event_type": "subscription.created",
+      "occurred_at": "2026-06-20T10:00:00Z",
+      "payload_json": "{\"subscription_id\":\"sub_O4EXI7Dp6UiwEd\",\"stripe_customer_id\":\"cus_iDTbj4HILjBySE\",\"email\":\"omar.haddad.set4@example.com\",\"plan\":\"annual_480\",\"started_at\":\"2026-06-20T10:00:00Z\"}",
+      "charge_id": null,
+      "ticket_id": null,
+      "dispute_id": null,
+      "stripe_customer_id": "cus_iDTbj4HILjBySE",
+      "email": "omar.haddad.set4@example.com",
+      "scenario_id": "story:omar"
+     },
+     {
+      "event_id": "story:omar|evt_nOoEzbxf05aOkx",
+      "source_system": "stripe",
+      "event_type": "charge.dispute.created",
+      "occurred_at": "2026-07-16T04:35:23Z",
+      "payload_json": "{\"id\":\"evt_nOoEzbxf05aOkx\",\"object\":\"event\",\"api_version\":\"2026-06-30\",\"type\":\"charge.dispute.created\",\"created\":1784176523,\"livemode\":false,\"data\":{\"object\":{\"id\":\"dp_ESIPLeHw9FWPwW\",\"object\":\"dispute\",\"amount\":48000,\"currency\":\"usd\",\"charge\":\"ch_ggf1ZEu2VBw9aQ\",\"reason\":\"fraudulent\",\"status\":\"needs_response\",\"balance_transactions\":[{\"type\":\"adjustment\",\"fee\":1500,\"description\":\"Dispute fee\"}],\"created\":1784176523}}}",
+      "charge_id": "ch_ggf1ZEu2VBw9aQ",
+      "ticket_id": null,
+      "dispute_id": "dp_ESIPLeHw9FWPwW",
+      "stripe_customer_id": null,
+      "email": null,
+      "scenario_id": "story:omar"
+     },
+     {
+      "event_id": "story:omar|call_UoUnJoy3lBB6vb",
+      "source_system": "mcp_gateway",
+      "event_type": "tool_call",
+      "occurred_at": "2026-07-17T11:51:44Z",
+      "payload_json": "{\"call_id\":\"call_UoUnJoy3lBB6vb\",\"session_id\":\"sess_QTy3GQRTz1iswn\",\"agent_id\":\"streamly-support-agent\",\"agent_version\":\"v2\",\"server\":\"streamly-ops\",\"tool\":\"get_dispute_evidence\",\"arguments\":{\"dispute_id\":\"dp_ESIPLeHw9FWPwW\"},\"result\":{\"dispute_id\":\"dp_ESIPLeHw9FWPwW\",\"charge_id\":\"ch_ggf1ZEu2VBw9aQ\",\"category\":\"unauthorized\",\"amount_usd\":480.0,\"customer_email\":\"omar.haddad.set4@example.com\",\"customer_tenure_months\":0,\"prior_complaint\":false,\"available_evidence\":[\"tos_acceptance\",\"cancellation_emails\"]},\"called_at\":\"2026-07-17T11:51:44Z\"}",
+      "charge_id": "ch_ggf1ZEu2VBw9aQ",
+      "ticket_id": null,
+      "dispute_id": "dp_ESIPLeHw9FWPwW",
+      "stripe_customer_id": null,
+      "email": "omar.haddad.set4@example.com",
+      "scenario_id": "story:omar"
+     },
+     {
+      "event_id": "story:omar|call_EIXhQg3B37RZmH",
+      "source_system": "mcp_gateway",
+      "event_type": "tool_call",
+      "occurred_at": "2026-07-17T12:00:08Z",
+      "payload_json": "{\"call_id\":\"call_EIXhQg3B37RZmH\",\"session_id\":\"sess_QTy3GQRTz1iswn\",\"agent_id\":\"streamly-support-agent\",\"agent_version\":\"v2\",\"server\":\"streamly-ops\",\"tool\":\"respond_to_dispute\",\"arguments\":{\"dispute_id\":\"dp_ESIPLeHw9FWPwW\",\"action\":\"contest\",\"evidence\":[\"tos_acceptance\"],\"rationale\":\"Contest with available evidence.\"},\"result\":{\"status\":\"submitted\"},\"called_at\":\"2026-07-17T12:00:08Z\"}",
+      "charge_id": null,
+      "ticket_id": null,
+      "dispute_id": "dp_ESIPLeHw9FWPwW",
+      "stripe_customer_id": null,
+      "email": null,
+      "scenario_id": "story:omar"
+     }
+    ],
+    "entities": [
+     {
+      "entity_id": "story:omar|stripe:cus_iDTbj4HILjBySE",
+      "label": "Customer",
+      "source_system": "stripe",
+      "source_key": "cus_iDTbj4HILjBySE",
+      "props": {
+       "email": "omar.haddad.set4@example.com",
+       "name": "Omar Haddad"
+      },
+      "scenario_id": "story:omar"
+     },
+     {
+      "entity_id": "story:omar|stripe:ch_ggf1ZEu2VBw9aQ",
+      "label": "Charge",
+      "source_system": "stripe",
+      "source_key": "ch_ggf1ZEu2VBw9aQ",
+      "props": {
+       "amount_usd": 480.0,
+       "plan": "annual_480"
+      },
+      "scenario_id": "story:omar"
+     },
+     {
+      "entity_id": "story:omar|stripe:dp_ESIPLeHw9FWPwW",
+      "label": "Dispute",
+      "source_system": "stripe",
+      "source_key": "dp_ESIPLeHw9FWPwW",
+      "props": {
+       "category": "unauthorized",
+       "amount_usd": 480.0
+      },
+      "scenario_id": "story:omar"
+     }
+    ],
+    "same_as": [],
+    "actors": [
+     {
+      "actor_id": "story:omar|system:fraudguard",
+      "kind": "SYSTEM",
+      "version": "rules-2026.1",
+      "name": "FraudGuard rules",
+      "team": null,
+      "scenario_id": "story:omar"
+     },
+     {
+      "actor_id": "story:omar|agent:streamly-support-agent:v2",
+      "kind": "AI_AGENT",
+      "version": "v2",
+      "name": "Streamly support agent v2",
+      "team": null,
+      "scenario_id": "story:omar"
+     }
+    ],
+    "decisions": [
+     {
+      "decision_id": "story:omar|dec:scr_GEWYAoZOVvKdUb",
+      "decision_type": "charge.fraud_screen",
+      "stage": "FINAL",
+      "decided_at": "2026-06-20T05:11:58Z",
+      "detection_method": "RULE",
+      "detection_confidence": 1.0,
+      "source_system": "fraudguard",
+      "scenario_id": "story:omar"
+     },
+     {
+      "decision_id": "story:omar|dec:call_EIXhQg3B37RZmH",
+      "decision_type": "dispute.response",
+      "stage": "FINAL",
+      "decided_at": "2026-07-17T12:00:08Z",
+      "detection_method": "RULE",
+      "detection_confidence": 1.0,
+      "source_system": "mcp_gateway",
+      "scenario_id": "story:omar"
+     },
+     {
+      "decision_id": "story:omar|dec:call_EIXhQg3B37RZmH:evidence",
+      "decision_type": "dispute.evidence",
+      "stage": "FINAL",
+      "decided_at": "2026-07-17T12:00:08Z",
+      "detection_method": "RULE",
+      "detection_confidence": 1.0,
+      "source_system": "mcp_gateway",
+      "scenario_id": "story:omar"
+     }
+    ],
+    "contexts": [
+     {
+      "context_id": "story:omar|ctx:scr_GEWYAoZOVvKdUb",
+      "decision_id": "story:omar|dec:scr_GEWYAoZOVvKdUb",
+      "attrs": {
+       "charge.risk_score": 70,
+       "charge.plan": "annual_480",
+       "charge.is_renewal": false,
+       "charge.country_match": false,
+       "charge.card_age_days": 10
+      },
+      "summary_text": "Charge screening: signup on annual_480, $480, risk score 70, card age 10 days, country does not match.",
+      "scenario_id": "story:omar"
+     },
+     {
+      "context_id": "story:omar|ctx:call_EIXhQg3B37RZmH",
+      "decision_id": "story:omar|dec:call_EIXhQg3B37RZmH",
+      "attrs": {
+       "dispute.amount_usd": 480.0,
+       "dispute.category": "unauthorized",
+       "dispute.tenure_months": 0,
+       "dispute.prior_complaint": false,
+       "dispute.usage_logs_available": false
+      },
+      "summary_text": "Dispute (unauthorized), $480, tenure 0 months, no prior complaint, usage logs not available. AI v2 chose to contest.",
+      "scenario_id": "story:omar"
+     },
+     {
+      "context_id": "story:omar|ctx:call_EIXhQg3B37RZmH:evidence",
+      "decision_id": "story:omar|dec:call_EIXhQg3B37RZmH:evidence",
+      "attrs": {
+       "dispute.amount_usd": 480.0,
+       "dispute.category": "unauthorized",
+       "dispute.tenure_months": 0,
+       "dispute.prior_complaint": false,
+       "dispute.usage_logs_available": false
+      },
+      "summary_text": "Dispute (unauthorized), $480, tenure 0 months, no prior complaint, usage logs not available. AI v2 submitted evidence: tos_acceptance.",
+      "scenario_id": "story:omar"
+     }
+    ],
+    "considered": [
+     {
+      "decision_id": "story:omar|dec:scr_GEWYAoZOVvKdUb",
+      "decision_type": "charge.fraud_screen",
+      "option_key": "approve",
+      "status": "CHOSEN",
+      "amount_usd": null
+     },
+     {
+      "decision_id": "story:omar|dec:scr_GEWYAoZOVvKdUb",
+      "decision_type": "charge.fraud_screen",
+      "option_key": "decline",
+      "status": "AVAILABLE",
+      "amount_usd": null
+     },
+     {
+      "decision_id": "story:omar|dec:scr_GEWYAoZOVvKdUb",
+      "decision_type": "charge.fraud_screen",
+      "option_key": "review",
+      "status": "AVAILABLE",
+      "amount_usd": null
+     },
+     {
+      "decision_id": "story:omar|dec:call_EIXhQg3B37RZmH",
+      "decision_type": "dispute.response",
+      "option_key": "contest",
+      "status": "CHOSEN",
+      "amount_usd": null
+     },
+     {
+      "decision_id": "story:omar|dec:call_EIXhQg3B37RZmH",
+      "decision_type": "dispute.response",
+      "option_key": "accept",
+      "status": "AVAILABLE",
+      "amount_usd": null
+     },
+     {
+      "decision_id": "story:omar|dec:call_EIXhQg3B37RZmH:evidence",
+      "decision_type": "dispute.evidence",
+      "option_key": "tos_acceptance",
+      "status": "CHOSEN",
+      "amount_usd": null
+     },
+     {
+      "decision_id": "story:omar|dec:call_EIXhQg3B37RZmH:evidence",
+      "decision_type": "dispute.evidence",
+      "option_key": "cancellation_emails",
+      "status": "AVAILABLE",
+      "amount_usd": null
+     }
+    ],
+    "made_by": [
+     {
+      "decision_id": "story:omar|dec:scr_GEWYAoZOVvKdUb",
+      "actor_id": "story:omar|system:fraudguard",
+      "role": "DECIDER"
+     },
+     {
+      "decision_id": "story:omar|dec:call_EIXhQg3B37RZmH",
+      "actor_id": "story:omar|agent:streamly-support-agent:v2",
+      "role": "DECIDER"
+     },
+     {
+      "decision_id": "story:omar|dec:call_EIXhQg3B37RZmH:evidence",
+      "actor_id": "story:omar|agent:streamly-support-agent:v2",
+      "role": "DECIDER"
+     }
+    ],
+    "about": [
+     {
+      "decision_id": "story:omar|dec:scr_GEWYAoZOVvKdUb",
+      "entity_id": "story:omar|stripe:ch_ggf1ZEu2VBw9aQ"
+     },
+     {
+      "decision_id": "story:omar|dec:scr_GEWYAoZOVvKdUb",
+      "entity_id": "story:omar|stripe:cus_iDTbj4HILjBySE"
+     },
+     {
+      "decision_id": "story:omar|dec:call_EIXhQg3B37RZmH",
+      "entity_id": "story:omar|stripe:dp_ESIPLeHw9FWPwW"
+     },
+     {
+      "decision_id": "story:omar|dec:call_EIXhQg3B37RZmH",
+      "entity_id": "story:omar|stripe:ch_ggf1ZEu2VBw9aQ"
+     },
+     {
+      "decision_id": "story:omar|dec:call_EIXhQg3B37RZmH",
+      "entity_id": "story:omar|stripe:cus_iDTbj4HILjBySE"
+     },
+     {
+      "decision_id": "story:omar|dec:call_EIXhQg3B37RZmH:evidence",
+      "entity_id": "story:omar|stripe:dp_ESIPLeHw9FWPwW"
+     },
+     {
+      "decision_id": "story:omar|dec:call_EIXhQg3B37RZmH:evidence",
+      "entity_id": "story:omar|stripe:ch_ggf1ZEu2VBw9aQ"
+     },
+     {
+      "decision_id": "story:omar|dec:call_EIXhQg3B37RZmH:evidence",
+      "entity_id": "story:omar|stripe:cus_iDTbj4HILjBySE"
+     }
+    ],
+    "preceded_by": [
+     {
+      "from": "story:omar|dec:call_EIXhQg3B37RZmH",
+      "to": "story:omar|dec:scr_GEWYAoZOVvKdUb"
+     },
+     {
+      "from": "story:omar|dec:call_EIXhQg3B37RZmH:evidence",
+      "to": "story:omar|dec:call_EIXhQg3B37RZmH"
+     }
+    ],
+    "overrides": [],
+    "under_policy": [
+     {
+      "decision_id": "story:omar|dec:scr_GEWYAoZOVvKdUb",
+      "policy_id": "fraud-screening",
+      "version": "2025.1"
+     },
+     {
+      "decision_id": "story:omar|dec:call_EIXhQg3B37RZmH",
+      "policy_id": "streamly-disputes",
+      "version": "2025.1"
+     },
+     {
+      "decision_id": "story:omar|dec:call_EIXhQg3B37RZmH:evidence",
+      "policy_id": "streamly-disputes",
+      "version": "2025.1"
+     }
+    ],
+    "evidenced_by": [
+     {
+      "node_id": "story:omar|dec:scr_GEWYAoZOVvKdUb",
+      "kind": "Decision",
+      "event_id": "story:omar|scr_GEWYAoZOVvKdUb"
+     },
+     {
+      "node_id": "story:omar|out:evt_nOoEzbxf05aOkx",
+      "kind": "Outcome",
+      "event_id": "story:omar|evt_nOoEzbxf05aOkx"
+     },
+     {
+      "node_id": "story:omar|dec:call_EIXhQg3B37RZmH",
+      "kind": "Decision",
+      "event_id": "story:omar|evt_nOoEzbxf05aOkx"
+     },
+     {
+      "node_id": "story:omar|dec:call_EIXhQg3B37RZmH",
+      "kind": "Decision",
+      "event_id": "story:omar|call_UoUnJoy3lBB6vb"
+     },
+     {
+      "node_id": "story:omar|dec:call_EIXhQg3B37RZmH",
+      "kind": "Decision",
+      "event_id": "story:omar|call_EIXhQg3B37RZmH"
+     },
+     {
+      "node_id": "story:omar|dec:call_EIXhQg3B37RZmH:evidence",
+      "kind": "Decision",
+      "event_id": "story:omar|call_UoUnJoy3lBB6vb"
+     },
+     {
+      "node_id": "story:omar|dec:call_EIXhQg3B37RZmH:evidence",
+      "kind": "Decision",
+      "event_id": "story:omar|call_EIXhQg3B37RZmH"
+     }
+    ],
+    "outcomes": [
+     {
+      "outcome_id": "story:omar|out:evt_nOoEzbxf05aOkx",
+      "outcome_type": "dispute_filed",
+      "occurred_at": "2026-07-16T04:35:23Z",
+      "value_usd": 480.0,
+      "scenario_id": "story:omar"
+     }
+    ],
+    "led_to": [
+     {
+      "decision_id": "story:omar|dec:scr_GEWYAoZOVvKdUb",
+      "outcome_id": "story:omar|out:evt_nOoEzbxf05aOkx",
+      "confidence": 1.0,
+      "attribution_method": "EXPLICIT_REF",
+      "window_days": 60
+     }
+    ],
+    "schema_proposals": []
+   }
+  },
+  {
+   "name": "60 days later",
+   "events": [
+    {
+     "event_id": "subevt_RzTcWVYXBYF5Tg",
+     "source_system": "subscriptions",
+     "event_type": "subscription.canceled",
+     "occurred_at": "2026-07-24T07:44:16Z",
+     "payload": {
+      "subscription_id": "sub_O4EXI7Dp6UiwEd",
+      "stripe_customer_id": "cus_iDTbj4HILjBySE",
+      "plan": "annual_480",
+      "at": "2026-07-24T07:44:16Z",
+      "reason": "dispute"
+     }
+    },
+    {
+     "event_id": "evt_cbQP9L2Rc3OUMw",
+     "source_system": "stripe",
+     "event_type": "charge.dispute.closed",
+     "occurred_at": "2026-09-29T15:36:32Z",
+     "payload": {
+      "id": "evt_cbQP9L2Rc3OUMw",
+      "object": "event",
+      "api_version": "2026-06-30",
+      "type": "charge.dispute.closed",
+      "created": 1790696192,
+      "livemode": false,
+      "data": {
+       "object": {
+        "id": "dp_ESIPLeHw9FWPwW",
+        "object": "dispute",
+        "amount": 48000,
+        "currency": "usd",
+        "charge": "ch_ggf1ZEu2VBw9aQ",
+        "reason": "fraudulent",
+        "status": "lost",
+        "created": 1790696192
+       }
+      }
+     }
+    }
+   ],
+   "rows": {
+    "events": [
+     {
+      "event_id": "story:omar|subevt_RzTcWVYXBYF5Tg",
+      "source_system": "subscriptions",
+      "event_type": "subscription.canceled",
+      "occurred_at": "2026-07-24T07:44:16Z",
+      "payload_json": "{\"subscription_id\":\"sub_O4EXI7Dp6UiwEd\",\"stripe_customer_id\":\"cus_iDTbj4HILjBySE\",\"plan\":\"annual_480\",\"at\":\"2026-07-24T07:44:16Z\",\"reason\":\"dispute\"}",
+      "charge_id": null,
+      "ticket_id": null,
+      "dispute_id": null,
+      "stripe_customer_id": "cus_iDTbj4HILjBySE",
+      "email": null,
+      "scenario_id": "story:omar"
+     },
+     {
+      "event_id": "story:omar|evt_cbQP9L2Rc3OUMw",
+      "source_system": "stripe",
+      "event_type": "charge.dispute.closed",
+      "occurred_at": "2026-09-29T15:36:32Z",
+      "payload_json": "{\"id\":\"evt_cbQP9L2Rc3OUMw\",\"object\":\"event\",\"api_version\":\"2026-06-30\",\"type\":\"charge.dispute.closed\",\"created\":1790696192,\"livemode\":false,\"data\":{\"object\":{\"id\":\"dp_ESIPLeHw9FWPwW\",\"object\":\"dispute\",\"amount\":48000,\"currency\":\"usd\",\"charge\":\"ch_ggf1ZEu2VBw9aQ\",\"reason\":\"fraudulent\",\"status\":\"lost\",\"created\":1790696192}}}",
+      "charge_id": "ch_ggf1ZEu2VBw9aQ",
+      "ticket_id": null,
+      "dispute_id": "dp_ESIPLeHw9FWPwW",
+      "stripe_customer_id": null,
+      "email": null,
+      "scenario_id": "story:omar"
+     }
+    ],
+    "entities": [],
+    "same_as": [],
+    "actors": [],
+    "decisions": [],
+    "contexts": [],
+    "considered": [],
+    "made_by": [],
+    "about": [],
+    "preceded_by": [],
+    "overrides": [],
+    "under_policy": [],
+    "evidenced_by": [
+     {
+      "node_id": "story:omar|out:evt_cbQP9L2Rc3OUMw",
+      "kind": "Outcome",
+      "event_id": "story:omar|evt_cbQP9L2Rc3OUMw"
+     },
+     {
+      "node_id": "story:omar|out:subevt_RzTcWVYXBYF5Tg",
+      "kind": "Outcome",
+      "event_id": "story:omar|subevt_RzTcWVYXBYF5Tg"
+     }
+    ],
+    "outcomes": [
+     {
+      "outcome_id": "story:omar|out:evt_cbQP9L2Rc3OUMw",
+      "outcome_type": "dispute_lost",
+      "occurred_at": "2026-09-29T15:36:32Z",
+      "value_usd": 510.0,
+      "scenario_id": "story:omar"
+     },
+     {
+      "outcome_id": "story:omar|out:subevt_RzTcWVYXBYF5Tg",
+      "outcome_type": "churn",
+      "occurred_at": "2026-07-24T07:44:16Z",
+      "value_usd": null,
+      "scenario_id": "story:omar"
+     }
+    ],
+    "led_to": [
+     {
+      "decision_id": "story:omar|dec:call_EIXhQg3B37RZmH",
+      "outcome_id": "story:omar|out:evt_cbQP9L2Rc3OUMw",
+      "confidence": 1.0,
+      "attribution_method": "EXPLICIT_REF",
+      "window_days": 120
+     },
+     {
+      "decision_id": "story:omar|dec:call_EIXhQg3B37RZmH:evidence",
+      "outcome_id": "story:omar|out:evt_cbQP9L2Rc3OUMw",
+      "confidence": 1.0,
+      "attribution_method": "EXPLICIT_REF",
+      "window_days": 120
+     },
+     {
+      "decision_id": "story:omar|dec:call_EIXhQg3B37RZmH",
+      "outcome_id": "story:omar|out:subevt_RzTcWVYXBYF5Tg",
+      "confidence": 1.0,
+      "attribution_method": "SAME_ENTITY_WINDOW",
+      "window_days": 400
+     }
+    ],
+    "schema_proposals": []
+   }
+  }
+ ],
+ "became": {
+  "scr_GEWYAoZOVvKdUb": [
+   "Decision \u00b7 fraud screen \u00b7 final: approve \u00b7 by FraudGuard rules"
+  ],
+  "evt_po8cvfCeikoFsO": [],
+  "subevt_Tc1EEmlRuvJqcN": [],
+  "evt_nOoEzbxf05aOkx": [
+   "Outcome \u00b7 dispute filed ($480)"
+  ],
+  "call_UoUnJoy3lBB6vb": [],
+  "call_EIXhQg3B37RZmH": [
+   "Decision \u00b7 response \u00b7 final: contest \u00b7 by AI v2",
+   "Decision \u00b7 evidence \u00b7 final: tos acceptance \u00b7 by AI v2"
+  ],
+  "subevt_RzTcWVYXBYF5Tg": [
+   "Outcome \u00b7 churn"
+  ],
+  "evt_cbQP9L2Rc3OUMw": [
+   "Outcome \u00b7 dispute lost ($510)"
+  ]
+ }
+}

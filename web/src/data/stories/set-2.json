@@ -1,0 +1,1166 @@
+{
+ "set": 2,
+ "key": "leo",
+ "scenario_id": "story:leo",
+ "title": "Denied, disputed, lost",
+ "point": "A costly chain across Zendesk, the agent, and Stripe: the Dana pattern, live.",
+ "customer": {
+  "name": "Leo Marsh",
+  "email": "leo.marsh.set2@example.com",
+  "plan": "annual_180",
+  "tenure_months": 26
+ },
+ "phases": [
+  {
+   "name": "events",
+   "events": [
+    {
+     "event_id": "subevt_QzeMFPFcEiTby0",
+     "source_system": "subscriptions",
+     "event_type": "subscription.created",
+     "occurred_at": "2024-04-05T10:00:00Z",
+     "payload": {
+      "subscription_id": "sub_Xo4NDj3y6bAcr7",
+      "stripe_customer_id": "cus_5fADEZdlUY6fZa",
+      "email": "leo.marsh.set2@example.com",
+      "plan": "annual_180",
+      "started_at": "2024-04-05T10:00:00Z"
+     }
+    },
+    {
+     "event_id": "scr_07RsUTPX05y4fS",
+     "source_system": "fraudguard",
+     "event_type": "charge.screened",
+     "occurred_at": "2026-06-05T08:00:58Z",
+     "payload": {
+      "screening_id": "scr_NtHxVMPZoe3Zok",
+      "charge_ref": "ch_cxSSYhFAALg1ZK",
+      "customer_email": "leo.marsh.set2@example.com",
+      "amount": 180.0,
+      "currency": "usd",
+      "plan": "annual_180",
+      "is_renewal": true,
+      "risk_score": 18,
+      "country_match": false,
+      "card_age_days": 622,
+      "decision": "approve",
+      "rule_id": "R-APPROVE-LE75",
+      "screened_at": "2026-06-05T08:00:58Z"
+     }
+    },
+    {
+     "event_id": "evt_YlyqkLVBPsnGg6",
+     "source_system": "stripe",
+     "event_type": "charge.succeeded",
+     "occurred_at": "2026-06-05T08:01:00Z",
+     "payload": {
+      "id": "evt_YlyqkLVBPsnGg6",
+      "object": "event",
+      "api_version": "2026-06-30",
+      "type": "charge.succeeded",
+      "created": 1780646460,
+      "livemode": false,
+      "data": {
+       "object": {
+        "id": "ch_cxSSYhFAALg1ZK",
+        "object": "charge",
+        "amount": 18000,
+        "currency": "usd",
+        "customer": "cus_5fADEZdlUY6fZa",
+        "billing_details": {
+         "email": "leo.marsh.set2@example.com",
+         "name": "Leo Marsh"
+        },
+        "metadata": {
+         "plan": "annual_180",
+         "subscription_id": "sub_Xo4NDj3y6bAcr7"
+        },
+        "status": "succeeded",
+        "created": 1780646460
+       }
+      }
+     }
+    },
+    {
+     "event_id": "zdevt_ACzkBh8bttkJna",
+     "source_system": "zendesk",
+     "event_type": "ticket.created",
+     "occurred_at": "2026-06-09T10:30:00Z",
+     "payload": {
+      "type": "ticket.created",
+      "ticket": {
+       "id": "400001",
+       "subject": "I was charged for a renewal but I haven't used the service a",
+       "description": "I was charged for a renewal but I haven't used the service at all. Can I get a refund?",
+       "requester": {
+        "email": "leo.marsh.set2@example.com",
+        "name": "Leo Marsh"
+       },
+       "via": {
+        "channel": "chat"
+       },
+       "tags": [
+        "didnt_use"
+       ],
+       "status": "new",
+       "custom_fields": [
+        {
+         "id": "stripe_charge_id",
+         "value": "ch_cxSSYhFAALg1ZK"
+        }
+       ],
+       "created_at": "2026-06-09T10:30:00Z"
+      }
+     }
+    },
+    {
+     "event_id": "call_Bvcmd0w0UrRFN6",
+     "source_system": "mcp_gateway",
+     "event_type": "tool_call",
+     "occurred_at": "2026-06-09T10:31:35Z",
+     "payload": {
+      "call_id": "call_Bvcmd0w0UrRFN6",
+      "session_id": "sess_N4zJ7TvJpHg89L",
+      "agent_id": "streamly-support-agent",
+      "agent_version": "v2",
+      "server": "streamly-ops",
+      "tool": "get_customer",
+      "arguments": {
+       "ticket_id": "400001"
+      },
+      "result": {
+       "customer_email": "leo.marsh.set2@example.com",
+       "tenure_months": 26,
+       "plan": "annual_180",
+       "prior_refunds_90d": 0,
+       "subscription_status": "active",
+       "charge_id": "ch_cxSSYhFAALg1ZK",
+       "charge_amount_usd": 180.0
+      },
+      "called_at": "2026-06-09T10:31:35Z"
+     }
+    },
+    {
+     "event_id": "call_Orsx78P5nF7oLx",
+     "source_system": "mcp_gateway",
+     "event_type": "tool_call",
+     "occurred_at": "2026-06-09T10:33:30Z",
+     "payload": {
+      "call_id": "call_Orsx78P5nF7oLx",
+      "session_id": "sess_N4zJ7TvJpHg89L",
+      "agent_id": "streamly-support-agent",
+      "agent_version": "v2",
+      "server": "streamly-ops",
+      "tool": "propose_resolution",
+      "arguments": {
+       "ticket_id": "400001",
+       "option": "deny",
+       "amount_usd": 0.0,
+       "rationale": "Policy does not support a refund for this request; reducing refunds."
+      },
+      "result": {
+       "status": "pending_review"
+      },
+      "called_at": "2026-06-09T10:33:30Z"
+     }
+    },
+    {
+     "event_id": "zdevt_dKe6pVG7l3W2Lp",
+     "source_system": "zendesk",
+     "event_type": "macro.applied",
+     "occurred_at": "2026-06-09T13:36:01Z",
+     "payload": {
+      "type": "macro.applied",
+      "ticket_id": "400001",
+      "macro": {
+       "id": 16031,
+       "title": "Deny refund"
+      },
+      "actor": {
+       "id": "zd_a01",
+       "name": "Amara Chen",
+       "group": "Team A",
+       "role": "agent"
+      },
+      "applied_at": "2026-06-09T13:36:01Z"
+     }
+    },
+    {
+     "event_id": "zdevt_AbdRbBdRTmhaDc",
+     "source_system": "zendesk",
+     "event_type": "ticket.updated",
+     "occurred_at": "2026-06-09T13:39:01Z",
+     "payload": {
+      "type": "ticket.updated",
+      "ticket_id": "400001",
+      "changes": {
+       "status": {
+        "from": "open",
+        "to": "solved"
+       }
+      },
+      "actor": {
+       "id": "zd_a01"
+      },
+      "updated_at": "2026-06-09T13:39:01Z"
+     }
+    },
+    {
+     "event_id": "evt_ZL5AHJrPsFx3MZ",
+     "source_system": "stripe",
+     "event_type": "charge.dispute.created",
+     "occurred_at": "2026-06-22T09:00:00Z",
+     "payload": {
+      "id": "evt_ZL5AHJrPsFx3MZ",
+      "object": "event",
+      "api_version": "2026-06-30",
+      "type": "charge.dispute.created",
+      "created": 1782118800,
+      "livemode": false,
+      "data": {
+       "object": {
+        "id": "dp_u3Q00hF1cWSOSE",
+        "object": "dispute",
+        "amount": 18000,
+        "currency": "usd",
+        "charge": "ch_cxSSYhFAALg1ZK",
+        "reason": "subscription_canceled",
+        "status": "needs_response",
+        "balance_transactions": [
+         {
+          "type": "adjustment",
+          "fee": 1500,
+          "description": "Dispute fee"
+         }
+        ],
+        "created": 1782118800
+       }
+      }
+     }
+    },
+    {
+     "event_id": "call_wJPTX6qc2MGvma",
+     "source_system": "mcp_gateway",
+     "event_type": "tool_call",
+     "occurred_at": "2026-06-24T03:43:57Z",
+     "payload": {
+      "call_id": "call_wJPTX6qc2MGvma",
+      "session_id": "sess_R98ek0HGOuVjD7",
+      "agent_id": "streamly-support-agent",
+      "agent_version": "v2",
+      "server": "streamly-ops",
+      "tool": "get_dispute_evidence",
+      "arguments": {
+       "dispute_id": "dp_u3Q00hF1cWSOSE"
+      },
+      "result": {
+       "dispute_id": "dp_u3Q00hF1cWSOSE",
+       "charge_id": "ch_cxSSYhFAALg1ZK",
+       "category": "subscription_canceled",
+       "amount_usd": 180.0,
+       "customer_email": "leo.marsh.set2@example.com",
+       "customer_tenure_months": 26,
+       "prior_complaint": true,
+       "available_evidence": [
+        "tos_acceptance",
+        "usage_logs",
+        "cancellation_emails"
+       ]
+      },
+      "called_at": "2026-06-24T03:43:57Z"
+     }
+    },
+    {
+     "event_id": "call_sg6C6zNMvTv9bE",
+     "source_system": "mcp_gateway",
+     "event_type": "tool_call",
+     "occurred_at": "2026-06-24T03:48:13Z",
+     "payload": {
+      "call_id": "call_sg6C6zNMvTv9bE",
+      "session_id": "sess_R98ek0HGOuVjD7",
+      "agent_id": "streamly-support-agent",
+      "agent_version": "v2",
+      "server": "streamly-ops",
+      "tool": "respond_to_dispute",
+      "arguments": {
+       "dispute_id": "dp_u3Q00hF1cWSOSE",
+       "action": "contest",
+       "evidence": [
+        "tos_acceptance"
+       ],
+       "rationale": "Contest with available evidence."
+      },
+      "result": {
+       "status": "submitted"
+      },
+      "called_at": "2026-06-24T03:48:13Z"
+     }
+    }
+   ],
+   "rows": {
+    "events": [
+     {
+      "event_id": "story:leo|subevt_QzeMFPFcEiTby0",
+      "source_system": "subscriptions",
+      "event_type": "subscription.created",
+      "occurred_at": "2024-04-05T10:00:00Z",
+      "payload_json": "{\"subscription_id\":\"sub_Xo4NDj3y6bAcr7\",\"stripe_customer_id\":\"cus_5fADEZdlUY6fZa\",\"email\":\"leo.marsh.set2@example.com\",\"plan\":\"annual_180\",\"started_at\":\"2024-04-05T10:00:00Z\"}",
+      "charge_id": null,
+      "ticket_id": null,
+      "dispute_id": null,
+      "stripe_customer_id": "cus_5fADEZdlUY6fZa",
+      "email": "leo.marsh.set2@example.com",
+      "scenario_id": "story:leo"
+     },
+     {
+      "event_id": "story:leo|scr_07RsUTPX05y4fS",
+      "source_system": "fraudguard",
+      "event_type": "charge.screened",
+      "occurred_at": "2026-06-05T08:00:58Z",
+      "payload_json": "{\"screening_id\":\"scr_NtHxVMPZoe3Zok\",\"charge_ref\":\"ch_cxSSYhFAALg1ZK\",\"customer_email\":\"leo.marsh.set2@example.com\",\"amount\":180.0,\"currency\":\"usd\",\"plan\":\"annual_180\",\"is_renewal\":true,\"risk_score\":18,\"country_match\":false,\"card_age_days\":622,\"decision\":\"approve\",\"rule_id\":\"R-APPROVE-LE75\",\"screened_at\":\"2026-06-05T08:00:58Z\"}",
+      "charge_id": "ch_cxSSYhFAALg1ZK",
+      "ticket_id": null,
+      "dispute_id": null,
+      "stripe_customer_id": null,
+      "email": "leo.marsh.set2@example.com",
+      "scenario_id": "story:leo"
+     },
+     {
+      "event_id": "story:leo|evt_YlyqkLVBPsnGg6",
+      "source_system": "stripe",
+      "event_type": "charge.succeeded",
+      "occurred_at": "2026-06-05T08:01:00Z",
+      "payload_json": "{\"id\":\"evt_YlyqkLVBPsnGg6\",\"object\":\"event\",\"api_version\":\"2026-06-30\",\"type\":\"charge.succeeded\",\"created\":1780646460,\"livemode\":false,\"data\":{\"object\":{\"id\":\"ch_cxSSYhFAALg1ZK\",\"object\":\"charge\",\"amount\":18000,\"currency\":\"usd\",\"customer\":\"cus_5fADEZdlUY6fZa\",\"billing_details\":{\"email\":\"leo.marsh.set2@example.com\",\"name\":\"Leo Marsh\"},\"metadata\":{\"plan\":\"annual_180\",\"subscription_id\":\"sub_Xo4NDj3y6bAcr7\"},\"status\":\"succeeded\",\"created\":1780646460}}}",
+      "charge_id": "ch_cxSSYhFAALg1ZK",
+      "ticket_id": null,
+      "dispute_id": null,
+      "stripe_customer_id": "cus_5fADEZdlUY6fZa",
+      "email": "leo.marsh.set2@example.com",
+      "scenario_id": "story:leo"
+     },
+     {
+      "event_id": "story:leo|zdevt_ACzkBh8bttkJna",
+      "source_system": "zendesk",
+      "event_type": "ticket.created",
+      "occurred_at": "2026-06-09T10:30:00Z",
+      "payload_json": "{\"type\":\"ticket.created\",\"ticket\":{\"id\":\"400001\",\"subject\":\"I was charged for a renewal but I haven't used the service a\",\"description\":\"I was charged for a renewal but I haven't used the service at all. Can I get a refund?\",\"requester\":{\"email\":\"leo.marsh.set2@example.com\",\"name\":\"Leo Marsh\"},\"via\":{\"channel\":\"chat\"},\"tags\":[\"didnt_use\"],\"status\":\"new\",\"custom_fields\":[{\"id\":\"stripe_charge_id\",\"value\":\"ch_cxSSYhFAALg1ZK\"}],\"created_at\":\"2026-06-09T10:30:00Z\"}}",
+      "charge_id": "ch_cxSSYhFAALg1ZK",
+      "ticket_id": "400001",
+      "dispute_id": null,
+      "stripe_customer_id": null,
+      "email": "leo.marsh.set2@example.com",
+      "scenario_id": "story:leo"
+     },
+     {
+      "event_id": "story:leo|call_Bvcmd0w0UrRFN6",
+      "source_system": "mcp_gateway",
+      "event_type": "tool_call",
+      "occurred_at": "2026-06-09T10:31:35Z",
+      "payload_json": "{\"call_id\":\"call_Bvcmd0w0UrRFN6\",\"session_id\":\"sess_N4zJ7TvJpHg89L\",\"agent_id\":\"streamly-support-agent\",\"agent_version\":\"v2\",\"server\":\"streamly-ops\",\"tool\":\"get_customer\",\"arguments\":{\"ticket_id\":\"400001\"},\"result\":{\"customer_email\":\"leo.marsh.set2@example.com\",\"tenure_months\":26,\"plan\":\"annual_180\",\"prior_refunds_90d\":0,\"subscription_status\":\"active\",\"charge_id\":\"ch_cxSSYhFAALg1ZK\",\"charge_amount_usd\":180.0},\"called_at\":\"2026-06-09T10:31:35Z\"}",
+      "charge_id": "ch_cxSSYhFAALg1ZK",
+      "ticket_id": "400001",
+      "dispute_id": null,
+      "stripe_customer_id": null,
+      "email": "leo.marsh.set2@example.com",
+      "scenario_id": "story:leo"
+     },
+     {
+      "event_id": "story:leo|call_Orsx78P5nF7oLx",
+      "source_system": "mcp_gateway",
+      "event_type": "tool_call",
+      "occurred_at": "2026-06-09T10:33:30Z",
+      "payload_json": "{\"call_id\":\"call_Orsx78P5nF7oLx\",\"session_id\":\"sess_N4zJ7TvJpHg89L\",\"agent_id\":\"streamly-support-agent\",\"agent_version\":\"v2\",\"server\":\"streamly-ops\",\"tool\":\"propose_resolution\",\"arguments\":{\"ticket_id\":\"400001\",\"option\":\"deny\",\"amount_usd\":0.0,\"rationale\":\"Policy does not support a refund for this request; reducing refunds.\"},\"result\":{\"status\":\"pending_review\"},\"called_at\":\"2026-06-09T10:33:30Z\"}",
+      "charge_id": null,
+      "ticket_id": "400001",
+      "dispute_id": null,
+      "stripe_customer_id": null,
+      "email": null,
+      "scenario_id": "story:leo"
+     },
+     {
+      "event_id": "story:leo|zdevt_dKe6pVG7l3W2Lp",
+      "source_system": "zendesk",
+      "event_type": "macro.applied",
+      "occurred_at": "2026-06-09T13:36:01Z",
+      "payload_json": "{\"type\":\"macro.applied\",\"ticket_id\":\"400001\",\"macro\":{\"id\":16031,\"title\":\"Deny refund\"},\"actor\":{\"id\":\"zd_a01\",\"name\":\"Amara Chen\",\"group\":\"Team A\",\"role\":\"agent\"},\"applied_at\":\"2026-06-09T13:36:01Z\"}",
+      "charge_id": null,
+      "ticket_id": "400001",
+      "dispute_id": null,
+      "stripe_customer_id": null,
+      "email": null,
+      "scenario_id": "story:leo"
+     },
+     {
+      "event_id": "story:leo|zdevt_AbdRbBdRTmhaDc",
+      "source_system": "zendesk",
+      "event_type": "ticket.updated",
+      "occurred_at": "2026-06-09T13:39:01Z",
+      "payload_json": "{\"type\":\"ticket.updated\",\"ticket_id\":\"400001\",\"changes\":{\"status\":{\"from\":\"open\",\"to\":\"solved\"}},\"actor\":{\"id\":\"zd_a01\"},\"updated_at\":\"2026-06-09T13:39:01Z\"}",
+      "charge_id": null,
+      "ticket_id": "400001",
+      "dispute_id": null,
+      "stripe_customer_id": null,
+      "email": null,
+      "scenario_id": "story:leo"
+     },
+     {
+      "event_id": "story:leo|evt_ZL5AHJrPsFx3MZ",
+      "source_system": "stripe",
+      "event_type": "charge.dispute.created",
+      "occurred_at": "2026-06-22T09:00:00Z",
+      "payload_json": "{\"id\":\"evt_ZL5AHJrPsFx3MZ\",\"object\":\"event\",\"api_version\":\"2026-06-30\",\"type\":\"charge.dispute.created\",\"created\":1782118800,\"livemode\":false,\"data\":{\"object\":{\"id\":\"dp_u3Q00hF1cWSOSE\",\"object\":\"dispute\",\"amount\":18000,\"currency\":\"usd\",\"charge\":\"ch_cxSSYhFAALg1ZK\",\"reason\":\"subscription_canceled\",\"status\":\"needs_response\",\"balance_transactions\":[{\"type\":\"adjustment\",\"fee\":1500,\"description\":\"Dispute fee\"}],\"created\":1782118800}}}",
+      "charge_id": "ch_cxSSYhFAALg1ZK",
+      "ticket_id": null,
+      "dispute_id": "dp_u3Q00hF1cWSOSE",
+      "stripe_customer_id": null,
+      "email": null,
+      "scenario_id": "story:leo"
+     },
+     {
+      "event_id": "story:leo|call_wJPTX6qc2MGvma",
+      "source_system": "mcp_gateway",
+      "event_type": "tool_call",
+      "occurred_at": "2026-06-24T03:43:57Z",
+      "payload_json": "{\"call_id\":\"call_wJPTX6qc2MGvma\",\"session_id\":\"sess_R98ek0HGOuVjD7\",\"agent_id\":\"streamly-support-agent\",\"agent_version\":\"v2\",\"server\":\"streamly-ops\",\"tool\":\"get_dispute_evidence\",\"arguments\":{\"dispute_id\":\"dp_u3Q00hF1cWSOSE\"},\"result\":{\"dispute_id\":\"dp_u3Q00hF1cWSOSE\",\"charge_id\":\"ch_cxSSYhFAALg1ZK\",\"category\":\"subscription_canceled\",\"amount_usd\":180.0,\"customer_email\":\"leo.marsh.set2@example.com\",\"customer_tenure_months\":26,\"prior_complaint\":true,\"available_evidence\":[\"tos_acceptance\",\"usage_logs\",\"cancellation_emails\"]},\"called_at\":\"2026-06-24T03:43:57Z\"}",
+      "charge_id": "ch_cxSSYhFAALg1ZK",
+      "ticket_id": null,
+      "dispute_id": "dp_u3Q00hF1cWSOSE",
+      "stripe_customer_id": null,
+      "email": "leo.marsh.set2@example.com",
+      "scenario_id": "story:leo"
+     },
+     {
+      "event_id": "story:leo|call_sg6C6zNMvTv9bE",
+      "source_system": "mcp_gateway",
+      "event_type": "tool_call",
+      "occurred_at": "2026-06-24T03:48:13Z",
+      "payload_json": "{\"call_id\":\"call_sg6C6zNMvTv9bE\",\"session_id\":\"sess_R98ek0HGOuVjD7\",\"agent_id\":\"streamly-support-agent\",\"agent_version\":\"v2\",\"server\":\"streamly-ops\",\"tool\":\"respond_to_dispute\",\"arguments\":{\"dispute_id\":\"dp_u3Q00hF1cWSOSE\",\"action\":\"contest\",\"evidence\":[\"tos_acceptance\"],\"rationale\":\"Contest with available evidence.\"},\"result\":{\"status\":\"submitted\"},\"called_at\":\"2026-06-24T03:48:13Z\"}",
+      "charge_id": null,
+      "ticket_id": null,
+      "dispute_id": "dp_u3Q00hF1cWSOSE",
+      "stripe_customer_id": null,
+      "email": null,
+      "scenario_id": "story:leo"
+     }
+    ],
+    "entities": [
+     {
+      "entity_id": "story:leo|stripe:cus_5fADEZdlUY6fZa",
+      "label": "Customer",
+      "source_system": "stripe",
+      "source_key": "cus_5fADEZdlUY6fZa",
+      "props": {
+       "email": "leo.marsh.set2@example.com",
+       "name": "Leo Marsh"
+      },
+      "scenario_id": "story:leo"
+     },
+     {
+      "entity_id": "story:leo|stripe:ch_cxSSYhFAALg1ZK",
+      "label": "Charge",
+      "source_system": "stripe",
+      "source_key": "ch_cxSSYhFAALg1ZK",
+      "props": {
+       "amount_usd": 180.0,
+       "plan": "annual_180"
+      },
+      "scenario_id": "story:leo"
+     },
+     {
+      "entity_id": "story:leo|zendesk:ticket:400001",
+      "label": "Ticket",
+      "source_system": "zendesk",
+      "source_key": "ticket:400001",
+      "props": {
+       "category": "didnt_use",
+       "channel": "chat",
+       "subject": "I was charged for a renewal but I haven't used the service a"
+      },
+      "scenario_id": "story:leo"
+     },
+     {
+      "entity_id": "story:leo|zendesk:user:leo.marsh.set2@example.com",
+      "label": "Customer",
+      "source_system": "zendesk",
+      "source_key": "user:leo.marsh.set2@example.com",
+      "props": {
+       "email": "leo.marsh.set2@example.com",
+       "name": "Leo Marsh"
+      },
+      "scenario_id": "story:leo"
+     },
+     {
+      "entity_id": "story:leo|stripe:dp_u3Q00hF1cWSOSE",
+      "label": "Dispute",
+      "source_system": "stripe",
+      "source_key": "dp_u3Q00hF1cWSOSE",
+      "props": {
+       "category": "subscription_canceled",
+       "amount_usd": 180.0
+      },
+      "scenario_id": "story:leo"
+     }
+    ],
+    "same_as": [
+     {
+      "from": "story:leo|zendesk:user:leo.marsh.set2@example.com",
+      "to": "story:leo|stripe:cus_5fADEZdlUY6fZa",
+      "confidence": 0.98,
+      "method": "EMAIL"
+     }
+    ],
+    "actors": [
+     {
+      "actor_id": "story:leo|system:fraudguard",
+      "kind": "SYSTEM",
+      "version": "rules-2026.1",
+      "name": "FraudGuard rules",
+      "team": null,
+      "scenario_id": "story:leo"
+     },
+     {
+      "actor_id": "story:leo|agent:streamly-support-agent:v2",
+      "kind": "AI_AGENT",
+      "version": "v2",
+      "name": "Streamly support agent v2",
+      "team": null,
+      "scenario_id": "story:leo"
+     },
+     {
+      "actor_id": "story:leo|zendesk:zd_a01",
+      "kind": "HUMAN",
+      "version": null,
+      "name": "Amara Chen",
+      "team": "Team A",
+      "scenario_id": "story:leo"
+     }
+    ],
+    "decisions": [
+     {
+      "decision_id": "story:leo|dec:scr_07RsUTPX05y4fS",
+      "decision_type": "charge.fraud_screen",
+      "stage": "FINAL",
+      "decided_at": "2026-06-05T08:00:58Z",
+      "detection_method": "RULE",
+      "detection_confidence": 1.0,
+      "source_system": "fraudguard",
+      "scenario_id": "story:leo"
+     },
+     {
+      "decision_id": "story:leo|dec:call_Orsx78P5nF7oLx",
+      "decision_type": "support.complaint_resolution",
+      "stage": "PROPOSAL",
+      "decided_at": "2026-06-09T10:33:30Z",
+      "detection_method": "RULE",
+      "detection_confidence": 1.0,
+      "source_system": "mcp_gateway",
+      "scenario_id": "story:leo"
+     },
+     {
+      "decision_id": "story:leo|dec:zdevt_dKe6pVG7l3W2Lp",
+      "decision_type": "support.complaint_resolution",
+      "stage": "FINAL",
+      "decided_at": "2026-06-09T13:36:01Z",
+      "detection_method": "RULE",
+      "detection_confidence": 1.0,
+      "source_system": "zendesk",
+      "scenario_id": "story:leo"
+     },
+     {
+      "decision_id": "story:leo|dec:call_sg6C6zNMvTv9bE",
+      "decision_type": "dispute.response",
+      "stage": "FINAL",
+      "decided_at": "2026-06-24T03:48:13Z",
+      "detection_method": "RULE",
+      "detection_confidence": 1.0,
+      "source_system": "mcp_gateway",
+      "scenario_id": "story:leo"
+     },
+     {
+      "decision_id": "story:leo|dec:call_sg6C6zNMvTv9bE:evidence",
+      "decision_type": "dispute.evidence",
+      "stage": "FINAL",
+      "decided_at": "2026-06-24T03:48:13Z",
+      "detection_method": "RULE",
+      "detection_confidence": 1.0,
+      "source_system": "mcp_gateway",
+      "scenario_id": "story:leo"
+     }
+    ],
+    "contexts": [
+     {
+      "context_id": "story:leo|ctx:scr_07RsUTPX05y4fS",
+      "decision_id": "story:leo|dec:scr_07RsUTPX05y4fS",
+      "attrs": {
+       "charge.risk_score": 18,
+       "charge.plan": "annual_180",
+       "charge.is_renewal": true,
+       "charge.country_match": false,
+       "charge.card_age_days": 622
+      },
+      "summary_text": "Charge screening: renewal on annual_180, $180, risk score 18, card age 622 days, country does not match.",
+      "scenario_id": "story:leo"
+     },
+     {
+      "context_id": "story:leo|ctx:call_Orsx78P5nF7oLx",
+      "decision_id": "story:leo|dec:call_Orsx78P5nF7oLx",
+      "attrs": {
+       "support.tenure_months": 26,
+       "support.plan": "annual_180",
+       "support.amount_usd": 180.0,
+       "support.complaint_category": "didnt_use",
+       "support.prior_refunds_90d": 0,
+       "support.channel": "chat"
+      },
+      "summary_text": "Complaint (didnt_use) via chat: customer tenure 26 months on annual_180, $180 charge, 0 refunds in last 90 days. AI v2 proposed deny.",
+      "scenario_id": "story:leo"
+     },
+     {
+      "context_id": "story:leo|ctx:zdevt_dKe6pVG7l3W2Lp",
+      "decision_id": "story:leo|dec:zdevt_dKe6pVG7l3W2Lp",
+      "attrs": {
+       "support.tenure_months": 26,
+       "support.plan": "annual_180",
+       "support.amount_usd": 180.0,
+       "support.complaint_category": "didnt_use",
+       "support.prior_refunds_90d": 0,
+       "support.channel": "chat"
+      },
+      "summary_text": "Complaint (didnt_use) via chat: customer tenure 26 months on annual_180, $180 charge, 0 refunds in last 90 days. Team A rep chose deny.",
+      "scenario_id": "story:leo"
+     },
+     {
+      "context_id": "story:leo|ctx:call_sg6C6zNMvTv9bE",
+      "decision_id": "story:leo|dec:call_sg6C6zNMvTv9bE",
+      "attrs": {
+       "dispute.amount_usd": 180.0,
+       "dispute.category": "subscription_canceled",
+       "dispute.tenure_months": 26,
+       "dispute.prior_complaint": true,
+       "dispute.usage_logs_available": true
+      },
+      "summary_text": "Dispute (subscription_canceled), $180, tenure 26 months, after a complaint, usage logs available. AI v2 chose to contest.",
+      "scenario_id": "story:leo"
+     },
+     {
+      "context_id": "story:leo|ctx:call_sg6C6zNMvTv9bE:evidence",
+      "decision_id": "story:leo|dec:call_sg6C6zNMvTv9bE:evidence",
+      "attrs": {
+       "dispute.amount_usd": 180.0,
+       "dispute.category": "subscription_canceled",
+       "dispute.tenure_months": 26,
+       "dispute.prior_complaint": true,
+       "dispute.usage_logs_available": true
+      },
+      "summary_text": "Dispute (subscription_canceled), $180, tenure 26 months, after a complaint, usage logs available. AI v2 submitted evidence: tos_acceptance.",
+      "scenario_id": "story:leo"
+     }
+    ],
+    "considered": [
+     {
+      "decision_id": "story:leo|dec:scr_07RsUTPX05y4fS",
+      "decision_type": "charge.fraud_screen",
+      "option_key": "approve",
+      "status": "CHOSEN",
+      "amount_usd": null
+     },
+     {
+      "decision_id": "story:leo|dec:scr_07RsUTPX05y4fS",
+      "decision_type": "charge.fraud_screen",
+      "option_key": "decline",
+      "status": "AVAILABLE",
+      "amount_usd": null
+     },
+     {
+      "decision_id": "story:leo|dec:scr_07RsUTPX05y4fS",
+      "decision_type": "charge.fraud_screen",
+      "option_key": "review",
+      "status": "AVAILABLE",
+      "amount_usd": null
+     },
+     {
+      "decision_id": "story:leo|dec:call_Orsx78P5nF7oLx",
+      "decision_type": "support.complaint_resolution",
+      "option_key": "deny",
+      "status": "PROPOSED",
+      "amount_usd": 0.0
+     },
+     {
+      "decision_id": "story:leo|dec:call_Orsx78P5nF7oLx",
+      "decision_type": "support.complaint_resolution",
+      "option_key": "full_refund",
+      "status": "AVAILABLE",
+      "amount_usd": null
+     },
+     {
+      "decision_id": "story:leo|dec:call_Orsx78P5nF7oLx",
+      "decision_type": "support.complaint_resolution",
+      "option_key": "partial_refund",
+      "status": "AVAILABLE",
+      "amount_usd": null
+     },
+     {
+      "decision_id": "story:leo|dec:call_Orsx78P5nF7oLx",
+      "decision_type": "support.complaint_resolution",
+      "option_key": "voucher",
+      "status": "AVAILABLE",
+      "amount_usd": null
+     },
+     {
+      "decision_id": "story:leo|dec:zdevt_dKe6pVG7l3W2Lp",
+      "decision_type": "support.complaint_resolution",
+      "option_key": "deny",
+      "status": "CHOSEN",
+      "amount_usd": 0.0
+     },
+     {
+      "decision_id": "story:leo|dec:zdevt_dKe6pVG7l3W2Lp",
+      "decision_type": "support.complaint_resolution",
+      "option_key": "full_refund",
+      "status": "AVAILABLE",
+      "amount_usd": null
+     },
+     {
+      "decision_id": "story:leo|dec:zdevt_dKe6pVG7l3W2Lp",
+      "decision_type": "support.complaint_resolution",
+      "option_key": "partial_refund",
+      "status": "AVAILABLE",
+      "amount_usd": null
+     },
+     {
+      "decision_id": "story:leo|dec:zdevt_dKe6pVG7l3W2Lp",
+      "decision_type": "support.complaint_resolution",
+      "option_key": "voucher",
+      "status": "AVAILABLE",
+      "amount_usd": null
+     },
+     {
+      "decision_id": "story:leo|dec:call_sg6C6zNMvTv9bE",
+      "decision_type": "dispute.response",
+      "option_key": "contest",
+      "status": "CHOSEN",
+      "amount_usd": null
+     },
+     {
+      "decision_id": "story:leo|dec:call_sg6C6zNMvTv9bE",
+      "decision_type": "dispute.response",
+      "option_key": "accept",
+      "status": "AVAILABLE",
+      "amount_usd": null
+     },
+     {
+      "decision_id": "story:leo|dec:call_sg6C6zNMvTv9bE:evidence",
+      "decision_type": "dispute.evidence",
+      "option_key": "tos_acceptance",
+      "status": "CHOSEN",
+      "amount_usd": null
+     },
+     {
+      "decision_id": "story:leo|dec:call_sg6C6zNMvTv9bE:evidence",
+      "decision_type": "dispute.evidence",
+      "option_key": "usage_logs",
+      "status": "AVAILABLE",
+      "amount_usd": null
+     },
+     {
+      "decision_id": "story:leo|dec:call_sg6C6zNMvTv9bE:evidence",
+      "decision_type": "dispute.evidence",
+      "option_key": "cancellation_emails",
+      "status": "AVAILABLE",
+      "amount_usd": null
+     }
+    ],
+    "made_by": [
+     {
+      "decision_id": "story:leo|dec:scr_07RsUTPX05y4fS",
+      "actor_id": "story:leo|system:fraudguard",
+      "role": "DECIDER"
+     },
+     {
+      "decision_id": "story:leo|dec:call_Orsx78P5nF7oLx",
+      "actor_id": "story:leo|agent:streamly-support-agent:v2",
+      "role": "PROPOSER"
+     },
+     {
+      "decision_id": "story:leo|dec:zdevt_dKe6pVG7l3W2Lp",
+      "actor_id": "story:leo|zendesk:zd_a01",
+      "role": "DECIDER"
+     },
+     {
+      "decision_id": "story:leo|dec:call_sg6C6zNMvTv9bE",
+      "actor_id": "story:leo|agent:streamly-support-agent:v2",
+      "role": "DECIDER"
+     },
+     {
+      "decision_id": "story:leo|dec:call_sg6C6zNMvTv9bE:evidence",
+      "actor_id": "story:leo|agent:streamly-support-agent:v2",
+      "role": "DECIDER"
+     }
+    ],
+    "about": [
+     {
+      "decision_id": "story:leo|dec:scr_07RsUTPX05y4fS",
+      "entity_id": "story:leo|stripe:ch_cxSSYhFAALg1ZK"
+     },
+     {
+      "decision_id": "story:leo|dec:scr_07RsUTPX05y4fS",
+      "entity_id": "story:leo|stripe:cus_5fADEZdlUY6fZa"
+     },
+     {
+      "decision_id": "story:leo|dec:call_Orsx78P5nF7oLx",
+      "entity_id": "story:leo|zendesk:ticket:400001"
+     },
+     {
+      "decision_id": "story:leo|dec:call_Orsx78P5nF7oLx",
+      "entity_id": "story:leo|stripe:ch_cxSSYhFAALg1ZK"
+     },
+     {
+      "decision_id": "story:leo|dec:call_Orsx78P5nF7oLx",
+      "entity_id": "story:leo|stripe:cus_5fADEZdlUY6fZa"
+     },
+     {
+      "decision_id": "story:leo|dec:zdevt_dKe6pVG7l3W2Lp",
+      "entity_id": "story:leo|zendesk:ticket:400001"
+     },
+     {
+      "decision_id": "story:leo|dec:zdevt_dKe6pVG7l3W2Lp",
+      "entity_id": "story:leo|stripe:ch_cxSSYhFAALg1ZK"
+     },
+     {
+      "decision_id": "story:leo|dec:zdevt_dKe6pVG7l3W2Lp",
+      "entity_id": "story:leo|stripe:cus_5fADEZdlUY6fZa"
+     },
+     {
+      "decision_id": "story:leo|dec:call_sg6C6zNMvTv9bE",
+      "entity_id": "story:leo|stripe:dp_u3Q00hF1cWSOSE"
+     },
+     {
+      "decision_id": "story:leo|dec:call_sg6C6zNMvTv9bE",
+      "entity_id": "story:leo|stripe:ch_cxSSYhFAALg1ZK"
+     },
+     {
+      "decision_id": "story:leo|dec:call_sg6C6zNMvTv9bE",
+      "entity_id": "story:leo|stripe:cus_5fADEZdlUY6fZa"
+     },
+     {
+      "decision_id": "story:leo|dec:call_sg6C6zNMvTv9bE:evidence",
+      "entity_id": "story:leo|stripe:dp_u3Q00hF1cWSOSE"
+     },
+     {
+      "decision_id": "story:leo|dec:call_sg6C6zNMvTv9bE:evidence",
+      "entity_id": "story:leo|stripe:ch_cxSSYhFAALg1ZK"
+     },
+     {
+      "decision_id": "story:leo|dec:call_sg6C6zNMvTv9bE:evidence",
+      "entity_id": "story:leo|stripe:cus_5fADEZdlUY6fZa"
+     }
+    ],
+    "preceded_by": [
+     {
+      "from": "story:leo|dec:call_Orsx78P5nF7oLx",
+      "to": "story:leo|dec:scr_07RsUTPX05y4fS"
+     },
+     {
+      "from": "story:leo|dec:zdevt_dKe6pVG7l3W2Lp",
+      "to": "story:leo|dec:call_Orsx78P5nF7oLx"
+     },
+     {
+      "from": "story:leo|dec:call_sg6C6zNMvTv9bE",
+      "to": "story:leo|dec:zdevt_dKe6pVG7l3W2Lp"
+     },
+     {
+      "from": "story:leo|dec:call_sg6C6zNMvTv9bE:evidence",
+      "to": "story:leo|dec:call_sg6C6zNMvTv9bE"
+     }
+    ],
+    "overrides": [],
+    "under_policy": [
+     {
+      "decision_id": "story:leo|dec:scr_07RsUTPX05y4fS",
+      "policy_id": "fraud-screening",
+      "version": "2025.1"
+     },
+     {
+      "decision_id": "story:leo|dec:call_Orsx78P5nF7oLx",
+      "policy_id": "streamly-refunds",
+      "version": "2025.1"
+     },
+     {
+      "decision_id": "story:leo|dec:zdevt_dKe6pVG7l3W2Lp",
+      "policy_id": "streamly-refunds",
+      "version": "2025.1"
+     },
+     {
+      "decision_id": "story:leo|dec:call_sg6C6zNMvTv9bE",
+      "policy_id": "streamly-disputes",
+      "version": "2025.1"
+     },
+     {
+      "decision_id": "story:leo|dec:call_sg6C6zNMvTv9bE:evidence",
+      "policy_id": "streamly-disputes",
+      "version": "2025.1"
+     }
+    ],
+    "evidenced_by": [
+     {
+      "node_id": "story:leo|dec:scr_07RsUTPX05y4fS",
+      "kind": "Decision",
+      "event_id": "story:leo|scr_07RsUTPX05y4fS"
+     },
+     {
+      "node_id": "story:leo|dec:call_Orsx78P5nF7oLx",
+      "kind": "Decision",
+      "event_id": "story:leo|zdevt_ACzkBh8bttkJna"
+     },
+     {
+      "node_id": "story:leo|dec:call_Orsx78P5nF7oLx",
+      "kind": "Decision",
+      "event_id": "story:leo|call_Bvcmd0w0UrRFN6"
+     },
+     {
+      "node_id": "story:leo|dec:call_Orsx78P5nF7oLx",
+      "kind": "Decision",
+      "event_id": "story:leo|call_Orsx78P5nF7oLx"
+     },
+     {
+      "node_id": "story:leo|dec:zdevt_dKe6pVG7l3W2Lp",
+      "kind": "Decision",
+      "event_id": "story:leo|zdevt_dKe6pVG7l3W2Lp"
+     },
+     {
+      "node_id": "story:leo|out:evt_ZL5AHJrPsFx3MZ",
+      "kind": "Outcome",
+      "event_id": "story:leo|evt_ZL5AHJrPsFx3MZ"
+     },
+     {
+      "node_id": "story:leo|dec:call_sg6C6zNMvTv9bE",
+      "kind": "Decision",
+      "event_id": "story:leo|evt_ZL5AHJrPsFx3MZ"
+     },
+     {
+      "node_id": "story:leo|dec:call_sg6C6zNMvTv9bE",
+      "kind": "Decision",
+      "event_id": "story:leo|call_wJPTX6qc2MGvma"
+     },
+     {
+      "node_id": "story:leo|dec:call_sg6C6zNMvTv9bE",
+      "kind": "Decision",
+      "event_id": "story:leo|call_sg6C6zNMvTv9bE"
+     },
+     {
+      "node_id": "story:leo|dec:call_sg6C6zNMvTv9bE:evidence",
+      "kind": "Decision",
+      "event_id": "story:leo|call_wJPTX6qc2MGvma"
+     },
+     {
+      "node_id": "story:leo|dec:call_sg6C6zNMvTv9bE:evidence",
+      "kind": "Decision",
+      "event_id": "story:leo|call_sg6C6zNMvTv9bE"
+     }
+    ],
+    "outcomes": [
+     {
+      "outcome_id": "story:leo|out:evt_ZL5AHJrPsFx3MZ",
+      "outcome_type": "dispute_filed",
+      "occurred_at": "2026-06-22T09:00:00Z",
+      "value_usd": 180.0,
+      "scenario_id": "story:leo"
+     }
+    ],
+    "led_to": [
+     {
+      "decision_id": "story:leo|dec:scr_07RsUTPX05y4fS",
+      "outcome_id": "story:leo|out:evt_ZL5AHJrPsFx3MZ",
+      "confidence": 1.0,
+      "attribution_method": "EXPLICIT_REF",
+      "window_days": 60
+     },
+     {
+      "decision_id": "story:leo|dec:zdevt_dKe6pVG7l3W2Lp",
+      "outcome_id": "story:leo|out:evt_ZL5AHJrPsFx3MZ",
+      "confidence": 1.0,
+      "attribution_method": "EXPLICIT_REF",
+      "window_days": 60
+     }
+    ],
+    "schema_proposals": []
+   }
+  },
+  {
+   "name": "60 days later",
+   "events": [
+    {
+     "event_id": "subevt_M3O3zSChKOp1Rk",
+     "source_system": "subscriptions",
+     "event_type": "subscription.canceled",
+     "occurred_at": "2026-07-02T20:21:40Z",
+     "payload": {
+      "subscription_id": "sub_Xo4NDj3y6bAcr7",
+      "stripe_customer_id": "cus_5fADEZdlUY6fZa",
+      "plan": "annual_180",
+      "at": "2026-07-02T20:21:40Z",
+      "reason": "dispute"
+     }
+    },
+    {
+     "event_id": "evt_pOqL8HycGmHcOe",
+     "source_system": "stripe",
+     "event_type": "charge.dispute.closed",
+     "occurred_at": "2026-08-25T00:05:53Z",
+     "payload": {
+      "id": "evt_pOqL8HycGmHcOe",
+      "object": "event",
+      "api_version": "2026-06-30",
+      "type": "charge.dispute.closed",
+      "created": 1787616353,
+      "livemode": false,
+      "data": {
+       "object": {
+        "id": "dp_u3Q00hF1cWSOSE",
+        "object": "dispute",
+        "amount": 18000,
+        "currency": "usd",
+        "charge": "ch_cxSSYhFAALg1ZK",
+        "reason": "subscription_canceled",
+        "status": "lost",
+        "created": 1787616353
+       }
+      }
+     }
+    }
+   ],
+   "rows": {
+    "events": [
+     {
+      "event_id": "story:leo|subevt_M3O3zSChKOp1Rk",
+      "source_system": "subscriptions",
+      "event_type": "subscription.canceled",
+      "occurred_at": "2026-07-02T20:21:40Z",
+      "payload_json": "{\"subscription_id\":\"sub_Xo4NDj3y6bAcr7\",\"stripe_customer_id\":\"cus_5fADEZdlUY6fZa\",\"plan\":\"annual_180\",\"at\":\"2026-07-02T20:21:40Z\",\"reason\":\"dispute\"}",
+      "charge_id": null,
+      "ticket_id": null,
+      "dispute_id": null,
+      "stripe_customer_id": "cus_5fADEZdlUY6fZa",
+      "email": null,
+      "scenario_id": "story:leo"
+     },
+     {
+      "event_id": "story:leo|evt_pOqL8HycGmHcOe",
+      "source_system": "stripe",
+      "event_type": "charge.dispute.closed",
+      "occurred_at": "2026-08-25T00:05:53Z",
+      "payload_json": "{\"id\":\"evt_pOqL8HycGmHcOe\",\"object\":\"event\",\"api_version\":\"2026-06-30\",\"type\":\"charge.dispute.closed\",\"created\":1787616353,\"livemode\":false,\"data\":{\"object\":{\"id\":\"dp_u3Q00hF1cWSOSE\",\"object\":\"dispute\",\"amount\":18000,\"currency\":\"usd\",\"charge\":\"ch_cxSSYhFAALg1ZK\",\"reason\":\"subscription_canceled\",\"status\":\"lost\",\"created\":1787616353}}}",
+      "charge_id": "ch_cxSSYhFAALg1ZK",
+      "ticket_id": null,
+      "dispute_id": "dp_u3Q00hF1cWSOSE",
+      "stripe_customer_id": null,
+      "email": null,
+      "scenario_id": "story:leo"
+     }
+    ],
+    "entities": [],
+    "same_as": [],
+    "actors": [],
+    "decisions": [],
+    "contexts": [],
+    "considered": [],
+    "made_by": [],
+    "about": [],
+    "preceded_by": [],
+    "overrides": [],
+    "under_policy": [],
+    "evidenced_by": [
+     {
+      "node_id": "story:leo|out:evt_pOqL8HycGmHcOe",
+      "kind": "Outcome",
+      "event_id": "story:leo|evt_pOqL8HycGmHcOe"
+     },
+     {
+      "node_id": "story:leo|out:subevt_M3O3zSChKOp1Rk",
+      "kind": "Outcome",
+      "event_id": "story:leo|subevt_M3O3zSChKOp1Rk"
+     }
+    ],
+    "outcomes": [
+     {
+      "outcome_id": "story:leo|out:evt_pOqL8HycGmHcOe",
+      "outcome_type": "dispute_lost",
+      "occurred_at": "2026-08-25T00:05:53Z",
+      "value_usd": 210.0,
+      "scenario_id": "story:leo"
+     },
+     {
+      "outcome_id": "story:leo|out:subevt_M3O3zSChKOp1Rk",
+      "outcome_type": "churn",
+      "occurred_at": "2026-07-02T20:21:40Z",
+      "value_usd": null,
+      "scenario_id": "story:leo"
+     }
+    ],
+    "led_to": [
+     {
+      "decision_id": "story:leo|dec:call_sg6C6zNMvTv9bE",
+      "outcome_id": "story:leo|out:evt_pOqL8HycGmHcOe",
+      "confidence": 1.0,
+      "attribution_method": "EXPLICIT_REF",
+      "window_days": 120
+     },
+     {
+      "decision_id": "story:leo|dec:call_sg6C6zNMvTv9bE:evidence",
+      "outcome_id": "story:leo|out:evt_pOqL8HycGmHcOe",
+      "confidence": 1.0,
+      "attribution_method": "EXPLICIT_REF",
+      "window_days": 120
+     },
+     {
+      "decision_id": "story:leo|dec:zdevt_dKe6pVG7l3W2Lp",
+      "outcome_id": "story:leo|out:subevt_M3O3zSChKOp1Rk",
+      "confidence": 0.6,
+      "attribution_method": "SAME_ENTITY_WINDOW",
+      "window_days": 400
+     },
+     {
+      "decision_id": "story:leo|dec:call_sg6C6zNMvTv9bE",
+      "outcome_id": "story:leo|out:subevt_M3O3zSChKOp1Rk",
+      "confidence": 0.6,
+      "attribution_method": "SAME_ENTITY_WINDOW",
+      "window_days": 400
+     }
+    ],
+    "schema_proposals": []
+   }
+  }
+ ],
+ "became": {
+  "subevt_QzeMFPFcEiTby0": [],
+  "scr_07RsUTPX05y4fS": [
+   "Decision \u00b7 fraud screen \u00b7 final: approve \u00b7 by FraudGuard rules"
+  ],
+  "evt_YlyqkLVBPsnGg6": [],
+  "zdevt_ACzkBh8bttkJna": [
+   "Identity \u00b7 Zendesk requester SAME_AS Stripe customer (email match)"
+  ],
+  "call_Bvcmd0w0UrRFN6": [],
+  "call_Orsx78P5nF7oLx": [
+   "Decision \u00b7 complaint resolution \u00b7 proposal: deny \u00b7 by AI v2"
+  ],
+  "zdevt_dKe6pVG7l3W2Lp": [
+   "Decision \u00b7 complaint resolution \u00b7 final: deny \u00b7 by Amara Chen (Team A)"
+  ],
+  "zdevt_AbdRbBdRTmhaDc": [],
+  "evt_ZL5AHJrPsFx3MZ": [
+   "Outcome \u00b7 dispute filed ($180)"
+  ],
+  "call_wJPTX6qc2MGvma": [],
+  "call_sg6C6zNMvTv9bE": [
+   "Decision \u00b7 response \u00b7 final: contest \u00b7 by AI v2",
+   "Decision \u00b7 evidence \u00b7 final: tos acceptance \u00b7 by AI v2"
+  ],
+  "subevt_M3O3zSChKOp1Rk": [
+   "Outcome \u00b7 churn"
+  ],
+  "evt_pOqL8HycGmHcOe": [
+   "Outcome \u00b7 dispute lost ($210)"
+  ]
+ }
+}
