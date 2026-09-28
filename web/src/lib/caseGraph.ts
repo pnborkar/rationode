@@ -50,5 +50,72 @@ export async function customerGraph(email: string) {
       rels.push({ id: `${d.id}->${o.id}`, from: d.id, to: o.id, type: "LED_TO" });
     }
   }
+  await addPolicyGap(email, nodes, rels);
   return { nodes, rels };
+}
+
+// When a customer's fraud screening went against the written policy (e.g. Omar: the tool approved a
+// risk-70 signup under rule R-APPROVE-LE75 while the policy says "review 60 and above"), draw why:
+// the signals, the rule, the policy branch with a POLICY_GAP link, and past decisions in the same gap.
+async function addPolicyGap(email: string, nodes: GraphNode[], rels: GraphRel[]) {
+  const [g] = await query<{
+    decision: string; chosen: string; risk: number; card_age: number; country: boolean; payload: string;
+    policy: string | null; branch: string | null; policy_option: string | null; point: string | null;
+  }>(
+    `MATCH (:Customer:Entity {source_system: 'stripe', email: $email})<-[:ABOUT]-(d:Decision {decision_type: 'charge.fraud_screen'})
+     MATCH (d)-[:HAD_CONTEXT]->(c:Context), (d)-[:CONSIDERED {status: 'CHOSEN'}]->(o:Option), (d)-[:EVIDENCED_BY]->(e:Event)
+     MATCH (d)-[:AT_POINT]->(p:DecisionPoint {tree_id: 'tree:charge.fraud_screen:policy:policy'})
+     OPTIONAL MATCH (d)-[:UNDER_POLICY]->(pol:Policy)
+     OPTIONAL MATCH (t:DecisionTree {tree_id: p.tree_id})
+     WITH d, c, o, e, p, pol, t WHERE p.policy_option <> o.option_key
+     RETURN d.decision_id AS decision, o.option_key AS chosen, c.\`charge.risk_score\` AS risk,
+            c.\`charge.card_age_days\` AS card_age, c.\`charge.country_match\` AS country, e.payload_json AS payload,
+            t.policy_text AS policy, p.path_label AS branch, p.policy_option AS policy_option, p.point_id AS point
+     LIMIT 1`,
+    { email },
+  );
+  if (!g) return;
+  const rule = (JSON.parse(g.payload) as { rule_id?: string }).rule_id ?? "rule";
+  const [pattern] = await query<{ n: number; disputed: number }>(
+    `MATCH (h:Decision {scenario_id: 'history'})-[:AT_POINT]->(:DecisionPoint {point_id: $point})
+     MATCH (h)-[:CONSIDERED {status: 'CHOSEN'}]->(:Option {option_key: $chosen})
+     WITH h, EXISTS { (h)-[:LED_TO]->(:Outcome {outcome_type: 'dispute_filed'}) } AS disputed
+     RETURN count(h) AS n, sum(CASE WHEN disputed THEN 1 ELSE 0 END) AS disputed`,
+    { point: g.point, chosen: g.chosen },
+  );
+  const sample = await query<{ id: string; outcomes: string[]; risk: number }>(
+    `MATCH (h:Decision {scenario_id: 'history'})-[:AT_POINT]->(:DecisionPoint {point_id: $point})
+     MATCH (h)-[:CONSIDERED {status: 'CHOSEN'}]->(:Option {option_key: $chosen})
+     MATCH (h)-[:LED_TO]->(:Outcome {outcome_type: 'dispute_filed'})
+     MATCH (h)-[:HAD_CONTEXT]->(c:Context)
+     OPTIONAL MATCH (h)-[:LED_TO]->(o:Outcome)
+     RETURN h.decision_id AS id, collect(DISTINCT o.outcome_type) AS outcomes, c.\`charge.risk_score\` AS risk
+     ORDER BY abs(c.\`charge.risk_score\` - $risk), id LIMIT 10`,
+    { point: g.point, chosen: g.chosen, risk: g.risk },
+  );
+
+  const id = (k: string) => `${g.decision}~${k}`;
+  nodes.push(
+    { id: id("signals"), kind: "signals", label: `Risk ${g.risk}`,
+      detail: `risk score ${g.risk} · card ${g.card_age} days old · card country ${g.country ? "matches" : "does not match"}` },
+    { id: id("rule"), kind: "rule", label: rule, detail: `fraud tool rule that fired: ${g.chosen}` },
+    { id: id("policy"), kind: "policy", label: `Policy: ${g.policy_option}`,
+      detail: `${g.policy ?? ""} Branch: ${g.branch}` },
+  );
+  rels.push(
+    { id: `${g.decision}->signals`, from: g.decision, to: id("signals"), type: "HAD_CONTEXT" },
+    { id: `${g.decision}->rule`, from: g.decision, to: id("rule"), type: "FIRED" },
+    { id: `${g.decision}->policy`, from: g.decision, to: id("policy"), type: "POLICY_GAP" },
+  );
+  if (pattern && sample.length) {
+    const rate = pattern.n ? Math.round((pattern.disputed / pattern.n) * 1000) / 10 : 0;
+    nodes.push({ id: id("pattern"), kind: "pattern", label: `${pattern.n.toLocaleString()} like this`,
+                 detail: `${pattern.n.toLocaleString()} past ${g.chosen} decisions in the same branch; ${pattern.disputed} (${rate}%) led to disputes` });
+    rels.push({ id: `${g.decision}->pattern`, from: id("policy"), to: id("pattern"), type: "SAME_GAP" });
+    for (const h of sample) {
+      nodes.push({ id: h.id, kind: "precedent", label: "past decision", option: g.chosen, outcomes: h.outcomes,
+                   detail: `risk ${h.risk} · ${h.id}` });
+      rels.push({ id: `${id("pattern")}->${h.id}`, from: id("pattern"), to: h.id, type: "INCLUDES" });
+    }
+  }
 }
