@@ -26,9 +26,11 @@ function server() {
     inputSchema: {
       decision_type: z.enum(DECISION_TYPES),
       context: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])),
+      customer_email: z.string().optional(),
     },
     annotations: { readOnlyHint: true },
-  }, async ({ decision_type, context }) => asText(await checkBeforeAct(decision_type, context as Context)));
+  }, async ({ decision_type, context, customer_email }) =>
+    asText(await checkBeforeAct(decision_type, context as Context, 150, customer_email)));
 
   mcp.registerTool("find_precedent", {
     title: "Find precedent",

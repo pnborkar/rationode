@@ -18,6 +18,11 @@ type WhatIf = { action: string; branch: string; support: number; dispute_rate: n
 type Precedent = {
   similar_decisions: number; search: string; options: Option[]; what_if: WhatIf[];
   neighbours: { decision_id: string; score: number; option: string | null; outcomes: string[] }[];
+  usage_link?: {
+    basis: string;
+    dispute_precedent: { question: string; disputes: number; win_rate: number | null };
+    if_denied: { dispute_rate: number | null; cost_if_disputed: number; expected_dispute_cost: number; assumes: string } | null;
+  } | null;
 };
 type Proposal = { ticket_id: string; option: string; amount_usd: number; rationale: string };
 type Usage = {
@@ -124,6 +129,22 @@ function StepCard({ step }: { step: Step }) {
             </div>
           ))}
         </div>
+        {p.usage_link && (
+          <div className="mt-3 rounded-md border border-teal-800 bg-teal-950/40 p-2 text-xs">
+            <p className="text-teal-300">Linked with viewing · customer {p.usage_link.basis}</p>
+            <p className="mt-1">
+              {p.usage_link.dispute_precedent.question}: <b>won {pct(p.usage_link.dispute_precedent.win_rate)}</b>
+              <span className="text-zinc-500"> ({p.usage_link.dispute_precedent.disputes} disputes)</span>
+            </p>
+            {p.usage_link.if_denied && (
+              <p className="mt-1">
+                If denied: {pct(p.usage_link.if_denied.dispute_rate)} dispute chance × ${p.usage_link.if_denied.cost_if_disputed} if
+                disputed = <b>${p.usage_link.if_denied.expected_dispute_cost} expected</b>
+                <span className="text-zinc-500"> ({p.usage_link.if_denied.assumes})</span>
+              </p>
+            )}
+          </div>
+        )}
         <p className="mt-3 text-xs text-zinc-500">What-if, through the learned outcome tree</p>
         <ul className="mt-1 space-y-1 text-xs">
           {p.what_if.map((w) => (

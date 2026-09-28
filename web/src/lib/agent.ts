@@ -44,6 +44,7 @@ How to work:
 const GetCustomer = z.object({ email: z.string() });
 const CheckBeforeAct = z.object({
   decision_type: z.literal("support.complaint_resolution"),
+  customer_email: z.string().optional(),
   context: z.object({
     "support.tenure_months": z.number(),
     "support.plan": z.string(),
@@ -80,12 +81,14 @@ const TOOLS: Record<string, Anthropic.Beta.BetaTool> = {
     description:
       "Before deciding, ask Rationode's decision graph what happened in similar past cases: the options chosen, " +
       "and the dispute, churn, and cost outcomes that followed, plus a what-if for each possible option. " +
-      "Pass the case context using these attribute names.",
+      "Pass the case context using these attribute names, and the customer's email so the graph can link their " +
+      "viewing to how disputes like theirs have ended (usage_link).",
     eager_input_streaming: true,
     input_schema: {
       type: "object",
       properties: {
         decision_type: { type: "string", enum: ["support.complaint_resolution"] },
+        customer_email: { type: "string" },
         context: {
           type: "object",
           properties: {
@@ -138,7 +141,7 @@ async function runTool(name: string, input: unknown): Promise<ToolRun> {
   if (name === "check_before_act") {
     const p = CheckBeforeAct.safeParse(input);
     if (!p.success) return { result: { INVALID_INPUT: p.error.message }, is_error: true };
-    return { result: await checkBeforeAct(p.data.decision_type, p.data.context as Context) };
+    return { result: await checkBeforeAct(p.data.decision_type, p.data.context as Context, 150, p.data.customer_email) };
   }
   if (name === "propose_resolution") {
     const p = ProposeResolution.safeParse(input);

@@ -1,5 +1,6 @@
 // Port of pipeline/src/rationode/analytics/precedent.py (check_before_act).
 import liveEmbeddings from "../data/live-embeddings.json";
+import { checkUsage } from "./customer";
 import { contextText, encode, type Context } from "./features";
 import { query, SCENARIO } from "./neo4j";
 
@@ -88,7 +89,48 @@ export async function whatIf(decisionType: string, ctx: Context) {
   return out;
 }
 
-export async function checkBeforeAct(decisionType: string, context: Context, k = 150) {
+// Link the customer's viewing to the dispute precedent in the graph: if they kept watching after the charge,
+// how do "I canceled" disputes end when usage logs are submitted? If they didn't, how do they end without?
+// Gives the expected cost of a dispute if the request is denied.
+async function linkUsage(email: string, whatIfs: { action: string; dispute_rate: number | null }[]) {
+  const usage = await checkUsage(email);
+  if (!usage || !usage.usage_data) return null;
+  const watched = usage.hours_since_charge > 0;
+  const [p] = await query<{ n: number; won: number }>(
+    `MATCH (d:Decision {decision_type: 'dispute.evidence'})-[:HAD_CONTEXT]->(c:Context {\`dispute.category\`: 'subscription_canceled'})
+     WHERE (d.scenario_id = 'history' OR d.scenario_id STARTS WITH 'story:')
+       AND c.\`dispute.usage_logs_available\` = $watched
+     WITH d, EXISTS { (d)-[:CONSIDERED {status: 'CHOSEN'}]->(:Option {option_key: 'usage_logs'}) } AS sent
+     WHERE sent = $watched
+     MATCH (d)-[:LED_TO]->(o:Outcome) WHERE o.outcome_type IN ['dispute_won', 'dispute_lost']
+     RETURN count(o) AS n, sum(CASE o.outcome_type WHEN 'dispute_won' THEN 1 ELSE 0 END) AS won`,
+    { watched },
+  );
+  const winRate = p && p.n ? Math.round((p.won / p.n) * 1000) / 1000 : null;
+  const deny = whatIfs.find((w) => w.action === "deny");
+  const amount = usage.latest_charge.amount_usd;
+  const disputeCost = winRate == null ? null : Math.round((winRate * 15 + (1 - winRate) * (amount + 30)) * 100) / 100;
+  return {
+    basis: watched
+      ? `kept watching after the charge (${usage.hours_since_charge} h across ${usage.weeks_since_charge} weeks)`
+      : "no viewing after the charge",
+    dispute_precedent: {
+      question: watched
+        ? "'I canceled' disputes from customers who kept using the service, contested with usage logs"
+        : "'I canceled' disputes from customers with no usage to show",
+      disputes: p?.n ?? 0,
+      win_rate: winRate,
+    },
+    if_denied: deny && disputeCost != null ? {
+      dispute_rate: deny.dispute_rate,
+      cost_if_disputed: disputeCost,
+      expected_dispute_cost: Math.round((deny.dispute_rate ?? 0) * disputeCost * 100) / 100,
+      assumes: watched ? "usage logs are submitted if a dispute is filed" : "no usage logs can be submitted",
+    } : null,
+  };
+}
+
+export async function checkBeforeAct(decisionType: string, context: Context, k = 150, customerEmail?: string) {
   const text = contextText(decisionType, context);
   const vector = EMBEDDINGS[text];
   const features = await encode(decisionType, context);
@@ -150,6 +192,7 @@ export async function checkBeforeAct(decisionType: string, context: Context, k =
       avg_cost: Math.round((rows.reduce((s, r) => s + r.cost, 0) / rows.length) * 100) / 100,
     }));
 
+  const whatIfs = await whatIf(decisionType, context);
   return {
     decision_type: decisionType,
     case: text,
@@ -169,6 +212,8 @@ export async function checkBeforeAct(decisionType: string, context: Context, k =
     examples: scored.slice(0, 3).map((c) => ({
       decision_id: c.id, score: Math.round(c.score * 1000) / 1000, context: contextText(decisionType, c.ctx),
     })),
-    what_if: await whatIf(decisionType, context),
+    what_if: whatIfs,
+    usage_link: customerEmail && decisionType === "support.complaint_resolution"
+      ? await linkUsage(customerEmail, whatIfs) : null,
   };
 }
