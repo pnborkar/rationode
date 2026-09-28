@@ -5,6 +5,7 @@
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import type { ViewNode, ViewRel } from "@/components/GraphView";
+import { LIVE_CASES } from "@/lib/liveCases";
 
 const GraphView = dynamic(() => import("@/components/GraphView"), { ssr: false });
 const GraphTable = dynamic(() => import("@/components/GraphTable"), { ssr: false });
@@ -22,12 +23,8 @@ type Step =
   | { kind: "precedent"; data: Precedent }
   | { kind: "proposal"; data: Proposal };
 
-const SAM = { name: "Sam Okafor", email: "sam.okafor26002@example.com" };
-const TICKET = "500001";
 const REP = { name: "Maya Chen", team: "Team A" };
 const OPTIONS = ["full_refund", "partial_refund", "voucher", "deny", "pause_subscription"];
-const DEFAULT_MESSAGE =
-  "Hi, I was charged $180 for my annual renewal but I haven't used Streamly at all this year. Can I get a refund?";
 
 const pct = (v: number | null | undefined) => (v == null ? "—" : `${Math.round(v * 100)}%`);
 const words = (s: string) => s.replaceAll("_", " ");
@@ -107,8 +104,11 @@ function StepCard({ step }: { step: Step }) {
 }
 
 export default function StreamlyLive() {
+  const [caseKey, setCaseKey] = useState(LIVE_CASES[0].key);
+  const current = LIVE_CASES.find((c) => c.key === caseKey)!;
+  const TICKET = current.ticket_id;
   const [graphOn, setGraphOn] = useState(true);
-  const [message, setMessage] = useState(DEFAULT_MESSAGE);
+  const [message, setMessage] = useState(LIVE_CASES[0].message);
   const [chat, setChat] = useState<{ from: "sam" | "agent"; text: string }[]>([]);
   const [thinking, setThinking] = useState("");
   const [steps, setSteps] = useState<Step[]>([]);
@@ -128,19 +128,27 @@ export default function StreamlyLive() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  // Sam's existing neighbourhood in the graph (charges, past decisions), read from AuraDB.
+  // The customer's existing neighbourhood in the graph (charges, past decisions), read from AuraDB.
   useEffect(() => {
     let alive = true;
-    fetch(`/api/graph/customer?email=${encodeURIComponent(SAM.email)}`)
+    fetch(`/api/graph/customer?email=${encodeURIComponent(current.email)}`)
       .then((res) => (res.ok ? res.json() : null))
       .then((graph) => { if (alive && graph) setBase(graph); });
     return () => { alive = false; };
-  }, []);
+  }, [current.email]);
 
   const customerId = base.nodes.find((n) => n.kind === "customer")?.id;
   const addLive = (nodes: ViewNode[], rels: ViewRel[]) =>
     setLive((g) => ({ nodes: [...g.nodes, ...nodes.filter((n) => !g.nodes.some((x) => x.id === n.id))],
                       rels: [...g.rels, ...rels.filter((r) => !g.rels.some((x) => x.id === r.id))] }));
+
+  function pickCase(key: string) {
+    const next = LIVE_CASES.find((c) => c.key === key)!;
+    setCaseKey(key);
+    setMessage(next.message);
+    setBase({ nodes: [], rels: [] });
+    reset();
+  }
 
   function reset() {
     setChat([]); setThinking(""); setSteps([]); setProposal(null); setFinal(null);
@@ -152,12 +160,12 @@ export default function StreamlyLive() {
     setRunning(true);
     setChat([{ from: "sam", text: message }]);
     const caseId = `case:${TICKET}`;
-    addLive([{ id: caseId, kind: "case", label: "Sam's complaint", live: true }], []);
+    addLive([{ id: caseId, kind: "case", label: `${current.name.split(" ")[0]}'s complaint`, live: true }], []);
 
     const res = await fetch("/api/agent", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ ticket_id: TICKET, customer_email: SAM.email, channel: "chat", message, graph: graphOn }),
+      body: JSON.stringify({ ticket_id: TICKET, customer_email: current.email, channel: "chat", message, graph: graphOn }),
     });
     const reader = res.body!.getReader();
     const decoder = new TextDecoder();
@@ -262,8 +270,13 @@ export default function StreamlyLive() {
       </header>
 
       <div className="grid min-h-0 flex-1 grid-cols-2 grid-rows-2 gap-3">
-        <Panel title="Streamly help chat" badge={<span className="text-xs text-zinc-500">{SAM.name}</span>}>
+        <Panel title="Streamly help chat" badge={
+          <select value={caseKey} onChange={(e) => pickCase(e.target.value)} disabled={running}
+                  className="rounded-md border border-zinc-700 bg-zinc-950 px-2 py-0.5 text-xs text-zinc-200">
+            {LIVE_CASES.map((c) => <option key={c.key} value={c.key}>{c.name}</option>)}
+          </select>}>
           <div className="flex h-full flex-col">
+            <p className="mb-3 rounded-md bg-zinc-950/60 px-3 py-2 text-xs text-zinc-400">{current.blurb}</p>
             <div className="flex-1 space-y-3">
               {chat.map((m, i) => (
                 <div key={i} className={`max-w-[85%] rounded-2xl px-4 py-2 text-sm ${
@@ -292,7 +305,7 @@ export default function StreamlyLive() {
               <p className="text-xs text-zinc-500">Decision graph off: the agent has only its instructions.</p>
             )}
             {steps.map((s, i) => <StepCard key={i} step={s} />)}
-            {!steps.length && !running && <p className="text-sm text-zinc-500">Send Sam&apos;s message to start.</p>}
+            {!steps.length && !running && <p className="text-sm text-zinc-500">Send {current.name.split(" ")[0]}&apos;s message to start.</p>}
           </div>
         </Panel>
 
