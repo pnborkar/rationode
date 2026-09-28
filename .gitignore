@@ -20,3 +20,6 @@ research/
 research\ /
 Research/
 Research*.pdf
+
+# Internal planning docs
+rationode-demo-spec.md
