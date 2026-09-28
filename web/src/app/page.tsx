@@ -202,7 +202,8 @@ export default function StreamlyLive() {
           const p = e as unknown as Proposal;
           setProposal(p);
           setSteps((s) => [...s, { kind: "proposal", data: p }]);
-          addLive([{ id: `proposal:${TICKET}`, kind: "proposal", label: `AI proposal\n${words(p.option)}`, live: true }],
+          addLive([{ id: `proposal:${TICKET}`, kind: "proposal", label: `AI: ${words(p.option)}`, option: p.option,
+                     detail: `AI proposal · $${p.amount_usd}`, live: true }],
                   [{ id: `${caseId}->proposal`, from: caseId, to: `proposal:${TICKET}`, type: "PROPOSED" }]);
         }
       }
@@ -215,7 +216,9 @@ export default function StreamlyLive() {
     const overridden = option !== proposal.option;
     setFinal({ option, overridden });
     const finalId = `final:${TICKET}`;
-    addLive([{ id: finalId, kind: "final", label: `${REP.name}\n${words(option)}`, live: true }],
+    addLive([{ id: finalId, kind: "final", label: words(option).replace(/^./, (c) => c.toUpperCase()), option,
+               detail: `${overridden ? "overrode the AI proposal" : "approved the AI proposal"} · ${REP.name} (${REP.team})`,
+               live: true }],
             [{ id: `${finalId}->proposal`, from: finalId, to: `proposal:${TICKET}`, type: overridden ? "OVERRIDES" : "APPROVED" }]);
   }
 
@@ -321,15 +324,21 @@ export default function StreamlyLive() {
                 <p className="mt-1 text-zinc-400">{proposal.rationale}</p>
               </div>
               {final ? (
-                <p className={`rounded-lg p-3 ${final.overridden ? "bg-red-950 text-red-200" : "bg-emerald-950 text-emerald-200"}`}>
-                  {final.overridden ? `Overridden → ${words(final.option)}` : "Approved"} by {REP.name}.
-                  Shown in the graph view{final.overridden ? ", linked to the AI proposal it overrides" : ""}
-                  <span className="opacity-60"> (written to Neo4j once the live pipeline is connected)</span>.
-                </p>
+                <div className={`space-y-1 rounded-lg p-3 ${final.overridden ? "bg-red-950 text-red-100" : "bg-emerald-950 text-emerald-100"}`}>
+                  <p className="text-lg font-semibold">Decision: {words(final.option).replace(/^./, (c) => c.toUpperCase())}</p>
+                  <p>
+                    Approved AI proposal: <b>{final.overridden ? "No" : "Yes"}</b>
+                    {final.overridden && <> · the AI proposed {words(proposal.option)}</>} · by {REP.name}
+                  </p>
+                  <p className="text-xs opacity-60">
+                    Shown in the graph view{final.overridden ? ", linked to the AI proposal it overrides" : ""}
+                    {" "}(written to Neo4j once the live pipeline is connected).
+                  </p>
+                </div>
               ) : (
                 <div className="flex flex-wrap items-center gap-2">
                   <button onClick={() => decide(proposal.option)}
-                          className="rounded-lg bg-emerald-600 px-4 py-2 font-semibold">Approve</button>
+                          className="rounded-lg bg-emerald-600 px-4 py-2 font-semibold">Approve AI proposal</button>
                   <span className="text-zinc-500">or</span>
                   <select value={overrideTo} onChange={(e) => setOverrideTo(e.target.value)}
                           className="rounded-lg border border-zinc-700 bg-zinc-950 px-2 py-2">

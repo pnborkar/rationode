@@ -28,8 +28,10 @@ function toNvl(n: ViewNode): Node {
   return {
     id: n.id,
     caption,
-    color: isDecision ? decisionColor(n.outcomes) : (KIND_COLOR[n.kind] ?? "#94a3b8"),
-    size: n.kind === "customer" ? 38 : n.kind === "case" || n.kind === "proposal" || n.kind === "final" ? 32
+    color: isDecision ? decisionColor(n.outcomes)
+      : n.kind === "outcome" ? (n.label === "renewal" ? "#22c55e" : "#f87171")
+      : (KIND_COLOR[n.kind] ?? "#94a3b8"),
+    size: n.kind === "customer" ? 38 : n.kind === "proposal" || n.kind === "final" ? 42 : n.kind === "case" ? 34
       : n.kind === "precedent" ? 28 : 28,
     captionSize: 3,
     selected: n.live,
