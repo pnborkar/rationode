@@ -9,8 +9,9 @@ export async function findPrecedent(text: string, decisionType?: string, limit =
   if (!terms) return [];
   return query(
     `CALL db.index.fulltext.queryNodes('context_text', $terms) YIELD node AS c, score
-     MATCH (d:Decision {stage: 'FINAL', scenario_id: $scenario})-[:HAD_CONTEXT]->(c)
-     WHERE $type IS NULL OR d.decision_type = $type
+     MATCH (d:Decision {stage: 'FINAL'})-[:HAD_CONTEXT]->(c)
+     WHERE (d.scenario_id = $scenario OR d.scenario_id STARTS WITH 'story:')
+       AND ($type IS NULL OR d.decision_type = $type)
      WITH d, c, score ORDER BY score DESC LIMIT $limit
      MATCH (d)-[:MADE_BY]->(a:Actor)
      OPTIONAL MATCH (d)-[:CONSIDERED {status: 'CHOSEN'}]->(o:Option)

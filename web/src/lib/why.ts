@@ -23,7 +23,7 @@ export async function why(decisionId: string) {
   const chain = await query(
     `MATCH (d:Decision {decision_id: $id})
      MATCH (c:Customer:Entity {source_system: 'stripe'})<-[:ABOUT]-(d)
-     MATCH (x:Decision)-[:ABOUT]->(c) WHERE x.scenario_id = $scenario
+     MATCH (x:Decision)-[:ABOUT]->(c) WHERE x.scenario_id = $scenario OR x.scenario_id STARTS WITH 'story:'
      MATCH (x)-[:MADE_BY]->(a:Actor)
      OPTIONAL MATCH (x)-[k:CONSIDERED]->(o:Option) WHERE k.status IN ['CHOSEN', 'PROPOSED']
      RETURN x.decision_id AS decision_id, x.decision_type AS decision_type, x.stage AS stage,

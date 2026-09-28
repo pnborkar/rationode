@@ -107,6 +107,13 @@ export async function checkBeforeAct(decisionType: string, context: Context, k =
          RETURN d.decision_id AS id, null AS text_score, c.features AS features, properties(c) AS ctx`,
         { type: decisionType, scenario: SCENARIO },
       );
+  // Decisions from loaded Events-tab sets are evidence too (they have features but no embedding).
+  candidates.push(...await query<Candidate>(
+    `MATCH (d:Decision {decision_type: $type, stage: 'FINAL'})-[:HAD_CONTEXT]->(c:Context)
+     WHERE d.scenario_id STARTS WITH 'story:'
+     RETURN d.decision_id AS id, null AS text_score, c.features AS features, properties(c) AS ctx`,
+    { type: decisionType },
+  ));
   const scored = candidates
     .map((c) => {
       const feature = cosine(features, c.features ?? []);

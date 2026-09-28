@@ -5,8 +5,9 @@
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import type { ViewNode, ViewRel } from "@/components/GraphView";
+import EventsTab from "@/components/EventsTab";
 import ThemeToggle from "@/components/ThemeToggle";
-import { LIVE_CASES } from "@/lib/liveCases";
+import { LIVE_CASES, type LiveCase } from "@/lib/liveCases";
 
 const GraphView = dynamic(() => import("@/components/GraphView"), { ssr: false });
 const GraphTable = dynamic(() => import("@/components/GraphTable"), { ssr: false });
@@ -104,9 +105,22 @@ function StepCard({ step }: { step: Step }) {
   );
 }
 
+// Customers from sets loaded on the Events tab, as live-tab cases.
+type SetInfo = { set: number; loaded: boolean;
+                 story: { key: string; title: string; point: string; message: string;
+                          customer: { name: string; email: string } } | null };
+const toCases = (sets: SetInfo[]): LiveCase[] => sets.filter((s) => s.loaded && s.story).map((s) => ({
+  key: `set-${s.set}`, name: s.story!.customer.name, email: s.story!.customer.email, ticket_id: `51000${s.set}`,
+  blurb: `Loaded from Events · Set ${s.set}: ${s.story!.title}. ${s.story!.point}`, message: s.story!.message,
+  setNumber: s.set,
+}));
+
 export default function StreamlyLive() {
+  const [tab, setTab] = useState<"live" | "events">("live");
+  const [storyCases, setStoryCases] = useState<LiveCase[]>([]);
+  const cases = [...LIVE_CASES, ...storyCases];
   const [caseKey, setCaseKey] = useState(LIVE_CASES[0].key);
-  const current = LIVE_CASES.find((c) => c.key === caseKey)!;
+  const current = cases.find((c) => c.key === caseKey) ?? LIVE_CASES[0];
   const TICKET = current.ticket_id;
   const [graphOn, setGraphOn] = useState(true);
   const [message, setMessage] = useState(LIVE_CASES[0].message);
@@ -121,6 +135,21 @@ export default function StreamlyLive() {
   const [live, setLive] = useState<{ nodes: ViewNode[]; rels: ViewRel[] }>({ nodes: [], rels: [] });
   const [graphMode, setGraphMode] = useState<"graph" | "table">("graph");
   const [expanded, setExpanded] = useState(false);
+
+  // Customers from sets loaded on the Events tab join the dropdown.
+  const refreshStories = () =>
+    fetch("/api/stories").then((r) => r.json()).then((sets: SetInfo[]) => setStoryCases(toCases(sets)));
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/stories").then((r) => r.json()).then((sets: SetInfo[]) => { if (alive) setStoryCases(toCases(sets)); });
+    return () => { alive = false; };
+  }, []);
+
+  async function removeStory(n: number) {
+    await fetch(`/api/stories/${n}`, { method: "DELETE" });
+    await refreshStories();
+    pickCase(LIVE_CASES[0].key);
+  }
 
   // Esc closes the expanded graph.
   useEffect(() => {
@@ -144,7 +173,7 @@ export default function StreamlyLive() {
                       rels: [...g.rels, ...rels.filter((r) => !g.rels.some((x) => x.id === r.id))] }));
 
   function pickCase(key: string) {
-    const next = LIVE_CASES.find((c) => c.key === key)!;
+    const next = cases.find((c) => c.key === key) ?? LIVE_CASES[0];
     setCaseKey(key);
     setMessage(next.message);
     setBase({ nodes: [], rels: [] });
@@ -260,11 +289,22 @@ export default function StreamlyLive() {
     <main className="flex h-screen flex-col gap-3 p-3">
       {/* Brand bar: fixed colours (not theme variables) so it looks the same in dark and light mode. */}
       <header className="flex items-center justify-between rounded-xl bg-gradient-to-r from-[#4c1d95] via-[#5b21b6] to-[#0369a1] px-4 py-2.5 text-white shadow-lg">
-        <div>
-          <h1 className="text-lg font-semibold">Rationode <span className="font-normal text-white/70">· Streamly live</span></h1>
-          <p className="text-xs text-white/70">Every decision from AI, humans, and systems, in one Neo4j graph</p>
+        <div className="flex items-center gap-6">
+          <div>
+            <h1 className="text-lg font-semibold">Rationode <span className="font-normal text-white/70">· Streamly</span></h1>
+            <p className="text-xs text-white/70">Every decision from AI, humans, and systems, in one Neo4j graph</p>
+          </div>
+          <nav className="flex rounded-full bg-white/10 p-1 text-sm">
+            {([["live", "Streamly live"], ["events", "Events"]] as const).map(([k, label]) => (
+              <button key={k} onClick={() => setTab(k)}
+                      className={`rounded-full px-4 py-1 font-semibold ${tab === k ? "bg-white text-[#4c1d95]" : "text-white/80"}`}>
+                {label}
+              </button>
+            ))}
+          </nav>
         </div>
         <div className="flex items-center gap-3">
+          {tab === "live" && <>
           <button onClick={() => setGraphOn((g) => !g)} disabled={running}
                   className={`rounded-full px-4 py-1.5 text-sm font-semibold transition ${
                     graphOn ? "bg-white text-[#0369a1]" : "bg-white/15 text-white"}`}>
@@ -272,18 +312,30 @@ export default function StreamlyLive() {
           </button>
           <button onClick={reset} disabled={running}
                   className="rounded-full bg-white/15 px-3 py-1.5 text-sm text-white hover:bg-white/25">Reset</button>
+          </>}
           <ThemeToggle />
         </div>
       </header>
 
-      <div className="grid min-h-0 flex-1 grid-cols-2 grid-rows-2 gap-3">
+      <div className={tab === "events" ? "flex min-h-0 flex-1" : "hidden"}>
+        <EventsTab active={tab === "events"} onChanged={refreshStories} />
+      </div>
+
+      <div className={tab === "live" ? "grid min-h-0 flex-1 grid-cols-2 grid-rows-2 gap-3" : "hidden"}>
         <Panel title="Streamly help chat" badge={
           <select value={caseKey} onChange={(e) => pickCase(e.target.value)} disabled={running}
                   className="rounded-md border border-zinc-700 bg-zinc-950 px-2 py-0.5 text-xs text-zinc-200">
-            {LIVE_CASES.map((c) => <option key={c.key} value={c.key}>{c.name}</option>)}
+            {cases.map((c) => <option key={c.key} value={c.key}>{c.name}{c.setNumber ? ` (Set ${c.setNumber})` : ""}</option>)}
           </select>}>
           <div className="flex h-full flex-col">
-            <p className="mb-3 rounded-md bg-zinc-950/60 px-3 py-2 text-xs text-zinc-400">{current.blurb}</p>
+            <div className="mb-3 flex items-start gap-2 rounded-md bg-zinc-950/60 px-3 py-2 text-xs text-zinc-400">
+              <p className="flex-1">{current.blurb}</p>
+              {current.setNumber && (
+                <button onClick={() => removeStory(current.setNumber!)} disabled={running}
+                        className="shrink-0 rounded border border-zinc-700 px-2 py-0.5 text-zinc-300 hover:bg-zinc-800">
+                  Remove {current.name.split(" ")[0]}&apos;s story</button>
+              )}
+            </div>
             <div className="flex-1 space-y-3">
               {chat.map((m, i) => (
                 <div key={i} className={`max-w-[85%] rounded-2xl px-4 py-2 text-sm ${
@@ -361,7 +413,7 @@ export default function StreamlyLive() {
         </Panel>
       </div>
 
-      {expanded && (
+      {expanded && tab === "live" && (
         <div className="fixed inset-0 z-50 flex flex-col bg-zinc-950/95 p-4 backdrop-blur">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-300">Decision graph · live from Neo4j</h2>

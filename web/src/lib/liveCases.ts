@@ -7,6 +7,7 @@ export type LiveCase = {
   ticket_id: string;
   blurb: string;       // one line for the presenter: what this case shows
   message: string;
+  setNumber?: number;  // loaded from the Events tab (removable)
 };
 
 export const LIVE_CASES: LiveCase[] = [
