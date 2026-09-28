@@ -35,7 +35,7 @@ function Panel({ title, badge, children, className = "" }: {
 }) {
   return (
     <section className={`flex min-h-0 flex-col rounded-xl border border-zinc-800 bg-zinc-900/60 ${className}`}>
-      <header className="flex items-center justify-between border-b border-zinc-800 px-4 py-2">
+      <header className="flex items-center justify-between rounded-t-xl border-b border-zinc-800 bg-zinc-800/70 px-4 py-2">
         <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-400">{title}</h2>
         {badge}
       </header>
