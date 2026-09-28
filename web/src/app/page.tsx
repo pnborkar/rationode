@@ -5,6 +5,7 @@
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import type { ViewNode, ViewRel } from "@/components/GraphView";
+import ThemeToggle from "@/components/ThemeToggle";
 import { LIVE_CASES } from "@/lib/liveCases";
 
 const GraphView = dynamic(() => import("@/components/GraphView"), { ssr: false });
@@ -257,18 +258,21 @@ export default function StreamlyLive() {
 
   return (
     <main className="flex h-screen flex-col gap-3 p-3">
-      <header className="flex items-center justify-between px-1">
+      {/* Brand bar: fixed colours (not theme variables) so it looks the same in dark and light mode. */}
+      <header className="flex items-center justify-between rounded-xl bg-gradient-to-r from-[#4c1d95] via-[#5b21b6] to-[#0369a1] px-4 py-2.5 text-white shadow-lg">
         <div>
-          <h1 className="text-lg font-semibold">Rationode <span className="text-zinc-500">· Streamly live</span></h1>
-          <p className="text-xs text-zinc-500">Every decision from AI, humans, and systems, in one Neo4j graph</p>
+          <h1 className="text-lg font-semibold">Rationode <span className="font-normal text-white/70">· Streamly live</span></h1>
+          <p className="text-xs text-white/70">Every decision from AI, humans, and systems, in one Neo4j graph</p>
         </div>
         <div className="flex items-center gap-3">
           <button onClick={() => setGraphOn((g) => !g)} disabled={running}
                   className={`rounded-full px-4 py-1.5 text-sm font-semibold transition ${
-                    graphOn ? "bg-sky-500 text-zinc-950" : "bg-zinc-800 text-zinc-300"}`}>
+                    graphOn ? "bg-white text-[#0369a1]" : "bg-white/15 text-white"}`}>
             Decision graph: {graphOn ? "ON" : "OFF"}
           </button>
-          <button onClick={reset} disabled={running} className="rounded-full bg-zinc-800 px-3 py-1.5 text-sm">Reset</button>
+          <button onClick={reset} disabled={running}
+                  className="rounded-full bg-white/15 px-3 py-1.5 text-sm text-white hover:bg-white/25">Reset</button>
+          <ThemeToggle />
         </div>
       </header>
 
@@ -283,7 +287,7 @@ export default function StreamlyLive() {
             <div className="flex-1 space-y-3">
               {chat.map((m, i) => (
                 <div key={i} className={`max-w-[85%] rounded-2xl px-4 py-2 text-sm ${
-                  m.from === "sam" ? "ml-auto bg-violet-600" : "bg-zinc-800"}`}>
+                  m.from === "sam" ? "ml-auto bg-violet-600 text-white" : "bg-zinc-800"}`}>
                   {m.text}
                 </div>
               ))}
@@ -295,7 +299,7 @@ export default function StreamlyLive() {
               <textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={2}
                         className="flex-1 resize-none rounded-lg border border-zinc-700 bg-zinc-950 p-2 text-sm" />
               <button onClick={send} disabled={running}
-                      className="rounded-lg bg-violet-600 px-4 text-sm font-semibold disabled:opacity-50">Send</button>
+                      className="rounded-lg bg-violet-600 px-4 text-sm font-semibold text-white disabled:opacity-50">Send</button>
             </div>
           </div>
         </Panel>
@@ -338,7 +342,7 @@ export default function StreamlyLive() {
               ) : (
                 <div className="flex flex-wrap items-center gap-2">
                   <button onClick={() => decide(proposal.option)}
-                          className="rounded-lg bg-emerald-600 px-4 py-2 font-semibold">Approve</button>
+                          className="rounded-lg bg-emerald-600 px-4 py-2 font-semibold text-white">Approve</button>
                   <span className="text-zinc-500">or</span>
                   <select value={overrideTo} onChange={(e) => setOverrideTo(e.target.value)}
                           className="rounded-lg border border-zinc-700 bg-zinc-950 px-2 py-2">
