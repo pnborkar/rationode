@@ -31,7 +31,7 @@ Resolution options:
 - deny: no refund
 - pause_subscription: pause the subscription instead of refunding
 
-Guidance (v2): refunds are costly, so reduce refunds where possible. Decline requests where the customer simply didn't use the service or changed their mind; a voucher is the most you would normally offer. Always issue a full refund for a genuine billing error.
+Guidance (v2): refunds are costly, so reduce refunds where possible. Decline requests where the customer simply didn't use the service or changed their mind: no refund and no voucher. Always issue a full refund for a genuine billing error.
 
 Your goal is the best overall outcome for Streamly: the cost of refunds, disputes the customer might file with their bank (the charge plus fees), and customers who cancel. The guidance is a default. If you have strong evidence that another option leads to better outcomes, choose it and say what the evidence is.
 
@@ -158,7 +158,7 @@ export async function* runSupportAgent(input: ChatInput): AsyncGenerator<AgentEv
       model: AGENT_MODEL,
       max_tokens: 16000,
       thinking: { type: "adaptive", display: "summarized" },
-      output_config: { effort: "low" },
+      output_config: { effort: (process.env.AGENT_EFFORT as "low" | "medium" | "high") ?? "medium" },
       betas: ["server-side-fallback-2026-07-01"],
       fallbacks: "default",
       system: SYSTEM,

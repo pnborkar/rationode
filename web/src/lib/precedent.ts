@@ -148,7 +148,17 @@ export async function checkBeforeAct(decisionType: string, context: Context, k =
     case: text,
     similar_decisions: scored.length,
     search: vector ? "vector search + feature similarity" : "feature similarity",
+    note:
+      "options: what was chosen among the nearest past decisions, and what followed (per-option samples can be small). " +
+      "what_if: outcome rates from the learned outcome tree for the branch this case would fall into under each action " +
+      "(support = number of past decisions in that branch).",
     options,
+    // The closest past decisions with what was chosen and what followed (drawn in the graph panel).
+    neighbours: scored.slice(0, 16).map((c) => {
+      const d = details.find((x) => x.id === c.id);
+      return { decision_id: c.id, score: Math.round(c.score * 1000) / 1000, option: d?.options[0] ?? null,
+               outcomes: d?.outcomes ?? [], cost: d?.cost ?? 0 };
+    }),
     examples: scored.slice(0, 3).map((c) => ({
       decision_id: c.id, score: Math.round(c.score * 1000) / 1000, context: contextText(decisionType, c.ctx),
     })),
