@@ -16,7 +16,7 @@ from rationode.pipeline.detect import Detector
 from rationode.pipeline.write import load_registry, write
 
 GENERATED = REPO_ROOT / "data" / "generated"
-SCENARIO_LABELS = ["Event", "Decision", "Context", "Entity", "Outcome", "Actor"]
+SCENARIO_LABELS = ["DecisionPoint", "DecisionTree", "Event", "Decision", "Context", "Entity", "Outcome", "Actor"]
 
 
 def ingest(path: str, scenario: str) -> None:

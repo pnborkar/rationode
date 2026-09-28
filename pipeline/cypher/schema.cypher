@@ -33,6 +33,9 @@ CREATE INDEX context_scenario IF NOT EXISTS FOR (n:Context) ON (n.scenario_id);
 CREATE INDEX entity_scenario IF NOT EXISTS FOR (n:Entity) ON (n.scenario_id);
 CREATE INDEX outcome_scenario IF NOT EXISTS FOR (n:Outcome) ON (n.scenario_id);
 CREATE INDEX actor_scenario IF NOT EXISTS FOR (n:Actor) ON (n.scenario_id);
+CREATE INDEX tree_scenario IF NOT EXISTS FOR (n:DecisionTree) ON (n.scenario_id);
+CREATE INDEX point_tree IF NOT EXISTS FOR (n:DecisionPoint) ON (n.tree_id);
+CREATE INDEX point_scenario IF NOT EXISTS FOR (n:DecisionPoint) ON (n.scenario_id);
 CREATE INDEX event_charge IF NOT EXISTS FOR (n:Event) ON (n.charge_id);
 CREATE INDEX event_customer IF NOT EXISTS FOR (n:Event) ON (n.stripe_customer_id);
 

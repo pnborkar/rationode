@@ -33,6 +33,7 @@ pipeline/
     registry.py                 Seed decision types, options, attributes, outcome types
     sim/                        Simulator: world model, event formats, generator, verification
     pipeline/                   Raw events → decision graph (parse, detect, write)
+    trees/                      Tree learner, policy/behavior/outcome trees, comparisons, reveal queries
 ```
 
 ## Setup
@@ -63,6 +64,12 @@ uv run python -m rationode.pipeline ingest history_events.jsonl --scenario histo
 uv run python -m rationode.pipeline stats
 uv run python -m rationode.pipeline dana       # one customer's full path across systems
 
+# 4. Decision trees, comparisons, and the demo's reveal queries
+uv run python -m rationode.trees build
+uv run python -m rationode.trees list
+uv run python -m rationode.trees show tree:dispute.response:policy:policy
+uv run python -m rationode.trees reveals
+
 # Remove a scenario
 uv run python -m rationode.pipeline reset --scenario history
 ```
@@ -76,7 +83,7 @@ Work in progress.
 - [x] Schema and registry
 - [x] Simulator and verification
 - [x] Batch pipeline into Neo4j
-- [ ] Decision trees and comparisons
+- [x] Decision trees and comparisons
 - [ ] Graph Data Science and vector search
 - [ ] Agent tools and MCP server
 - [ ] Demo app
