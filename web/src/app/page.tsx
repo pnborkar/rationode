@@ -338,7 +338,7 @@ export default function StreamlyLive() {
               ) : (
                 <div className="flex flex-wrap items-center gap-2">
                   <button onClick={() => decide(proposal.option)}
-                          className="rounded-lg bg-emerald-600 px-4 py-2 font-semibold">Approve AI proposal</button>
+                          className="rounded-lg bg-emerald-600 px-4 py-2 font-semibold">Approve</button>
                   <span className="text-zinc-500">or</span>
                   <select value={overrideTo} onChange={(e) => setOverrideTo(e.target.value)}
                           className="rounded-lg border border-zinc-700 bg-zinc-950 px-2 py-2">
