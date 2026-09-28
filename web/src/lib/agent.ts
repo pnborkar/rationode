@@ -64,7 +64,8 @@ const ProposeResolution = z.object({
 const TOOLS: Record<string, Anthropic.Beta.BetaTool> = {
   get_customer: {
     name: "get_customer",
-    description: "Look up a customer by email: tenure in months, plan, latest charge, refunds in the last 90 days.",
+    description: "Look up a customer by email: tenure in months, plan, latest charge, the refunds issued in the last " +
+      "90 days (date, amount, charge), and how much of the latest charge has already been refunded.",
     eager_input_streaming: true,
     input_schema: { type: "object", properties: { email: { type: "string" } }, required: ["email"] },
   },

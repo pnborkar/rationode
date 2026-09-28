@@ -20,6 +20,8 @@ export type CustomerInfo = {
   subscription_status: string;
   charge_id: string;
   charge_amount_usd: number;
+  refunds_90d: { date: string; amount_usd: number; charge_id: string }[];   // the refunds themselves, not just a count
+  latest_charge_refunded_usd: number;                                        // already refunded on the latest charge
 };
 
 // What the support agent's get_customer tool returns: assembled from Stripe and
@@ -47,11 +49,22 @@ export async function getCustomer(email: string): Promise<CustomerInfo | null> {
   );
   const r = rows[0];
   if (!r) return null;
+  const refunds = await query<{ date: string; amount_usd: number; charge_id: string }>(
+    `MATCH (ch:Event {event_type: 'charge.succeeded', stripe_customer_id: $cus})
+     MATCH (rf:Event {event_type: 'refund.created', charge_id: ch.charge_id})
+     WHERE rf.occurred_at <= datetime($now) AND rf.occurred_at >= datetime($now) - duration('P90D')
+     RETURN toString(date(rf.occurred_at)) AS date, rf.charge_id AS charge_id,
+            apoc.convert.fromJsonMap(rf.payload_json).data.object.amount / 100.0 AS amount_usd
+     ORDER BY date`,
+    { cus: r.cus, now: DEMO_NOW.toISOString() },
+  );
   return {
     customer_email: email, name: r.name, stripe_customer_id: r.cus,
     tenure_months: tenureMonths(new Date(r.started), DEMO_NOW), plan: r.plan,
     prior_refunds_90d: r.refunds, subscription_status: r.canceled ? "canceled" : "active",
     charge_id: r.charge_id, charge_amount_usd: r.amount,
+    refunds_90d: refunds,
+    latest_charge_refunded_usd: refunds.filter((x) => x.charge_id === r.charge_id).reduce((t, x) => t + x.amount_usd, 0),
   };
 }
 

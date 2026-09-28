@@ -72,7 +72,8 @@ function StepCard({ step }: { step: Step }) {
       <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-3 text-sm">
         <p className="text-xs text-zinc-500">get_customer</p>
         <p>Looked up <b>{String(c.name)}</b>: {String(c.tenure_months)} months, {words(String(c.plan))},
-          last charge ${String(c.charge_amount_usd)}, {String(c.prior_refunds_90d)} refunds in 90 days.</p>
+          last charge ${String(c.charge_amount_usd)}, {String(c.prior_refunds_90d)} refunds in 90 days
+          {Number(c.latest_charge_refunded_usd) > 0 && <> · <b>latest charge already refunded ${String(c.latest_charge_refunded_usd)}</b></>}.</p>
       </div>
     );
   }
