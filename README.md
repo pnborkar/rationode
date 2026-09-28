@@ -34,11 +34,12 @@ pipeline/
     sim/                        Simulator: world model, event formats, generator, verification
     pipeline/                   Raw events → decision graph (parse, detect, write)
     trees/                      Tree learner, policy/behavior/outcome trees, comparisons, reveal queries
+    analytics/                  Embeddings, GDS (kNN, Leiden, peer groups), check_before_act
 ```
 
 ## Setup
 
-Requirements: Python 3.12+, [uv](https://docs.astral.sh/uv/), a Neo4j 5 database (AuraDB works).
+Requirements: Python 3.12+, [uv](https://docs.astral.sh/uv/), a Neo4j 5 database with the Graph Data Science plugin (AuraDB works).
 
 ```bash
 cp .env.example .env            # fill in your Neo4j connection details
@@ -70,6 +71,11 @@ uv run python -m rationode.trees list
 uv run python -m rationode.trees show tree:dispute.response:policy:policy
 uv run python -m rationode.trees reveals
 
+# 5. Embeddings, graph data science (GDS plugin), and precedent for a new case
+uv run python -m rationode.analytics embed
+uv run python -m rationode.analytics gds
+uv run python -m rationode.analytics precedent sam
+
 # Remove a scenario
 uv run python -m rationode.pipeline reset --scenario history
 ```
@@ -84,6 +90,6 @@ Work in progress.
 - [x] Simulator and verification
 - [x] Batch pipeline into Neo4j
 - [x] Decision trees and comparisons
-- [ ] Graph Data Science and vector search
+- [x] Graph Data Science and vector search
 - [ ] Agent tools and MCP server
 - [ ] Demo app

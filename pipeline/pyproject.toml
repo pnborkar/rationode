@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Rationode decision graph: simulator, pipeline, and analytics for the Neo4j demo"
 requires-python = ">=3.12"
 dependencies = [
+    "fastembed>=0.8.1",
     "neo4j>=5.20",
     "python-dotenv>=1.0",
 ]
