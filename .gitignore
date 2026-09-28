@@ -1,0 +1,22 @@
+.env
+.env.*
+!.env.example
+__pycache__/
+*.pyc
+.venv/
+node_modules/
+.next/
+.vercel/
+data/generated/
+
+# Aura credentials downloads
+Neo4j-*.txt
+
+# macOS
+.DS_Store
+
+# Research material
+research/
+research\ /
+Research/
+Research*.pdf
