@@ -5,6 +5,7 @@
  "title": "The loyal customer we almost lost",
  "point": "A human override recorded against the AI, and it worked.",
  "message": "I forgot to cancel and didn't watch anything this period. Please refund me.",
+ "via_bank": false,
  "customer": {
   "name": "Priya Shah",
   "email": "priya.shah.set1@example.com",
@@ -26,6 +27,48 @@
       "email": "priya.shah.set1@example.com",
       "plan": "monthly_49",
       "started_at": "2023-12-12T10:00:00Z"
+     }
+    },
+    {
+     "event_id": "pb_N0WzHMSDSW7ADI",
+     "source_system": "streamly_app",
+     "event_type": "playback.weekly_summary",
+     "occurred_at": "2026-05-25T06:00:00Z",
+     "payload": {
+      "stripe_customer_id": "cus_aJVm50H9ncwl6h",
+      "email": "priya.shah.set1@example.com",
+      "week_start": "2026-05-18",
+      "hours_watched": 0.5,
+      "titles_watched": 1,
+      "sessions": 0
+     }
+    },
+    {
+     "event_id": "pb_sxHGQEL8IKkeiG",
+     "source_system": "streamly_app",
+     "event_type": "playback.weekly_summary",
+     "occurred_at": "2026-06-01T06:00:00Z",
+     "payload": {
+      "stripe_customer_id": "cus_aJVm50H9ncwl6h",
+      "email": "priya.shah.set1@example.com",
+      "week_start": "2026-05-25",
+      "hours_watched": 0.0,
+      "titles_watched": 0,
+      "sessions": 0
+     }
+    },
+    {
+     "event_id": "pb_aIlUFflySK7ei8",
+     "source_system": "streamly_app",
+     "event_type": "playback.weekly_summary",
+     "occurred_at": "2026-06-08T06:00:00Z",
+     "payload": {
+      "stripe_customer_id": "cus_aJVm50H9ncwl6h",
+      "email": "priya.shah.set1@example.com",
+      "week_start": "2026-06-01",
+      "hours_watched": 0.0,
+      "titles_watched": 0,
+      "sessions": 0
      }
     },
     {
@@ -80,6 +123,20 @@
         "created": 1781245140
        }
       }
+     }
+    },
+    {
+     "event_id": "pb_2otsAiYvTEMBYB",
+     "source_system": "streamly_app",
+     "event_type": "playback.weekly_summary",
+     "occurred_at": "2026-06-15T06:00:00Z",
+     "payload": {
+      "stripe_customer_id": "cus_aJVm50H9ncwl6h",
+      "email": "priya.shah.set1@example.com",
+      "week_start": "2026-06-08",
+      "hours_watched": 0.0,
+      "titles_watched": 0,
+      "sessions": 0
      }
     },
     {
@@ -234,6 +291,34 @@
       },
       "updated_at": "2026-06-17T07:58:53Z"
      }
+    },
+    {
+     "event_id": "pb_CLTi1hqshnZYrA",
+     "source_system": "streamly_app",
+     "event_type": "playback.weekly_summary",
+     "occurred_at": "2026-06-22T06:00:00Z",
+     "payload": {
+      "stripe_customer_id": "cus_aJVm50H9ncwl6h",
+      "email": "priya.shah.set1@example.com",
+      "week_start": "2026-06-15",
+      "hours_watched": 0.0,
+      "titles_watched": 0,
+      "sessions": 0
+     }
+    },
+    {
+     "event_id": "pb_HWeNEigztGJ2kJ",
+     "source_system": "streamly_app",
+     "event_type": "playback.weekly_summary",
+     "occurred_at": "2026-06-29T06:00:00Z",
+     "payload": {
+      "stripe_customer_id": "cus_aJVm50H9ncwl6h",
+      "email": "priya.shah.set1@example.com",
+      "week_start": "2026-06-22",
+      "hours_watched": 1.5,
+      "titles_watched": 2,
+      "sessions": 1
+     }
     }
    ],
    "rows": {
@@ -244,6 +329,45 @@
       "event_type": "subscription.created",
       "occurred_at": "2023-12-12T10:00:00Z",
       "payload_json": "{\"subscription_id\":\"sub_v1cfGwbP0dhhDO\",\"stripe_customer_id\":\"cus_aJVm50H9ncwl6h\",\"email\":\"priya.shah.set1@example.com\",\"plan\":\"monthly_49\",\"started_at\":\"2023-12-12T10:00:00Z\"}",
+      "charge_id": null,
+      "ticket_id": null,
+      "dispute_id": null,
+      "stripe_customer_id": "cus_aJVm50H9ncwl6h",
+      "email": "priya.shah.set1@example.com",
+      "scenario_id": "story:priya"
+     },
+     {
+      "event_id": "story:priya|pb_N0WzHMSDSW7ADI",
+      "source_system": "streamly_app",
+      "event_type": "playback.weekly_summary",
+      "occurred_at": "2026-05-25T06:00:00Z",
+      "payload_json": "{\"stripe_customer_id\":\"cus_aJVm50H9ncwl6h\",\"email\":\"priya.shah.set1@example.com\",\"week_start\":\"2026-05-18\",\"hours_watched\":0.5,\"titles_watched\":1,\"sessions\":0}",
+      "charge_id": null,
+      "ticket_id": null,
+      "dispute_id": null,
+      "stripe_customer_id": "cus_aJVm50H9ncwl6h",
+      "email": "priya.shah.set1@example.com",
+      "scenario_id": "story:priya"
+     },
+     {
+      "event_id": "story:priya|pb_sxHGQEL8IKkeiG",
+      "source_system": "streamly_app",
+      "event_type": "playback.weekly_summary",
+      "occurred_at": "2026-06-01T06:00:00Z",
+      "payload_json": "{\"stripe_customer_id\":\"cus_aJVm50H9ncwl6h\",\"email\":\"priya.shah.set1@example.com\",\"week_start\":\"2026-05-25\",\"hours_watched\":0.0,\"titles_watched\":0,\"sessions\":0}",
+      "charge_id": null,
+      "ticket_id": null,
+      "dispute_id": null,
+      "stripe_customer_id": "cus_aJVm50H9ncwl6h",
+      "email": "priya.shah.set1@example.com",
+      "scenario_id": "story:priya"
+     },
+     {
+      "event_id": "story:priya|pb_aIlUFflySK7ei8",
+      "source_system": "streamly_app",
+      "event_type": "playback.weekly_summary",
+      "occurred_at": "2026-06-08T06:00:00Z",
+      "payload_json": "{\"stripe_customer_id\":\"cus_aJVm50H9ncwl6h\",\"email\":\"priya.shah.set1@example.com\",\"week_start\":\"2026-06-01\",\"hours_watched\":0.0,\"titles_watched\":0,\"sessions\":0}",
       "charge_id": null,
       "ticket_id": null,
       "dispute_id": null,
@@ -271,6 +395,19 @@
       "occurred_at": "2026-06-12T06:19:00Z",
       "payload_json": "{\"id\":\"evt_eCmUOjKuTs5eWh\",\"object\":\"event\",\"api_version\":\"2026-06-30\",\"type\":\"charge.succeeded\",\"created\":1781245140,\"livemode\":false,\"data\":{\"object\":{\"id\":\"ch_Zf3nhmI3gLGDWp\",\"object\":\"charge\",\"amount\":4900,\"currency\":\"usd\",\"customer\":\"cus_aJVm50H9ncwl6h\",\"billing_details\":{\"email\":\"priya.shah.set1@example.com\",\"name\":\"Priya Shah\"},\"metadata\":{\"plan\":\"monthly_49\",\"subscription_id\":\"sub_v1cfGwbP0dhhDO\"},\"status\":\"succeeded\",\"created\":1781245140}}}",
       "charge_id": "ch_Zf3nhmI3gLGDWp",
+      "ticket_id": null,
+      "dispute_id": null,
+      "stripe_customer_id": "cus_aJVm50H9ncwl6h",
+      "email": "priya.shah.set1@example.com",
+      "scenario_id": "story:priya"
+     },
+     {
+      "event_id": "story:priya|pb_2otsAiYvTEMBYB",
+      "source_system": "streamly_app",
+      "event_type": "playback.weekly_summary",
+      "occurred_at": "2026-06-15T06:00:00Z",
+      "payload_json": "{\"stripe_customer_id\":\"cus_aJVm50H9ncwl6h\",\"email\":\"priya.shah.set1@example.com\",\"week_start\":\"2026-06-08\",\"hours_watched\":0.0,\"titles_watched\":0,\"sessions\":0}",
+      "charge_id": null,
       "ticket_id": null,
       "dispute_id": null,
       "stripe_customer_id": "cus_aJVm50H9ncwl6h",
@@ -353,6 +490,32 @@
       "dispute_id": null,
       "stripe_customer_id": null,
       "email": null,
+      "scenario_id": "story:priya"
+     },
+     {
+      "event_id": "story:priya|pb_CLTi1hqshnZYrA",
+      "source_system": "streamly_app",
+      "event_type": "playback.weekly_summary",
+      "occurred_at": "2026-06-22T06:00:00Z",
+      "payload_json": "{\"stripe_customer_id\":\"cus_aJVm50H9ncwl6h\",\"email\":\"priya.shah.set1@example.com\",\"week_start\":\"2026-06-15\",\"hours_watched\":0.0,\"titles_watched\":0,\"sessions\":0}",
+      "charge_id": null,
+      "ticket_id": null,
+      "dispute_id": null,
+      "stripe_customer_id": "cus_aJVm50H9ncwl6h",
+      "email": "priya.shah.set1@example.com",
+      "scenario_id": "story:priya"
+     },
+     {
+      "event_id": "story:priya|pb_HWeNEigztGJ2kJ",
+      "source_system": "streamly_app",
+      "event_type": "playback.weekly_summary",
+      "occurred_at": "2026-06-29T06:00:00Z",
+      "payload_json": "{\"stripe_customer_id\":\"cus_aJVm50H9ncwl6h\",\"email\":\"priya.shah.set1@example.com\",\"week_start\":\"2026-06-22\",\"hours_watched\":1.5,\"titles_watched\":2,\"sessions\":1}",
+      "charge_id": null,
+      "ticket_id": null,
+      "dispute_id": null,
+      "stripe_customer_id": "cus_aJVm50H9ncwl6h",
+      "email": "priya.shah.set1@example.com",
       "scenario_id": "story:priya"
      }
     ],
@@ -803,10 +966,14 @@
  ],
  "became": {
   "subevt_qBa4yn5DCghibO": [],
+  "pb_N0WzHMSDSW7ADI": [],
+  "pb_sxHGQEL8IKkeiG": [],
+  "pb_aIlUFflySK7ei8": [],
   "scr_ungtFen6I9sg45": [
    "Decision \u00b7 fraud screen \u00b7 final: approve \u00b7 by FraudGuard rules"
   ],
   "evt_eCmUOjKuTs5eWh": [],
+  "pb_2otsAiYvTEMBYB": [],
   "zdevt_DFljbqS12MQC5p": [
    "Identity \u00b7 Zendesk requester SAME_AS Stripe customer (email match)"
   ],
@@ -821,6 +988,8 @@
    "Outcome \u00b7 refund cost ($49)"
   ],
   "zdevt_8BJMEY2N4nF2mm": [],
+  "pb_CLTi1hqshnZYrA": [],
+  "pb_HWeNEigztGJ2kJ": [],
   "subevt_Dk2ky6Wris44d5": [
    "Outcome \u00b7 renewal"
   ]

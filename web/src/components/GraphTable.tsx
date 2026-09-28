@@ -8,9 +8,10 @@ const KIND_LABEL: Record<string, string> = {
   decision: "Decision (history)", outcome: "Outcome", case: "New case", precedent: "Similar past decision",
   proposal: "AI proposal (live)", final: "Rep decision (live)",
   signals: "Fraud signals", rule: "Fraud rule", policy: "Written policy", pattern: "Same policy gap",
+  usage: "Viewing (week)",
 };
 const ORDER = ["customer", "charge", "ticket", "dispute", "subscription", "decision", "signals", "rule", "policy",
-               "outcome", "case", "pattern", "precedent", "proposal", "final"];
+               "outcome", "usage", "case", "pattern", "precedent", "proposal", "final"];
 
 const words = (s: string) => s.replaceAll("_", " ");
 

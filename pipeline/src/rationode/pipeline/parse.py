@@ -76,6 +76,9 @@ def parse(raw: dict) -> Ev:
         e.charge_id = result.get("charge_id")
         e.email = result.get("customer_email")
         e.data = {"agent_id": p["agent_id"], "agent_version": p["agent_version"], "args": args, "result": result}
+    elif src == "streamly_app":
+        e.stripe_customer_id, e.email = p["stripe_customer_id"], p.get("email")
+        e.data = {"week_start": p["week_start"], "hours_watched": p["hours_watched"], "titles_watched": p["titles_watched"]}
     elif src == "subscriptions":
         e.subscription_id, e.stripe_customer_id = p["subscription_id"], p["stripe_customer_id"]
         e.email = p.get("email")

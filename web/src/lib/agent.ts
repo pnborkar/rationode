@@ -63,7 +63,8 @@ const ProposeResolution = z.object({
 const TOOLS: Record<string, Anthropic.Beta.BetaTool> = {
   get_customer: {
     name: "get_customer",
-    description: "Look up a customer by email: tenure in months, plan, latest charge, refunds in the last 90 days.",
+    description: "Look up a customer by email: tenure in months, plan, latest charge, refunds in the last 90 days, " +
+      "and hours watched in the last 30 days from the Streamly app (null when there is no usage data).",
     eager_input_streaming: true,
     input_schema: { type: "object", properties: { email: { type: "string" } }, required: ["email"] },
   },

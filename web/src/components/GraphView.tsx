@@ -14,6 +14,7 @@ const KIND_COLOR: Record<string, string> = {
   customer: "#a78bfa", charge: "#64748b", ticket: "#64748b", dispute: "#64748b", subscription: "#64748b",
   outcome: "#f87171", case: "#fbbf24", proposal: "#38bdf8", final: "#34d399",
   signals: "#f59e0b", rule: "#94a3b8", policy: "#0ea5e9", pattern: "#dc2626",
+  usage: "#14b8a6",
 };
 
 export function decisionColor(outcomes: string[] = []): string {
@@ -43,8 +44,8 @@ export default function GraphView({ nodes, rels }: { nodes: ViewNode[]; rels: Vi
   const nvlNodes = useMemo(() => nodes.map(toNvl), [nodes]);
   const nvlRels = useMemo<Relationship[]>(() => rels.map((r) => ({
     id: r.id, from: r.from, to: r.to, caption: r.type,
-    color: r.type === "OVERRIDES" || r.type === "POLICY_GAP" ? "#f87171" : r.type === "SIMILAR_TO" ? "#334155" : "#64748b",
-    width: r.type === "SIMILAR_TO" || r.type === "INCLUDES" ? 1 : r.type === "POLICY_GAP" ? 4 : 2,
+    color: r.type === "OVERRIDES" || r.type === "POLICY_GAP" || r.type === "CONTRADICTS" ? "#f87171" : r.type === "SIMILAR_TO" ? "#334155" : "#64748b",
+    width: r.type === "SIMILAR_TO" || r.type === "INCLUDES" ? 1 : r.type === "POLICY_GAP" || r.type === "CONTRADICTS" ? 4 : 2,
   })), [rels]);
 
   // Keep everything in view as live nodes arrive.

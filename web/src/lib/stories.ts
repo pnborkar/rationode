@@ -12,7 +12,7 @@ import { removeScenario, writeRows, type Rows } from "./storyWriter";
 type RawEvent = { event_id: string; source_system: string; event_type: string; occurred_at: string;
                   payload: Record<string, unknown> };
 export type StorySet = {
-  set: number; key: string; scenario_id: string; title: string; point: string; message: string;
+  set: number; key: string; scenario_id: string; title: string; point: string; message: string; via_bank: boolean;
   customer: { name: string; email: string; plan: string; tenure_months: number };
   phases: { name: string; events: RawEvent[]; rows: Rows }[];
   became: Record<string, string[]>;

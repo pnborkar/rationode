@@ -11,7 +11,7 @@ Usage:
 
 import json
 from dataclasses import asdict
-from datetime import date
+from datetime import date, timedelta
 
 from rationode.db import REPO_ROOT, database, driver
 from rationode.pipeline.detect import Detector, Registry
@@ -23,50 +23,69 @@ from rationode.sim.generate import Sim, months_before
 OUT_DIR = REPO_ROOT / "web" / "src" / "data" / "stories"
 OUTCOME_TYPES = {"charge.dispute.closed", "subscription.canceled", "subscription.renewed"}
 
-# (set number, key, name, plan, tenure months, renewal?, charge day, force, title, point, live message or None)
-# The live message is what the customer says on the live tab; None = use their Zendesk ticket's words.
+# One entry per set. "message" is what the customer says on the live tab (None = their Zendesk ticket's words).
+# "usage" is weekly viewing from the Streamly app: (week start, hours watched), chosen to fit each story.
 SETS = [
-    (1, "priya", "Priya Shah", "monthly_49", 30, True, date(2026, 6, 12), {
-        "risk_score": 22, "fraud": False, "complaint": True, "complaint_at": wm.dt(date(2026, 6, 16), 14.2),
-        "category": "didnt_use", "ai_option": "deny", "reviewed": True, "rep_team": "A",
-        "final_option": "full_refund", "dispute": False, "churn": False, "renew": True},
-     "The loyal customer we almost lost",
-     "A human override recorded against the AI, and it worked.", None),
-    (2, "leo", "Leo Marsh", "annual_180", 26, True, date(2026, 6, 5), {
-        "risk_score": 18, "fraud": False, "complaint": True, "complaint_at": wm.dt(date(2026, 6, 9), 10.5),
-        "category": "didnt_use", "ai_option": "deny", "reviewed": True, "rep_team": "A", "final_option": "deny",
-        "dispute": True, "dispute_category": "subscription_canceled", "dispute_at": wm.dt(date(2026, 6, 22), 9.0),
-        "usage_logs_available": True, "contest": True, "evidence": ["tos_acceptance"], "won": False, "churn": True},
-     "Denied, disputed, lost",
-     "A costly chain across Zendesk, the agent, and Stripe: the Dana pattern, live.", None),
-    (3, "mei", "Mei Tanaka", "monthly_49", 38, True, date(2026, 6, 14), {
-        "risk_score": 15, "fraud": False, "complaint": True, "complaint_at": wm.dt(date(2026, 6, 18), 16.0),
-        "category": "too_expensive", "ai_option": "pause_subscription", "reviewed": True, "rep_team": "B",
-        "final_option": "pause_subscription", "dispute": False, "churn": False, "renew": True},
-     "The pause that saved a customer",
-     "The newer pause_subscription option (still PROPOSED in the schema registry) showing up in fresh events.", None),
-    (4, "omar", "Omar Haddad", "annual_480", 0, False, date(2026, 6, 20), {
-        "risk_score": 70, "fraud": True, "contest": True, "won": False, "churn": True},
-     "The fraud that slipped through",
-     "The fraud tool approved a risk-70 signup (its review threshold is 75); the charge came back as unauthorized.",
-     "I never signed up for Streamly. Why was I charged $480?"),
-    (5, "nina", "Nina Brooks", "annual_300", 34, True, date(2026, 6, 8), {
-        "risk_score": 12, "fraud": False, "no_complaint": True, "friendly_dispute": True,
-        "dispute_category": "subscription_canceled", "dispute_at": wm.dt(date(2026, 6, 19), 15.0),
-        "usage_logs_available": True, "contest": True, "evidence": ["usage_logs", "tos_acceptance"],
-        "won": True, "churn": False},
-     "The usage logs that won",
-     "She told her bank she'd canceled; the agent sent usage logs showing she kept watching, and the dispute was won.",
-     "I thought I canceled. Why was I charged $300 again?"),
-    (6, "theo", "Theo Grant", "monthly_25", 3, True, date(2026, 6, 10), {
-        "risk_score": 25, "fraud": False, "complaint": True, "complaint_at": wm.dt(date(2026, 6, 13), 11.0),
-        "category": "didnt_use", "ai_option": "deny", "reviewed": True, "rep_team": "B",
-        "final_option": "full_refund", "dispute": False, "churn": True},
-     "The generous rep",
-     "A Team B rep refunded a 3-month customer the AI would have denied; he cancelled anyway. "
-     "GDS picked out Team B's peer group for calls like this.",
-     None),
+    dict(set=1, key="priya", name="Priya Shah", plan="monthly_49", tenure=30, renewal=True, charge_day=date(2026, 6, 12),
+         force={"risk_score": 22, "fraud": False, "complaint": True, "complaint_at": wm.dt(date(2026, 6, 16), 14.2),
+                "category": "didnt_use", "ai_option": "deny", "reviewed": True, "rep_team": "A",
+                "final_option": "full_refund", "dispute": False, "churn": False, "renew": True},
+         title="The loyal customer we almost lost",
+         point="A human override recorded against the AI, and it worked.", message=None,
+         usage=[(date(2026, 5, 18), 0.5), (date(2026, 5, 25), 0.0), (date(2026, 6, 1), 0.0), (date(2026, 6, 8), 0.0),
+                (date(2026, 6, 15), 0.0), (date(2026, 6, 22), 1.5)]),
+    dict(set=2, key="leo", name="Leo Marsh", plan="annual_180", tenure=26, renewal=True, charge_day=date(2026, 6, 5),
+         force={"risk_score": 18, "fraud": False, "complaint": True, "complaint_at": wm.dt(date(2026, 6, 9), 10.5),
+                "category": "didnt_use", "ai_option": "deny", "reviewed": True, "rep_team": "A", "final_option": "deny",
+                "dispute": True, "dispute_category": "subscription_canceled", "dispute_at": wm.dt(date(2026, 6, 22), 9.0),
+                "usage_logs_available": True, "contest": True, "evidence": ["tos_acceptance"], "won": False,
+                "churn": True},
+         title="Denied, disputed, lost",
+         point="A costly chain across Zendesk, the agent, and Stripe: the Dana pattern, live.", message=None,
+         usage=[(date(2026, 5, 11), 0.0), (date(2026, 5, 18), 0.0), (date(2026, 5, 25), 0.0), (date(2026, 6, 1), 0.0),
+                (date(2026, 6, 8), 0.0), (date(2026, 6, 15), 0.0)]),
+    dict(set=3, key="mei", name="Mei Tanaka", plan="monthly_49", tenure=38, renewal=True, charge_day=date(2026, 6, 14),
+         force={"risk_score": 15, "fraud": False, "complaint": True, "complaint_at": wm.dt(date(2026, 6, 18), 16.0),
+                "category": "too_expensive", "ai_option": "pause_subscription", "reviewed": True, "rep_team": "B",
+                "final_option": "pause_subscription", "dispute": False, "churn": False, "renew": True},
+         title="The pause that saved a customer",
+         point="The newer pause_subscription option (still PROPOSED in the schema registry) showing up in fresh events.",
+         message=None,
+         usage=[(date(2026, 5, 18), 5.5), (date(2026, 5, 25), 6.0), (date(2026, 6, 1), 4.5), (date(2026, 6, 8), 5.0),
+                (date(2026, 6, 15), 3.5), (date(2026, 6, 22), 0.0)]),
+    dict(set=4, key="omar", name="Omar Haddad", plan="annual_480", tenure=0, renewal=False, charge_day=date(2026, 6, 20),
+         force={"risk_score": 70, "fraud": True, "contest": True, "won": False, "churn": True},
+         title="The fraud that slipped through",
+         point="The fraud tool approved a risk-70 signup (its review threshold is 75); the charge came back as unauthorized.",
+         message="I never signed up for Streamly. Why was I charged $480?",
+         usage=[(date(2026, 6, 22), 0.0)]),
+    dict(set=5, key="nina", name="Nina Brooks", plan="annual_300", tenure=34, renewal=True, charge_day=date(2026, 6, 8),
+         force={"risk_score": 12, "fraud": False, "no_complaint": True, "friendly_dispute": True,
+                "dispute_category": "subscription_canceled", "dispute_at": wm.dt(date(2026, 6, 19), 15.0),
+                "usage_logs_available": True, "contest": True, "evidence": ["usage_logs", "tos_acceptance"],
+                "won": True, "churn": False},
+         title="The usage logs that won",
+         point="She told her bank she'd canceled; the agent sent usage logs showing she kept watching, and the dispute was won.",
+         message="I thought I canceled. Why was I charged $300 again?",
+         usage=[(date(2026, 5, 18), 6.5), (date(2026, 5, 25), 7.5), (date(2026, 6, 1), 6.0), (date(2026, 6, 8), 8.0),
+                (date(2026, 6, 15), 5.5), (date(2026, 6, 22), 6.5)]),
+    dict(set=6, key="theo", name="Theo Grant", plan="monthly_25", tenure=3, renewal=True, charge_day=date(2026, 6, 10),
+         force={"risk_score": 25, "fraud": False, "complaint": True, "complaint_at": wm.dt(date(2026, 6, 13), 11.0),
+                "category": "didnt_use", "ai_option": "deny", "reviewed": True, "rep_team": "B",
+                "final_option": "full_refund", "dispute": False, "churn": True},
+         title="The generous rep",
+         point="A Team B rep refunded a 3-month customer the AI would have denied; he cancelled anyway. "
+               "GDS picked out Team B's peer group for calls like this.",
+         message=None,
+         usage=[(date(2026, 5, 25), 0.0), (date(2026, 6, 1), 0.0), (date(2026, 6, 8), 0.0), (date(2026, 6, 15), 0.0)]),
 ]
+
+
+def usage_events(sim: Sim, c, weeks) -> list[dict]:
+    """Weekly viewing summaries, each emitted at the end of its week (only weeks after signup)."""
+    return [f.playback_weekly(sim.ids, wm.dt(week + timedelta(days=7), 6.0), c, week.isoformat(), hours,
+                              titles=max(0, round(hours * 1.3)))
+            for week, hours in weeks if week >= c.started - timedelta(days=6)]
 
 
 def summarize(rows, events: list[dict]) -> dict[str, list[str]]:
@@ -138,16 +157,17 @@ def copy_registry(r: Registry) -> Registry:
     return Registry({k: dict(v) for k, v in r.options.items()}, dict(r.windows))
 
 
-def build(sim: Sim, spec, registry: Registry) -> dict:
-    n, key, name, plan, tenure, renewal, charge_day, force, title, point, live_message = spec
+def build(sim: Sim, spec: dict, registry: Registry) -> dict:
+    n, key, name, plan, tenure = spec["set"], spec["key"], spec["name"], spec["plan"], spec["tenure"]
+    charge_day = spec["charge_day"]
     started = months_before(charge_day, tenure) if tenure else charge_day
     c = sim.customer(started, plan=plan, name=name)
     c.email = f"{name.lower().replace(' ', '.')}.set{n}@example.com"
-    force = dict(force)
+    force = dict(spec["force"])
     if team := force.pop("rep_team", None):
         force["rep"] = next(r for r in sim.reps if r["team"] == team)
-    case_events, _ = sim.case(c, charge_day, renewal=renewal, force=force)
-    events = [f.subscription_created(sim.ids, wm.dt(c.started, 10), c)] + case_events
+    case_events, _ = sim.case(c, charge_day, renewal=spec["renewal"], force=force)
+    events = [f.subscription_created(sim.ids, wm.dt(c.started, 10), c)] + case_events + usage_events(sim, c, spec["usage"])
     events.sort(key=lambda e: (e["occurred_at"], e["event_id"]))
     phase1 = [e for e in events if e["event_type"] not in OUTCOME_TYPES]
     phase2 = [e for e in events if e["event_type"] in OUTCOME_TYPES]
@@ -158,9 +178,10 @@ def build(sim: Sim, spec, registry: Registry) -> dict:
     first, total = rows_dict(rows_first), rows_dict(rows_all)
     became = summarize(rows_all, events)
     ticket = next((e for e in phase1 if e["event_type"] == "ticket.created"), None)
-    message = live_message or (ticket["payload"]["ticket"]["description"] if ticket else "")
+    message = spec["message"] or (ticket["payload"]["ticket"]["description"] if ticket else "")
     return {
-        "set": n, "key": key, "scenario_id": scenario, "title": title, "point": point, "message": message,
+        "set": n, "key": key, "scenario_id": scenario, "title": spec["title"], "point": spec["point"],
+        "message": message, "via_bank": ticket is None,
         "customer": {"name": c.name, "email": c.email, "plan": plan, "tenure_months": tenure},
         "phases": [
             {"name": "events", "events": phase1, "rows": first},
@@ -175,11 +196,11 @@ def main() -> None:
         base_registry = load_registry(d, database())
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     for spec in SETS:
-        story = build(Sim(seed=1000 + spec[0]), spec, base_registry)
-        path = OUT_DIR / f"set-{spec[0]}.json"
+        story = build(Sim(seed=1000 + spec["set"]), spec, base_registry)
+        path = OUT_DIR / f"set-{spec['set']}.json"
         path.write_text(json.dumps(story, indent=1, default=str))
         p1, p2 = story["phases"]
-        print(f"Set {spec[0]} ({story['customer']['name']}): {len(p1['events'])} events + {len(p2['events'])} later · "
+        print(f"Set {spec['set']} ({story['customer']['name']}): {len(p1['events'])} events + {len(p2['events'])} later · "
               f"{len(p1['rows']['decisions'])} decisions, {len(p1['rows']['outcomes'])}+{len(p2['rows']['outcomes'])} outcomes"
               f"{' · schema proposals: ' + ', '.join(x['key'] for x in p1['rows']['schema_proposals']) if p1['rows']['schema_proposals'] else ''}")
 

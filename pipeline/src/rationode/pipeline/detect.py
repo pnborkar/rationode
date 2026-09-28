@@ -165,7 +165,7 @@ class Detector:
                 "charge_id": e.charge_id, "ticket_id": e.ticket_id, "dispute_id": e.dispute_id,
                 "stripe_customer_id": e.stripe_customer_id, "email": e.email, "scenario_id": self.scenario})
             charge = e.charge_id or ticket_charge.get(e.ticket_id) or dispute_charge.get(e.dispute_id)
-            if e.source == "subscriptions":
+            if e.source in ("subscriptions", "streamly_app"):   # customer-level: outcomes and usage context
                 customer_events.append(e)
             elif charge:
                 cases[charge].append(e)

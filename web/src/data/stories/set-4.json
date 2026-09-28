@@ -5,6 +5,7 @@
  "title": "The fraud that slipped through",
  "point": "The fraud tool approved a risk-70 signup (its review threshold is 75); the charge came back as unauthorized.",
  "message": "I never signed up for Streamly. Why was I charged $480?",
+ "via_bank": true,
  "customer": {
   "name": "Omar Haddad",
   "email": "omar.haddad.set4@example.com",
@@ -80,6 +81,20 @@
       "email": "omar.haddad.set4@example.com",
       "plan": "annual_480",
       "started_at": "2026-06-20T10:00:00Z"
+     }
+    },
+    {
+     "event_id": "pb_YKKQy2V504l6sT",
+     "source_system": "streamly_app",
+     "event_type": "playback.weekly_summary",
+     "occurred_at": "2026-06-29T06:00:00Z",
+     "payload": {
+      "stripe_customer_id": "cus_iDTbj4HILjBySE",
+      "email": "omar.haddad.set4@example.com",
+      "week_start": "2026-06-22",
+      "hours_watched": 0.0,
+      "titles_watched": 0,
+      "sessions": 0
      }
     },
     {
@@ -207,6 +222,19 @@
       "event_type": "subscription.created",
       "occurred_at": "2026-06-20T10:00:00Z",
       "payload_json": "{\"subscription_id\":\"sub_O4EXI7Dp6UiwEd\",\"stripe_customer_id\":\"cus_iDTbj4HILjBySE\",\"email\":\"omar.haddad.set4@example.com\",\"plan\":\"annual_480\",\"started_at\":\"2026-06-20T10:00:00Z\"}",
+      "charge_id": null,
+      "ticket_id": null,
+      "dispute_id": null,
+      "stripe_customer_id": "cus_iDTbj4HILjBySE",
+      "email": "omar.haddad.set4@example.com",
+      "scenario_id": "story:omar"
+     },
+     {
+      "event_id": "story:omar|pb_YKKQy2V504l6sT",
+      "source_system": "streamly_app",
+      "event_type": "playback.weekly_summary",
+      "occurred_at": "2026-06-29T06:00:00Z",
+      "payload_json": "{\"stripe_customer_id\":\"cus_iDTbj4HILjBySE\",\"email\":\"omar.haddad.set4@example.com\",\"week_start\":\"2026-06-22\",\"hours_watched\":0.0,\"titles_watched\":0,\"sessions\":0}",
       "charge_id": null,
       "ticket_id": null,
       "dispute_id": null,
@@ -713,6 +741,7 @@
   ],
   "evt_po8cvfCeikoFsO": [],
   "subevt_Tc1EEmlRuvJqcN": [],
+  "pb_YKKQy2V504l6sT": [],
   "evt_nOoEzbxf05aOkx": [
    "Outcome \u00b7 dispute filed ($480)"
   ],

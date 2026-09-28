@@ -5,6 +5,7 @@
  "title": "The usage logs that won",
  "point": "She told her bank she'd canceled; the agent sent usage logs showing she kept watching, and the dispute was won.",
  "message": "I thought I canceled. Why was I charged $300 again?",
+ "via_bank": true,
  "customer": {
   "name": "Nina Brooks",
   "email": "nina.brooks.set5@example.com",
@@ -26,6 +27,34 @@
       "email": "nina.brooks.set5@example.com",
       "plan": "annual_300",
       "started_at": "2023-08-08T10:00:00Z"
+     }
+    },
+    {
+     "event_id": "pb_5q1udeO2MqDAxI",
+     "source_system": "streamly_app",
+     "event_type": "playback.weekly_summary",
+     "occurred_at": "2026-05-25T06:00:00Z",
+     "payload": {
+      "stripe_customer_id": "cus_xyIwJMCQR1cabn",
+      "email": "nina.brooks.set5@example.com",
+      "week_start": "2026-05-18",
+      "hours_watched": 6.5,
+      "titles_watched": 8,
+      "sessions": 5
+     }
+    },
+    {
+     "event_id": "pb_eHtFX6MtANpEPY",
+     "source_system": "streamly_app",
+     "event_type": "playback.weekly_summary",
+     "occurred_at": "2026-06-01T06:00:00Z",
+     "payload": {
+      "stripe_customer_id": "cus_xyIwJMCQR1cabn",
+      "email": "nina.brooks.set5@example.com",
+      "week_start": "2026-05-25",
+      "hours_watched": 7.5,
+      "titles_watched": 10,
+      "sessions": 5
      }
     },
     {
@@ -80,6 +109,34 @@
         "created": 1780882980
        }
       }
+     }
+    },
+    {
+     "event_id": "pb_9hpzqmUleEo7v8",
+     "source_system": "streamly_app",
+     "event_type": "playback.weekly_summary",
+     "occurred_at": "2026-06-08T06:00:00Z",
+     "payload": {
+      "stripe_customer_id": "cus_xyIwJMCQR1cabn",
+      "email": "nina.brooks.set5@example.com",
+      "week_start": "2026-06-01",
+      "hours_watched": 6.0,
+      "titles_watched": 8,
+      "sessions": 4
+     }
+    },
+    {
+     "event_id": "pb_Pecu4kga503Y9d",
+     "source_system": "streamly_app",
+     "event_type": "playback.weekly_summary",
+     "occurred_at": "2026-06-15T06:00:00Z",
+     "payload": {
+      "stripe_customer_id": "cus_xyIwJMCQR1cabn",
+      "email": "nina.brooks.set5@example.com",
+      "week_start": "2026-06-08",
+      "hours_watched": 8.0,
+      "titles_watched": 10,
+      "sessions": 6
      }
     },
     {
@@ -173,6 +230,34 @@
       },
       "called_at": "2026-06-20T18:20:20Z"
      }
+    },
+    {
+     "event_id": "pb_LnqBhywe7901YL",
+     "source_system": "streamly_app",
+     "event_type": "playback.weekly_summary",
+     "occurred_at": "2026-06-22T06:00:00Z",
+     "payload": {
+      "stripe_customer_id": "cus_xyIwJMCQR1cabn",
+      "email": "nina.brooks.set5@example.com",
+      "week_start": "2026-06-15",
+      "hours_watched": 5.5,
+      "titles_watched": 7,
+      "sessions": 4
+     }
+    },
+    {
+     "event_id": "pb_whnLDGiUFOTdyV",
+     "source_system": "streamly_app",
+     "event_type": "playback.weekly_summary",
+     "occurred_at": "2026-06-29T06:00:00Z",
+     "payload": {
+      "stripe_customer_id": "cus_xyIwJMCQR1cabn",
+      "email": "nina.brooks.set5@example.com",
+      "week_start": "2026-06-22",
+      "hours_watched": 6.5,
+      "titles_watched": 8,
+      "sessions": 5
+     }
     }
    ],
    "rows": {
@@ -183,6 +268,32 @@
       "event_type": "subscription.created",
       "occurred_at": "2023-08-08T10:00:00Z",
       "payload_json": "{\"subscription_id\":\"sub_BoCZ7kkNNvSGAH\",\"stripe_customer_id\":\"cus_xyIwJMCQR1cabn\",\"email\":\"nina.brooks.set5@example.com\",\"plan\":\"annual_300\",\"started_at\":\"2023-08-08T10:00:00Z\"}",
+      "charge_id": null,
+      "ticket_id": null,
+      "dispute_id": null,
+      "stripe_customer_id": "cus_xyIwJMCQR1cabn",
+      "email": "nina.brooks.set5@example.com",
+      "scenario_id": "story:nina"
+     },
+     {
+      "event_id": "story:nina|pb_5q1udeO2MqDAxI",
+      "source_system": "streamly_app",
+      "event_type": "playback.weekly_summary",
+      "occurred_at": "2026-05-25T06:00:00Z",
+      "payload_json": "{\"stripe_customer_id\":\"cus_xyIwJMCQR1cabn\",\"email\":\"nina.brooks.set5@example.com\",\"week_start\":\"2026-05-18\",\"hours_watched\":6.5,\"titles_watched\":8,\"sessions\":5}",
+      "charge_id": null,
+      "ticket_id": null,
+      "dispute_id": null,
+      "stripe_customer_id": "cus_xyIwJMCQR1cabn",
+      "email": "nina.brooks.set5@example.com",
+      "scenario_id": "story:nina"
+     },
+     {
+      "event_id": "story:nina|pb_eHtFX6MtANpEPY",
+      "source_system": "streamly_app",
+      "event_type": "playback.weekly_summary",
+      "occurred_at": "2026-06-01T06:00:00Z",
+      "payload_json": "{\"stripe_customer_id\":\"cus_xyIwJMCQR1cabn\",\"email\":\"nina.brooks.set5@example.com\",\"week_start\":\"2026-05-25\",\"hours_watched\":7.5,\"titles_watched\":10,\"sessions\":5}",
       "charge_id": null,
       "ticket_id": null,
       "dispute_id": null,
@@ -210,6 +321,32 @@
       "occurred_at": "2026-06-08T01:43:00Z",
       "payload_json": "{\"id\":\"evt_YqOPfqQMAyG0eO\",\"object\":\"event\",\"api_version\":\"2026-06-30\",\"type\":\"charge.succeeded\",\"created\":1780882980,\"livemode\":false,\"data\":{\"object\":{\"id\":\"ch_Cu6GyoJJm5OMKA\",\"object\":\"charge\",\"amount\":30000,\"currency\":\"usd\",\"customer\":\"cus_xyIwJMCQR1cabn\",\"billing_details\":{\"email\":\"nina.brooks.set5@example.com\",\"name\":\"Nina Brooks\"},\"metadata\":{\"plan\":\"annual_300\",\"subscription_id\":\"sub_BoCZ7kkNNvSGAH\"},\"status\":\"succeeded\",\"created\":1780882980}}}",
       "charge_id": "ch_Cu6GyoJJm5OMKA",
+      "ticket_id": null,
+      "dispute_id": null,
+      "stripe_customer_id": "cus_xyIwJMCQR1cabn",
+      "email": "nina.brooks.set5@example.com",
+      "scenario_id": "story:nina"
+     },
+     {
+      "event_id": "story:nina|pb_9hpzqmUleEo7v8",
+      "source_system": "streamly_app",
+      "event_type": "playback.weekly_summary",
+      "occurred_at": "2026-06-08T06:00:00Z",
+      "payload_json": "{\"stripe_customer_id\":\"cus_xyIwJMCQR1cabn\",\"email\":\"nina.brooks.set5@example.com\",\"week_start\":\"2026-06-01\",\"hours_watched\":6.0,\"titles_watched\":8,\"sessions\":4}",
+      "charge_id": null,
+      "ticket_id": null,
+      "dispute_id": null,
+      "stripe_customer_id": "cus_xyIwJMCQR1cabn",
+      "email": "nina.brooks.set5@example.com",
+      "scenario_id": "story:nina"
+     },
+     {
+      "event_id": "story:nina|pb_Pecu4kga503Y9d",
+      "source_system": "streamly_app",
+      "event_type": "playback.weekly_summary",
+      "occurred_at": "2026-06-15T06:00:00Z",
+      "payload_json": "{\"stripe_customer_id\":\"cus_xyIwJMCQR1cabn\",\"email\":\"nina.brooks.set5@example.com\",\"week_start\":\"2026-06-08\",\"hours_watched\":8.0,\"titles_watched\":10,\"sessions\":6}",
+      "charge_id": null,
       "ticket_id": null,
       "dispute_id": null,
       "stripe_customer_id": "cus_xyIwJMCQR1cabn",
@@ -253,6 +390,32 @@
       "dispute_id": "dp_xOaHyfcuECNMQ3",
       "stripe_customer_id": null,
       "email": null,
+      "scenario_id": "story:nina"
+     },
+     {
+      "event_id": "story:nina|pb_LnqBhywe7901YL",
+      "source_system": "streamly_app",
+      "event_type": "playback.weekly_summary",
+      "occurred_at": "2026-06-22T06:00:00Z",
+      "payload_json": "{\"stripe_customer_id\":\"cus_xyIwJMCQR1cabn\",\"email\":\"nina.brooks.set5@example.com\",\"week_start\":\"2026-06-15\",\"hours_watched\":5.5,\"titles_watched\":7,\"sessions\":4}",
+      "charge_id": null,
+      "ticket_id": null,
+      "dispute_id": null,
+      "stripe_customer_id": "cus_xyIwJMCQR1cabn",
+      "email": "nina.brooks.set5@example.com",
+      "scenario_id": "story:nina"
+     },
+     {
+      "event_id": "story:nina|pb_whnLDGiUFOTdyV",
+      "source_system": "streamly_app",
+      "event_type": "playback.weekly_summary",
+      "occurred_at": "2026-06-29T06:00:00Z",
+      "payload_json": "{\"stripe_customer_id\":\"cus_xyIwJMCQR1cabn\",\"email\":\"nina.brooks.set5@example.com\",\"week_start\":\"2026-06-22\",\"hours_watched\":6.5,\"titles_watched\":8,\"sessions\":5}",
+      "charge_id": null,
+      "ticket_id": null,
+      "dispute_id": null,
+      "stripe_customer_id": "cus_xyIwJMCQR1cabn",
+      "email": "nina.brooks.set5@example.com",
       "scenario_id": "story:nina"
      }
     ],
@@ -673,10 +836,14 @@
  ],
  "became": {
   "subevt_6M8HTq2A9TCFJr": [],
+  "pb_5q1udeO2MqDAxI": [],
+  "pb_eHtFX6MtANpEPY": [],
   "scr_TOL8xMZDA1uQkS": [
    "Decision \u00b7 fraud screen \u00b7 final: approve \u00b7 by FraudGuard rules"
   ],
   "evt_YqOPfqQMAyG0eO": [],
+  "pb_9hpzqmUleEo7v8": [],
+  "pb_Pecu4kga503Y9d": [],
   "evt_2gQhZ9KuKJZjJA": [
    "Outcome \u00b7 dispute filed ($300)"
   ],
@@ -685,6 +852,8 @@
    "Decision \u00b7 response \u00b7 final: contest \u00b7 by AI v2",
    "Decision \u00b7 evidence \u00b7 final: usage logs, tos acceptance \u00b7 by AI v2"
   ],
+  "pb_LnqBhywe7901YL": [],
+  "pb_whnLDGiUFOTdyV": [],
   "evt_RaciRNAdGkE0K9": [
    "Outcome \u00b7 dispute won ($300 kept, $15 fee)"
   ]

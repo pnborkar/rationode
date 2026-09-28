@@ -107,12 +107,15 @@ function StepCard({ step }: { step: Step }) {
 
 // Customers from sets loaded on the Events tab, as live-tab cases.
 type SetInfo = { set: number; loaded: boolean;
-                 story: { key: string; title: string; point: string; message: string;
+                 story: { key: string; title: string; point: string; message: string; via_bank: boolean;
                           customer: { name: string; email: string } } | null };
 const toCases = (sets: SetInfo[]): LiveCase[] => sets.filter((s) => s.loaded && s.story).map((s) => ({
   key: `set-${s.set}`, name: s.story!.customer.name, email: s.story!.customer.email, ticket_id: `51000${s.set}`,
   blurb: `Loaded from Events · Set ${s.set}: ${s.story!.title}. ${s.story!.point}`, message: s.story!.message,
   setNumber: s.set,
+  note: s.story!.via_bank
+    ? `${s.story!.customer.name.split(" ")[0]} went to their bank, not support. Sending this message here asks: what if they had contacted support first? (Their real story is a card dispute.)`
+    : undefined,
 }));
 
 export default function StreamlyLive() {
@@ -329,7 +332,10 @@ export default function StreamlyLive() {
           </select>}>
           <div className="flex h-full flex-col">
             <div className="mb-3 flex items-start gap-2 rounded-md bg-zinc-950/60 px-3 py-2 text-xs text-zinc-400">
-              <p className="flex-1">{current.blurb}</p>
+              <div className="flex-1">
+                <p>{current.blurb}</p>
+                {current.note && <p className="mt-1 text-amber-300">{current.note}</p>}
+              </div>
               {current.setNumber && (
                 <button onClick={() => removeStory(current.setNumber!)} disabled={running}
                         className="shrink-0 rounded border border-zinc-700 px-2 py-0.5 text-zinc-300 hover:bg-zinc-800">

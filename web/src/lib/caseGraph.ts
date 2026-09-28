@@ -50,8 +50,44 @@ export async function customerGraph(email: string) {
       rels.push({ id: `${d.id}->${o.id}`, from: d.id, to: o.id, type: "LED_TO" });
     }
   }
+  await addUsage(r.customer, nodes, rels);
   await addPolicyGap(email, nodes, rels);
   return { nodes, rels };
+}
+
+// Weekly viewing from the Streamly app. Weeks with viewing on or after a disputed charge contradict an
+// "I canceled" (subscription_canceled) dispute, e.g. Nina kept watching after the renewal she disputed.
+async function addUsage(customerId: string, nodes: GraphNode[], rels: GraphRel[]) {
+  const weeks = await query<{ id: string; week: string; hours: number; titles: number }>(
+    `MATCH (c:Customer:Entity {entity_id: $customer})
+     MATCH (e:Event {event_type: 'playback.weekly_summary', stripe_customer_id: c.source_key})
+     WITH e, apoc.convert.fromJsonMap(e.payload_json) AS p
+     RETURN e.event_id AS id, p.week_start AS week, p.hours_watched AS hours, p.titles_watched AS titles
+     ORDER BY week`,
+    { customer: customerId },
+  );
+  if (!weeks.length) return;
+  const disputes = await query<{ dispute: string; charged: string }>(
+    `MATCH (:Customer:Entity {entity_id: $customer})<-[:ABOUT]-(:Decision)-[:ABOUT]->(dp:Dispute)
+     WHERE dp.category = 'subscription_canceled'
+     MATCH (:Decision)-[:ABOUT]->(dp)
+     MATCH (ch:Charge)<-[:ABOUT]-(:Decision)-[:ABOUT]->(dp)
+     MATCH (ev:Event {event_type: 'charge.succeeded', charge_id: ch.source_key})
+     RETURN DISTINCT dp.entity_id AS dispute, toString(date(ev.occurred_at)) AS charged`,
+    { customer: customerId },
+  );
+  for (const w of weeks) {
+    nodes.push({ id: w.id, kind: "usage", label: `${w.hours} h`,
+                 detail: `week of ${w.week} · ${w.hours} hours · ${w.titles} titles (Streamly app)` });
+    rels.push({ id: `${customerId}->${w.id}`, from: customerId, to: w.id, type: "WATCHED" });
+    for (const d of disputes) {
+      // A week counts if it ends on or after the disputed charge and has viewing.
+      const weekEnd = new Date(new Date(w.week).getTime() + 6 * 86_400_000).toISOString().slice(0, 10);
+      if (w.hours > 0 && weekEnd >= d.charged) {
+        rels.push({ id: `${w.id}->${d.dispute}`, from: w.id, to: d.dispute, type: "CONTRADICTS" });
+      }
+    }
+  }
 }
 
 // When a customer's fraud screening went against the written policy (e.g. Omar: the tool approved a

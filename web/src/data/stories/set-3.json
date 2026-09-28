@@ -5,6 +5,7 @@
  "title": "The pause that saved a customer",
  "point": "The newer pause_subscription option (still PROPOSED in the schema registry) showing up in fresh events.",
  "message": "I can't justify paying this much anymore. Is there anything you can do?",
+ "via_bank": false,
  "customer": {
   "name": "Mei Tanaka",
   "email": "mei.tanaka.set3@example.com",
@@ -26,6 +27,48 @@
       "email": "mei.tanaka.set3@example.com",
       "plan": "monthly_49",
       "started_at": "2023-04-14T10:00:00Z"
+     }
+    },
+    {
+     "event_id": "pb_wrZkpvFL4IgCF9",
+     "source_system": "streamly_app",
+     "event_type": "playback.weekly_summary",
+     "occurred_at": "2026-05-25T06:00:00Z",
+     "payload": {
+      "stripe_customer_id": "cus_UiiU2l1mvNjFAg",
+      "email": "mei.tanaka.set3@example.com",
+      "week_start": "2026-05-18",
+      "hours_watched": 5.5,
+      "titles_watched": 7,
+      "sessions": 4
+     }
+    },
+    {
+     "event_id": "pb_3TL1pAPMq0GD9T",
+     "source_system": "streamly_app",
+     "event_type": "playback.weekly_summary",
+     "occurred_at": "2026-06-01T06:00:00Z",
+     "payload": {
+      "stripe_customer_id": "cus_UiiU2l1mvNjFAg",
+      "email": "mei.tanaka.set3@example.com",
+      "week_start": "2026-05-25",
+      "hours_watched": 6.0,
+      "titles_watched": 8,
+      "sessions": 4
+     }
+    },
+    {
+     "event_id": "pb_1acqoBVbqKeGvb",
+     "source_system": "streamly_app",
+     "event_type": "playback.weekly_summary",
+     "occurred_at": "2026-06-08T06:00:00Z",
+     "payload": {
+      "stripe_customer_id": "cus_UiiU2l1mvNjFAg",
+      "email": "mei.tanaka.set3@example.com",
+      "week_start": "2026-06-01",
+      "hours_watched": 4.5,
+      "titles_watched": 6,
+      "sessions": 3
      }
     },
     {
@@ -80,6 +123,20 @@
         "created": 1781456100
        }
       }
+     }
+    },
+    {
+     "event_id": "pb_d6KGzcPVcKt2q6",
+     "source_system": "streamly_app",
+     "event_type": "playback.weekly_summary",
+     "occurred_at": "2026-06-15T06:00:00Z",
+     "payload": {
+      "stripe_customer_id": "cus_UiiU2l1mvNjFAg",
+      "email": "mei.tanaka.set3@example.com",
+      "week_start": "2026-06-08",
+      "hours_watched": 5.0,
+      "titles_watched": 6,
+      "sessions": 4
      }
     },
     {
@@ -217,6 +274,34 @@
       },
       "updated_at": "2026-06-19T01:54:05Z"
      }
+    },
+    {
+     "event_id": "pb_9jt86CZahGKiga",
+     "source_system": "streamly_app",
+     "event_type": "playback.weekly_summary",
+     "occurred_at": "2026-06-22T06:00:00Z",
+     "payload": {
+      "stripe_customer_id": "cus_UiiU2l1mvNjFAg",
+      "email": "mei.tanaka.set3@example.com",
+      "week_start": "2026-06-15",
+      "hours_watched": 3.5,
+      "titles_watched": 5,
+      "sessions": 2
+     }
+    },
+    {
+     "event_id": "pb_D11P0GZmE8lyP8",
+     "source_system": "streamly_app",
+     "event_type": "playback.weekly_summary",
+     "occurred_at": "2026-06-29T06:00:00Z",
+     "payload": {
+      "stripe_customer_id": "cus_UiiU2l1mvNjFAg",
+      "email": "mei.tanaka.set3@example.com",
+      "week_start": "2026-06-22",
+      "hours_watched": 0.0,
+      "titles_watched": 0,
+      "sessions": 0
+     }
     }
    ],
    "rows": {
@@ -227,6 +312,45 @@
       "event_type": "subscription.created",
       "occurred_at": "2023-04-14T10:00:00Z",
       "payload_json": "{\"subscription_id\":\"sub_dAFFdA8RuRyJha\",\"stripe_customer_id\":\"cus_UiiU2l1mvNjFAg\",\"email\":\"mei.tanaka.set3@example.com\",\"plan\":\"monthly_49\",\"started_at\":\"2023-04-14T10:00:00Z\"}",
+      "charge_id": null,
+      "ticket_id": null,
+      "dispute_id": null,
+      "stripe_customer_id": "cus_UiiU2l1mvNjFAg",
+      "email": "mei.tanaka.set3@example.com",
+      "scenario_id": "story:mei"
+     },
+     {
+      "event_id": "story:mei|pb_wrZkpvFL4IgCF9",
+      "source_system": "streamly_app",
+      "event_type": "playback.weekly_summary",
+      "occurred_at": "2026-05-25T06:00:00Z",
+      "payload_json": "{\"stripe_customer_id\":\"cus_UiiU2l1mvNjFAg\",\"email\":\"mei.tanaka.set3@example.com\",\"week_start\":\"2026-05-18\",\"hours_watched\":5.5,\"titles_watched\":7,\"sessions\":4}",
+      "charge_id": null,
+      "ticket_id": null,
+      "dispute_id": null,
+      "stripe_customer_id": "cus_UiiU2l1mvNjFAg",
+      "email": "mei.tanaka.set3@example.com",
+      "scenario_id": "story:mei"
+     },
+     {
+      "event_id": "story:mei|pb_3TL1pAPMq0GD9T",
+      "source_system": "streamly_app",
+      "event_type": "playback.weekly_summary",
+      "occurred_at": "2026-06-01T06:00:00Z",
+      "payload_json": "{\"stripe_customer_id\":\"cus_UiiU2l1mvNjFAg\",\"email\":\"mei.tanaka.set3@example.com\",\"week_start\":\"2026-05-25\",\"hours_watched\":6.0,\"titles_watched\":8,\"sessions\":4}",
+      "charge_id": null,
+      "ticket_id": null,
+      "dispute_id": null,
+      "stripe_customer_id": "cus_UiiU2l1mvNjFAg",
+      "email": "mei.tanaka.set3@example.com",
+      "scenario_id": "story:mei"
+     },
+     {
+      "event_id": "story:mei|pb_1acqoBVbqKeGvb",
+      "source_system": "streamly_app",
+      "event_type": "playback.weekly_summary",
+      "occurred_at": "2026-06-08T06:00:00Z",
+      "payload_json": "{\"stripe_customer_id\":\"cus_UiiU2l1mvNjFAg\",\"email\":\"mei.tanaka.set3@example.com\",\"week_start\":\"2026-06-01\",\"hours_watched\":4.5,\"titles_watched\":6,\"sessions\":3}",
       "charge_id": null,
       "ticket_id": null,
       "dispute_id": null,
@@ -254,6 +378,19 @@
       "occurred_at": "2026-06-14T16:55:00Z",
       "payload_json": "{\"id\":\"evt_x8uodYp4vR2jTZ\",\"object\":\"event\",\"api_version\":\"2026-06-30\",\"type\":\"charge.succeeded\",\"created\":1781456100,\"livemode\":false,\"data\":{\"object\":{\"id\":\"ch_Cd9MoFXDRaXJwz\",\"object\":\"charge\",\"amount\":4900,\"currency\":\"usd\",\"customer\":\"cus_UiiU2l1mvNjFAg\",\"billing_details\":{\"email\":\"mei.tanaka.set3@example.com\",\"name\":\"Mei Tanaka\"},\"metadata\":{\"plan\":\"monthly_49\",\"subscription_id\":\"sub_dAFFdA8RuRyJha\"},\"status\":\"succeeded\",\"created\":1781456100}}}",
       "charge_id": "ch_Cd9MoFXDRaXJwz",
+      "ticket_id": null,
+      "dispute_id": null,
+      "stripe_customer_id": "cus_UiiU2l1mvNjFAg",
+      "email": "mei.tanaka.set3@example.com",
+      "scenario_id": "story:mei"
+     },
+     {
+      "event_id": "story:mei|pb_d6KGzcPVcKt2q6",
+      "source_system": "streamly_app",
+      "event_type": "playback.weekly_summary",
+      "occurred_at": "2026-06-15T06:00:00Z",
+      "payload_json": "{\"stripe_customer_id\":\"cus_UiiU2l1mvNjFAg\",\"email\":\"mei.tanaka.set3@example.com\",\"week_start\":\"2026-06-08\",\"hours_watched\":5.0,\"titles_watched\":6,\"sessions\":4}",
+      "charge_id": null,
       "ticket_id": null,
       "dispute_id": null,
       "stripe_customer_id": "cus_UiiU2l1mvNjFAg",
@@ -336,6 +473,32 @@
       "dispute_id": null,
       "stripe_customer_id": null,
       "email": null,
+      "scenario_id": "story:mei"
+     },
+     {
+      "event_id": "story:mei|pb_9jt86CZahGKiga",
+      "source_system": "streamly_app",
+      "event_type": "playback.weekly_summary",
+      "occurred_at": "2026-06-22T06:00:00Z",
+      "payload_json": "{\"stripe_customer_id\":\"cus_UiiU2l1mvNjFAg\",\"email\":\"mei.tanaka.set3@example.com\",\"week_start\":\"2026-06-15\",\"hours_watched\":3.5,\"titles_watched\":5,\"sessions\":2}",
+      "charge_id": null,
+      "ticket_id": null,
+      "dispute_id": null,
+      "stripe_customer_id": "cus_UiiU2l1mvNjFAg",
+      "email": "mei.tanaka.set3@example.com",
+      "scenario_id": "story:mei"
+     },
+     {
+      "event_id": "story:mei|pb_D11P0GZmE8lyP8",
+      "source_system": "streamly_app",
+      "event_type": "playback.weekly_summary",
+      "occurred_at": "2026-06-29T06:00:00Z",
+      "payload_json": "{\"stripe_customer_id\":\"cus_UiiU2l1mvNjFAg\",\"email\":\"mei.tanaka.set3@example.com\",\"week_start\":\"2026-06-22\",\"hours_watched\":0.0,\"titles_watched\":0,\"sessions\":0}",
+      "charge_id": null,
+      "ticket_id": null,
+      "dispute_id": null,
+      "stripe_customer_id": "cus_UiiU2l1mvNjFAg",
+      "email": "mei.tanaka.set3@example.com",
       "scenario_id": "story:mei"
      }
     ],
@@ -773,10 +936,14 @@
  ],
  "became": {
   "subevt_PAR6YMjqo6Xb3v": [],
+  "pb_wrZkpvFL4IgCF9": [],
+  "pb_3TL1pAPMq0GD9T": [],
+  "pb_1acqoBVbqKeGvb": [],
   "scr_4tca2g0V3XkKsg": [
    "Decision \u00b7 fraud screen \u00b7 final: approve \u00b7 by FraudGuard rules"
   ],
   "evt_x8uodYp4vR2jTZ": [],
+  "pb_d6KGzcPVcKt2q6": [],
   "zdevt_liMHc1NMR9btP4": [
    "Identity \u00b7 Zendesk requester SAME_AS Stripe customer (email match)"
   ],
@@ -789,6 +956,8 @@
   ],
   "subevt_ly1ltcW6iJwNRg": [],
   "zdevt_LMeBsW1dAHf9aN": [],
+  "pb_9jt86CZahGKiga": [],
+  "pb_D11P0GZmE8lyP8": [],
   "subevt_pyeBLzU3p3Mj8K": [
    "Outcome \u00b7 renewal"
   ]

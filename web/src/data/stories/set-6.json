@@ -5,6 +5,7 @@
  "title": "The generous rep",
  "point": "A Team B rep refunded a 3-month customer the AI would have denied; he cancelled anyway. GDS picked out Team B's peer group for calls like this.",
  "message": "I forgot to cancel and didn't watch anything this period. Please refund me.",
+ "via_bank": false,
  "customer": {
   "name": "Theo Grant",
   "email": "theo.grant.set6@example.com",
@@ -26,6 +27,34 @@
       "email": "theo.grant.set6@example.com",
       "plan": "monthly_25",
       "started_at": "2026-03-10T10:00:00Z"
+     }
+    },
+    {
+     "event_id": "pb_KkT8GGRXeGPzxJ",
+     "source_system": "streamly_app",
+     "event_type": "playback.weekly_summary",
+     "occurred_at": "2026-06-01T06:00:00Z",
+     "payload": {
+      "stripe_customer_id": "cus_ZKG9xkwf07fdDU",
+      "email": "theo.grant.set6@example.com",
+      "week_start": "2026-05-25",
+      "hours_watched": 0.0,
+      "titles_watched": 0,
+      "sessions": 0
+     }
+    },
+    {
+     "event_id": "pb_7yFfjwfDK0pQU6",
+     "source_system": "streamly_app",
+     "event_type": "playback.weekly_summary",
+     "occurred_at": "2026-06-08T06:00:00Z",
+     "payload": {
+      "stripe_customer_id": "cus_ZKG9xkwf07fdDU",
+      "email": "theo.grant.set6@example.com",
+      "week_start": "2026-06-01",
+      "hours_watched": 0.0,
+      "titles_watched": 0,
+      "sessions": 0
      }
     },
     {
@@ -234,6 +263,34 @@
       },
       "updated_at": "2026-06-14T01:27:42Z"
      }
+    },
+    {
+     "event_id": "pb_0CktZHWnFuXDYV",
+     "source_system": "streamly_app",
+     "event_type": "playback.weekly_summary",
+     "occurred_at": "2026-06-15T06:00:00Z",
+     "payload": {
+      "stripe_customer_id": "cus_ZKG9xkwf07fdDU",
+      "email": "theo.grant.set6@example.com",
+      "week_start": "2026-06-08",
+      "hours_watched": 0.0,
+      "titles_watched": 0,
+      "sessions": 0
+     }
+    },
+    {
+     "event_id": "pb_0MY4yYPbv38rw7",
+     "source_system": "streamly_app",
+     "event_type": "playback.weekly_summary",
+     "occurred_at": "2026-06-22T06:00:00Z",
+     "payload": {
+      "stripe_customer_id": "cus_ZKG9xkwf07fdDU",
+      "email": "theo.grant.set6@example.com",
+      "week_start": "2026-06-15",
+      "hours_watched": 0.0,
+      "titles_watched": 0,
+      "sessions": 0
+     }
     }
    ],
    "rows": {
@@ -244,6 +301,32 @@
       "event_type": "subscription.created",
       "occurred_at": "2026-03-10T10:00:00Z",
       "payload_json": "{\"subscription_id\":\"sub_Ji3ycCBexptzky\",\"stripe_customer_id\":\"cus_ZKG9xkwf07fdDU\",\"email\":\"theo.grant.set6@example.com\",\"plan\":\"monthly_25\",\"started_at\":\"2026-03-10T10:00:00Z\"}",
+      "charge_id": null,
+      "ticket_id": null,
+      "dispute_id": null,
+      "stripe_customer_id": "cus_ZKG9xkwf07fdDU",
+      "email": "theo.grant.set6@example.com",
+      "scenario_id": "story:theo"
+     },
+     {
+      "event_id": "story:theo|pb_KkT8GGRXeGPzxJ",
+      "source_system": "streamly_app",
+      "event_type": "playback.weekly_summary",
+      "occurred_at": "2026-06-01T06:00:00Z",
+      "payload_json": "{\"stripe_customer_id\":\"cus_ZKG9xkwf07fdDU\",\"email\":\"theo.grant.set6@example.com\",\"week_start\":\"2026-05-25\",\"hours_watched\":0.0,\"titles_watched\":0,\"sessions\":0}",
+      "charge_id": null,
+      "ticket_id": null,
+      "dispute_id": null,
+      "stripe_customer_id": "cus_ZKG9xkwf07fdDU",
+      "email": "theo.grant.set6@example.com",
+      "scenario_id": "story:theo"
+     },
+     {
+      "event_id": "story:theo|pb_7yFfjwfDK0pQU6",
+      "source_system": "streamly_app",
+      "event_type": "playback.weekly_summary",
+      "occurred_at": "2026-06-08T06:00:00Z",
+      "payload_json": "{\"stripe_customer_id\":\"cus_ZKG9xkwf07fdDU\",\"email\":\"theo.grant.set6@example.com\",\"week_start\":\"2026-06-01\",\"hours_watched\":0.0,\"titles_watched\":0,\"sessions\":0}",
       "charge_id": null,
       "ticket_id": null,
       "dispute_id": null,
@@ -353,6 +436,32 @@
       "dispute_id": null,
       "stripe_customer_id": null,
       "email": null,
+      "scenario_id": "story:theo"
+     },
+     {
+      "event_id": "story:theo|pb_0CktZHWnFuXDYV",
+      "source_system": "streamly_app",
+      "event_type": "playback.weekly_summary",
+      "occurred_at": "2026-06-15T06:00:00Z",
+      "payload_json": "{\"stripe_customer_id\":\"cus_ZKG9xkwf07fdDU\",\"email\":\"theo.grant.set6@example.com\",\"week_start\":\"2026-06-08\",\"hours_watched\":0.0,\"titles_watched\":0,\"sessions\":0}",
+      "charge_id": null,
+      "ticket_id": null,
+      "dispute_id": null,
+      "stripe_customer_id": "cus_ZKG9xkwf07fdDU",
+      "email": "theo.grant.set6@example.com",
+      "scenario_id": "story:theo"
+     },
+     {
+      "event_id": "story:theo|pb_0MY4yYPbv38rw7",
+      "source_system": "streamly_app",
+      "event_type": "playback.weekly_summary",
+      "occurred_at": "2026-06-22T06:00:00Z",
+      "payload_json": "{\"stripe_customer_id\":\"cus_ZKG9xkwf07fdDU\",\"email\":\"theo.grant.set6@example.com\",\"week_start\":\"2026-06-15\",\"hours_watched\":0.0,\"titles_watched\":0,\"sessions\":0}",
+      "charge_id": null,
+      "ticket_id": null,
+      "dispute_id": null,
+      "stripe_customer_id": "cus_ZKG9xkwf07fdDU",
+      "email": "theo.grant.set6@example.com",
       "scenario_id": "story:theo"
      }
     ],
@@ -804,6 +913,8 @@
  ],
  "became": {
   "subevt_NPFI0epA7EN8Ee": [],
+  "pb_KkT8GGRXeGPzxJ": [],
+  "pb_7yFfjwfDK0pQU6": [],
   "scr_a85xOlHveDxHby": [
    "Decision \u00b7 fraud screen \u00b7 final: approve \u00b7 by FraudGuard rules"
   ],
@@ -822,6 +933,8 @@
    "Outcome \u00b7 refund cost ($25)"
   ],
   "zdevt_fL3zynsMgaZXR3": [],
+  "pb_0CktZHWnFuXDYV": [],
+  "pb_0MY4yYPbv38rw7": [],
   "subevt_b97DjurJrZwUP0": [
    "Outcome \u00b7 churn"
   ]

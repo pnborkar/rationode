@@ -9,7 +9,7 @@ export async function GET() {
       set: s.set, loaded: x.loaded, outcomesLoaded: x.outcomesLoaded,
       // Revealed only once loaded, so the Events tab can keep sets anonymous.
       story: x.loaded ? { key: s.key, title: s.title, point: s.point, customer: s.customer,
-                          message: complaintText(s) } : null,
+                          message: complaintText(s), via_bank: s.via_bank } : null,
     };
   }));
 }

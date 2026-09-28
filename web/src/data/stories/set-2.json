@@ -5,6 +5,7 @@
  "title": "Denied, disputed, lost",
  "point": "A costly chain across Zendesk, the agent, and Stripe: the Dana pattern, live.",
  "message": "I was charged for a renewal but I haven't used the service at all. Can I get a refund?",
+ "via_bank": false,
  "customer": {
   "name": "Leo Marsh",
   "email": "leo.marsh.set2@example.com",
@@ -26,6 +27,48 @@
       "email": "leo.marsh.set2@example.com",
       "plan": "annual_180",
       "started_at": "2024-04-05T10:00:00Z"
+     }
+    },
+    {
+     "event_id": "pb_KYYLI3CtqP7sj9",
+     "source_system": "streamly_app",
+     "event_type": "playback.weekly_summary",
+     "occurred_at": "2026-05-18T06:00:00Z",
+     "payload": {
+      "stripe_customer_id": "cus_5fADEZdlUY6fZa",
+      "email": "leo.marsh.set2@example.com",
+      "week_start": "2026-05-11",
+      "hours_watched": 0.0,
+      "titles_watched": 0,
+      "sessions": 0
+     }
+    },
+    {
+     "event_id": "pb_LFFEKiBQRbov3h",
+     "source_system": "streamly_app",
+     "event_type": "playback.weekly_summary",
+     "occurred_at": "2026-05-25T06:00:00Z",
+     "payload": {
+      "stripe_customer_id": "cus_5fADEZdlUY6fZa",
+      "email": "leo.marsh.set2@example.com",
+      "week_start": "2026-05-18",
+      "hours_watched": 0.0,
+      "titles_watched": 0,
+      "sessions": 0
+     }
+    },
+    {
+     "event_id": "pb_OVqY5hcFuFEDPW",
+     "source_system": "streamly_app",
+     "event_type": "playback.weekly_summary",
+     "occurred_at": "2026-06-01T06:00:00Z",
+     "payload": {
+      "stripe_customer_id": "cus_5fADEZdlUY6fZa",
+      "email": "leo.marsh.set2@example.com",
+      "week_start": "2026-05-25",
+      "hours_watched": 0.0,
+      "titles_watched": 0,
+      "sessions": 0
      }
     },
     {
@@ -80,6 +123,20 @@
         "created": 1780646460
        }
       }
+     }
+    },
+    {
+     "event_id": "pb_rxKx8JBjmlZIMM",
+     "source_system": "streamly_app",
+     "event_type": "playback.weekly_summary",
+     "occurred_at": "2026-06-08T06:00:00Z",
+     "payload": {
+      "stripe_customer_id": "cus_5fADEZdlUY6fZa",
+      "email": "leo.marsh.set2@example.com",
+      "week_start": "2026-06-01",
+      "hours_watched": 0.0,
+      "titles_watched": 0,
+      "sessions": 0
      }
     },
     {
@@ -207,6 +264,34 @@
      }
     },
     {
+     "event_id": "pb_IC2k6kgicizMWx",
+     "source_system": "streamly_app",
+     "event_type": "playback.weekly_summary",
+     "occurred_at": "2026-06-15T06:00:00Z",
+     "payload": {
+      "stripe_customer_id": "cus_5fADEZdlUY6fZa",
+      "email": "leo.marsh.set2@example.com",
+      "week_start": "2026-06-08",
+      "hours_watched": 0.0,
+      "titles_watched": 0,
+      "sessions": 0
+     }
+    },
+    {
+     "event_id": "pb_LrKsHDoRb1n6E0",
+     "source_system": "streamly_app",
+     "event_type": "playback.weekly_summary",
+     "occurred_at": "2026-06-22T06:00:00Z",
+     "payload": {
+      "stripe_customer_id": "cus_5fADEZdlUY6fZa",
+      "email": "leo.marsh.set2@example.com",
+      "week_start": "2026-06-15",
+      "hours_watched": 0.0,
+      "titles_watched": 0,
+      "sessions": 0
+     }
+    },
+    {
      "event_id": "evt_ZL5AHJrPsFx3MZ",
      "source_system": "stripe",
      "event_type": "charge.dispute.created",
@@ -314,6 +399,45 @@
       "scenario_id": "story:leo"
      },
      {
+      "event_id": "story:leo|pb_KYYLI3CtqP7sj9",
+      "source_system": "streamly_app",
+      "event_type": "playback.weekly_summary",
+      "occurred_at": "2026-05-18T06:00:00Z",
+      "payload_json": "{\"stripe_customer_id\":\"cus_5fADEZdlUY6fZa\",\"email\":\"leo.marsh.set2@example.com\",\"week_start\":\"2026-05-11\",\"hours_watched\":0.0,\"titles_watched\":0,\"sessions\":0}",
+      "charge_id": null,
+      "ticket_id": null,
+      "dispute_id": null,
+      "stripe_customer_id": "cus_5fADEZdlUY6fZa",
+      "email": "leo.marsh.set2@example.com",
+      "scenario_id": "story:leo"
+     },
+     {
+      "event_id": "story:leo|pb_LFFEKiBQRbov3h",
+      "source_system": "streamly_app",
+      "event_type": "playback.weekly_summary",
+      "occurred_at": "2026-05-25T06:00:00Z",
+      "payload_json": "{\"stripe_customer_id\":\"cus_5fADEZdlUY6fZa\",\"email\":\"leo.marsh.set2@example.com\",\"week_start\":\"2026-05-18\",\"hours_watched\":0.0,\"titles_watched\":0,\"sessions\":0}",
+      "charge_id": null,
+      "ticket_id": null,
+      "dispute_id": null,
+      "stripe_customer_id": "cus_5fADEZdlUY6fZa",
+      "email": "leo.marsh.set2@example.com",
+      "scenario_id": "story:leo"
+     },
+     {
+      "event_id": "story:leo|pb_OVqY5hcFuFEDPW",
+      "source_system": "streamly_app",
+      "event_type": "playback.weekly_summary",
+      "occurred_at": "2026-06-01T06:00:00Z",
+      "payload_json": "{\"stripe_customer_id\":\"cus_5fADEZdlUY6fZa\",\"email\":\"leo.marsh.set2@example.com\",\"week_start\":\"2026-05-25\",\"hours_watched\":0.0,\"titles_watched\":0,\"sessions\":0}",
+      "charge_id": null,
+      "ticket_id": null,
+      "dispute_id": null,
+      "stripe_customer_id": "cus_5fADEZdlUY6fZa",
+      "email": "leo.marsh.set2@example.com",
+      "scenario_id": "story:leo"
+     },
+     {
       "event_id": "story:leo|scr_07RsUTPX05y4fS",
       "source_system": "fraudguard",
       "event_type": "charge.screened",
@@ -333,6 +457,19 @@
       "occurred_at": "2026-06-05T08:01:00Z",
       "payload_json": "{\"id\":\"evt_YlyqkLVBPsnGg6\",\"object\":\"event\",\"api_version\":\"2026-06-30\",\"type\":\"charge.succeeded\",\"created\":1780646460,\"livemode\":false,\"data\":{\"object\":{\"id\":\"ch_cxSSYhFAALg1ZK\",\"object\":\"charge\",\"amount\":18000,\"currency\":\"usd\",\"customer\":\"cus_5fADEZdlUY6fZa\",\"billing_details\":{\"email\":\"leo.marsh.set2@example.com\",\"name\":\"Leo Marsh\"},\"metadata\":{\"plan\":\"annual_180\",\"subscription_id\":\"sub_Xo4NDj3y6bAcr7\"},\"status\":\"succeeded\",\"created\":1780646460}}}",
       "charge_id": "ch_cxSSYhFAALg1ZK",
+      "ticket_id": null,
+      "dispute_id": null,
+      "stripe_customer_id": "cus_5fADEZdlUY6fZa",
+      "email": "leo.marsh.set2@example.com",
+      "scenario_id": "story:leo"
+     },
+     {
+      "event_id": "story:leo|pb_rxKx8JBjmlZIMM",
+      "source_system": "streamly_app",
+      "event_type": "playback.weekly_summary",
+      "occurred_at": "2026-06-08T06:00:00Z",
+      "payload_json": "{\"stripe_customer_id\":\"cus_5fADEZdlUY6fZa\",\"email\":\"leo.marsh.set2@example.com\",\"week_start\":\"2026-06-01\",\"hours_watched\":0.0,\"titles_watched\":0,\"sessions\":0}",
+      "charge_id": null,
       "ticket_id": null,
       "dispute_id": null,
       "stripe_customer_id": "cus_5fADEZdlUY6fZa",
@@ -402,6 +539,32 @@
       "dispute_id": null,
       "stripe_customer_id": null,
       "email": null,
+      "scenario_id": "story:leo"
+     },
+     {
+      "event_id": "story:leo|pb_IC2k6kgicizMWx",
+      "source_system": "streamly_app",
+      "event_type": "playback.weekly_summary",
+      "occurred_at": "2026-06-15T06:00:00Z",
+      "payload_json": "{\"stripe_customer_id\":\"cus_5fADEZdlUY6fZa\",\"email\":\"leo.marsh.set2@example.com\",\"week_start\":\"2026-06-08\",\"hours_watched\":0.0,\"titles_watched\":0,\"sessions\":0}",
+      "charge_id": null,
+      "ticket_id": null,
+      "dispute_id": null,
+      "stripe_customer_id": "cus_5fADEZdlUY6fZa",
+      "email": "leo.marsh.set2@example.com",
+      "scenario_id": "story:leo"
+     },
+     {
+      "event_id": "story:leo|pb_LrKsHDoRb1n6E0",
+      "source_system": "streamly_app",
+      "event_type": "playback.weekly_summary",
+      "occurred_at": "2026-06-22T06:00:00Z",
+      "payload_json": "{\"stripe_customer_id\":\"cus_5fADEZdlUY6fZa\",\"email\":\"leo.marsh.set2@example.com\",\"week_start\":\"2026-06-15\",\"hours_watched\":0.0,\"titles_watched\":0,\"sessions\":0}",
+      "charge_id": null,
+      "ticket_id": null,
+      "dispute_id": null,
+      "stripe_customer_id": "cus_5fADEZdlUY6fZa",
+      "email": "leo.marsh.set2@example.com",
       "scenario_id": "story:leo"
      },
      {
@@ -1134,10 +1297,14 @@
  ],
  "became": {
   "subevt_QzeMFPFcEiTby0": [],
+  "pb_KYYLI3CtqP7sj9": [],
+  "pb_LFFEKiBQRbov3h": [],
+  "pb_OVqY5hcFuFEDPW": [],
   "scr_07RsUTPX05y4fS": [
    "Decision \u00b7 fraud screen \u00b7 final: approve \u00b7 by FraudGuard rules"
   ],
   "evt_YlyqkLVBPsnGg6": [],
+  "pb_rxKx8JBjmlZIMM": [],
   "zdevt_ACzkBh8bttkJna": [
    "Identity \u00b7 Zendesk requester SAME_AS Stripe customer (email match)"
   ],
@@ -1149,6 +1316,8 @@
    "Decision \u00b7 complaint resolution \u00b7 final: deny \u00b7 by Amara Chen (Team A)"
   ],
   "zdevt_AbdRbBdRTmhaDc": [],
+  "pb_IC2k6kgicizMWx": [],
+  "pb_LrKsHDoRb1n6E0": [],
   "evt_ZL5AHJrPsFx3MZ": [
    "Outcome \u00b7 dispute filed ($180)"
   ],

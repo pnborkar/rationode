@@ -20,6 +20,8 @@ export type CustomerInfo = {
   subscription_status: string;
   charge_id: string;
   charge_amount_usd: number;
+  usage_hours_30d: number | null;   // Streamly app viewing; null = no usage data
+  last_watched_week: string | null;
 };
 
 // What the support agent's get_customer tool returns: assembled from Stripe and
@@ -47,10 +49,20 @@ export async function getCustomer(email: string): Promise<CustomerInfo | null> {
   );
   const r = rows[0];
   if (!r) return null;
+  const [u] = await query<{ weeks: number; hours: number; last: string | null }>(
+    `MATCH (e:Event {event_type: 'playback.weekly_summary', stripe_customer_id: $cus})
+     WHERE e.occurred_at <= datetime($now) AND e.occurred_at > datetime($now) - duration('P30D')
+     WITH apoc.convert.fromJsonMap(e.payload_json) AS p
+     RETURN count(p) AS weeks, sum(p.hours_watched) AS hours,
+            max(CASE WHEN p.hours_watched > 0 THEN p.week_start END) AS last`,
+    { cus: r.cus, now: DEMO_NOW.toISOString() },
+  );
   return {
     customer_email: email, name: r.name, stripe_customer_id: r.cus,
     tenure_months: tenureMonths(new Date(r.started), DEMO_NOW), plan: r.plan,
     prior_refunds_90d: r.refunds, subscription_status: r.canceled ? "canceled" : "active",
     charge_id: r.charge_id, charge_amount_usd: r.amount,
+    usage_hours_30d: u && u.weeks > 0 ? Math.round(u.hours * 10) / 10 : null,
+    last_watched_week: u?.last ?? null,
   };
 }

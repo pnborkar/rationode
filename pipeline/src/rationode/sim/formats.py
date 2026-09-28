@@ -138,3 +138,11 @@ def tool_call(ids, at, version: str, session_id: str, tool: str, arguments: dict
         "agent_version": version, "server": "streamly-ops", "tool": tool,
         "arguments": arguments, "result": result, "called_at": iso(at),
     })
+
+
+# ---------------------------------------------------------------- Streamly app (viewing activity)
+def playback_weekly(ids, at, c, week_start: str, hours: float, titles: int) -> dict:
+    return envelope(ids.new("pb"), "streamly_app", "playback.weekly_summary", at, {
+        "stripe_customer_id": c.stripe_customer_id, "email": c.email, "week_start": week_start,
+        "hours_watched": hours, "titles_watched": titles, "sessions": max(0, round(hours / 1.4)),
+    })

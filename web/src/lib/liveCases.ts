@@ -8,6 +8,7 @@ export type LiveCase = {
   blurb: string;       // one line for the presenter: what this case shows
   message: string;
   setNumber?: number;  // loaded from the Events tab (removable)
+  note?: string;       // shown with the blurb, e.g. the customer went to their bank rather than support
 };
 
 export const LIVE_CASES: LiveCase[] = [
