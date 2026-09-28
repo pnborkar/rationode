@@ -106,7 +106,8 @@ export default function EventsTab({ active, onChanged }: { active: boolean; onCh
     setBusy(null);
   }
 
-  const events = result ? [...history, ...result.events.slice(0, shown)] : [];
+  // Newest phase on top: after "60 days later", its events lead and the earlier ones follow below a divider.
+  const incoming = result ? result.events.slice(0, shown) : [];
 
   return (
     <div className="grid min-h-0 flex-1 grid-cols-[300px_1fr_1fr] gap-3">
@@ -162,8 +163,15 @@ export default function EventsTab({ active, onChanged }: { active: boolean; onCh
         </header>
         <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-4">
           {!result && <p className="text-sm text-zinc-500">Load a set to see its events arrive.</p>}
-          {events.map((e) => (
-            <div key={e.event_id} className={`rounded-lg border border-zinc-800 bg-zinc-950 p-2.5 text-sm ${
+          {history.length > 0 && (
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-amber-400">60 days later · new events</p>
+          )}
+          {[...incoming, ...(history.length && !streaming ? [null] : []), ...(streaming ? [] : history)].map((e, i) => e === null ? (
+            <p key="divider" className="pt-2 text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
+              Earlier events</p>
+          ) : (
+            <div key={e.event_id + i} className={`rounded-lg border bg-zinc-950 p-2.5 text-sm ${
+              history.length && incoming.includes(e) ? "border-amber-700" : "border-zinc-800"} ${
               e.became.length ? "" : "opacity-60"}`}>
               <div className="flex items-center gap-2">
                 <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${SOURCE[e.source_system]?.cls ?? ""}`}>
