@@ -35,6 +35,10 @@ pipeline/
     pipeline/                   Raw events → decision graph (parse, detect, write)
     trees/                      Tree learner, policy/behavior/outcome trees, comparisons, reveal queries
     analytics/                  Embeddings, GDS (kNN, Leiden, peer groups), check_before_act
+web/                            Next.js demo app: live support agent (Claude), MCP server, access code
+  src/lib/                      Neo4j access, feature encoding, check_before_act, why, find_precedent, agent loop
+  src/app/api/agent/            Streams the agent's thinking, tool calls, and proposal (server-sent events)
+  src/app/api/mcp/              MCP server: check_before_act, find_precedent, why
 ```
 
 ## Setup
@@ -80,6 +84,18 @@ uv run python -m rationode.analytics precedent sam
 uv run python -m rationode.pipeline reset --scenario history
 ```
 
+### Demo app
+
+```bash
+cd web
+ln -s ../.env .env.local        # the app reads the same .env (add ANTHROPIC_API_KEY, DEMO_ACCESS_CODE)
+npm install
+npm run dev                     # http://localhost:3000, log in with DEMO_ACCESS_CODE
+```
+
+The MCP server is at `/api/mcp` (Streamable HTTP); send `Authorization: Bearer <DEMO_ACCESS_CODE>`.
+Prepared live cases have precomputed embeddings (`uv run python -m rationode.analytics export-live`).
+
 Ingest is idempotent: IDs are derived from source events and written with `MERGE`, so re-running is safe. Every node carries a `scenario_id`, so separate runs can live side by side and be removed cleanly.
 
 ## Status
@@ -91,5 +107,5 @@ Work in progress.
 - [x] Batch pipeline into Neo4j
 - [x] Decision trees and comparisons
 - [x] Graph Data Science and vector search
-- [ ] Agent tools and MCP server
+- [x] Agent tools and MCP server
 - [ ] Demo app

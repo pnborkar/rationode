@@ -1,14 +1,15 @@
 """Analytics CLI.
 
     uv run python -m rationode.analytics embed [--all]      # context embeddings -> vector index
-    uv run python -m rationode.analytics gds                # kNN, Leiden, rep peer groups (Aura Graph Analytics)
+    uv run python -m rationode.analytics gds                # kNN, Leiden, rep peer groups (GDS plugin)
     uv run python -m rationode.analytics precedent sam      # check_before_act on a live case
+    uv run python -m rationode.analytics export-live        # embeddings for prepared live cases -> web app
 """
 
 import argparse
 import json
 
-from rationode.db import database, driver
+from rationode.db import REPO_ROOT, database, driver
 
 LIVE_CASES = {
     "sam": ("support.complaint_resolution",
@@ -36,7 +37,21 @@ def main() -> None:
     p.add_argument("--scenario", default="history")
     p = sub.add_parser("precedent")
     p.add_argument("case", choices=sorted(LIVE_CASES))
+    sub.add_parser("export-live")
     args = parser.parse_args()
+
+    if args.cmd == "export-live":
+        # The web app can't run the embedding model, so prepared live cases are embedded here.
+        # Keyed by context text: the app computes the same text and looks the vector up.
+        from rationode.analytics.embed import embed_texts
+        from rationode.analytics.features import context_text
+        texts = sorted({context_text(t, c) for t, c in LIVE_CASES.values()}
+                       | {context_text("dispute.response", LIVE_CASES["dispute_1"][1])})
+        out = REPO_ROOT / "web" / "src" / "data" / "live-embeddings.json"
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(json.dumps(dict(zip(texts, embed_texts(texts)))))
+        print(f"wrote {len(texts)} embeddings to {out}")
+        return
 
     with driver() as d:
         db = database()

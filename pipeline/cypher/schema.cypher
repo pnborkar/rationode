@@ -39,6 +39,9 @@ CREATE INDEX point_scenario IF NOT EXISTS FOR (n:DecisionPoint) ON (n.scenario_i
 CREATE INDEX event_charge IF NOT EXISTS FOR (n:Event) ON (n.charge_id);
 CREATE INDEX event_customer IF NOT EXISTS FOR (n:Event) ON (n.stripe_customer_id);
 
+// Full-text index for find_precedent (free-text search over decision contexts)
+CREATE FULLTEXT INDEX context_text IF NOT EXISTS FOR (c:Context) ON EACH [c.embedding_text];
+
 // Vector index for "find decisions like this one"
 // 384 dimensions = local sentence-embedding model (demo spec Section 11)
 CREATE VECTOR INDEX context_embedding_v1 IF NOT EXISTS
