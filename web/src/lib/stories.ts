@@ -3,6 +3,8 @@ import set1 from "../data/stories/set-1.json";
 import set2 from "../data/stories/set-2.json";
 import set3 from "../data/stories/set-3.json";
 import set4 from "../data/stories/set-4.json";
+import set5 from "../data/stories/set-5.json";
+import set6 from "../data/stories/set-6.json";
 import { query } from "./neo4j";
 import { placeScenario, recomputePoints, touchedPoints, type BranchChange } from "./storyTrees";
 import { removeScenario, writeRows, type Rows } from "./storyWriter";
@@ -10,13 +12,13 @@ import { removeScenario, writeRows, type Rows } from "./storyWriter";
 type RawEvent = { event_id: string; source_system: string; event_type: string; occurred_at: string;
                   payload: Record<string, unknown> };
 export type StorySet = {
-  set: number; key: string; scenario_id: string; title: string; point: string;
+  set: number; key: string; scenario_id: string; title: string; point: string; message: string;
   customer: { name: string; email: string; plan: string; tenure_months: number };
   phases: { name: string; events: RawEvent[]; rows: Rows }[];
   became: Record<string, string[]>;
 };
 
-export const SETS = [set1, set2, set3, set4] as unknown as StorySet[];
+export const SETS = [set1, set2, set3, set4, set5, set6] as unknown as StorySet[];
 
 export function getSet(n: number): StorySet {
   const s = SETS.find((x) => x.set === n);
@@ -24,11 +26,9 @@ export function getSet(n: number): StorySet {
   return s;
 }
 
-// The customer's own words, used when their complaint is sent to the live agent.
+// What the customer says when their case is sent to the live agent (their ticket's words, or a set-specific line).
 export function complaintText(s: StorySet): string {
-  const ticket = s.phases[0].events.find((e) => e.event_type === "ticket.created");
-  const description = (ticket?.payload.ticket as { description?: string } | undefined)?.description;
-  return description ?? `I never signed up for Streamly. Why was I charged $${s.customer.plan.split("_")[1]}?`;
+  return s.message;
 }
 
 export async function status() {

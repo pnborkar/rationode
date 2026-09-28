@@ -4,6 +4,7 @@
  "scenario_id": "story:priya",
  "title": "The loyal customer we almost lost",
  "point": "A human override recorded against the AI, and it worked.",
+ "message": "I forgot to cancel and didn't watch anything this period. Please refund me.",
  "customer": {
   "name": "Priya Shah",
   "email": "priya.shah.set1@example.com",

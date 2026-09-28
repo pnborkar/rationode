@@ -4,6 +4,7 @@
  "scenario_id": "story:omar",
  "title": "The fraud that slipped through",
  "point": "The fraud tool approved a risk-70 signup (its review threshold is 75); the charge came back as unauthorized.",
+ "message": "I never signed up for Streamly. Why was I charged $480?",
  "customer": {
   "name": "Omar Haddad",
   "email": "omar.haddad.set4@example.com",

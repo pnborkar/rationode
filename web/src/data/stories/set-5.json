@@ -1,0 +1,692 @@
+{
+ "set": 5,
+ "key": "nina",
+ "scenario_id": "story:nina",
+ "title": "The usage logs that won",
+ "point": "She told her bank she'd canceled; the agent sent usage logs showing she kept watching, and the dispute was won.",
+ "message": "I thought I canceled. Why was I charged $300 again?",
+ "customer": {
+  "name": "Nina Brooks",
+  "email": "nina.brooks.set5@example.com",
+  "plan": "annual_300",
+  "tenure_months": 34
+ },
+ "phases": [
+  {
+   "name": "events",
+   "events": [
+    {
+     "event_id": "subevt_6M8HTq2A9TCFJr",
+     "source_system": "subscriptions",
+     "event_type": "subscription.created",
+     "occurred_at": "2023-08-08T10:00:00Z",
+     "payload": {
+      "subscription_id": "sub_BoCZ7kkNNvSGAH",
+      "stripe_customer_id": "cus_xyIwJMCQR1cabn",
+      "email": "nina.brooks.set5@example.com",
+      "plan": "annual_300",
+      "started_at": "2023-08-08T10:00:00Z"
+     }
+    },
+    {
+     "event_id": "scr_TOL8xMZDA1uQkS",
+     "source_system": "fraudguard",
+     "event_type": "charge.screened",
+     "occurred_at": "2026-06-08T01:42:58Z",
+     "payload": {
+      "screening_id": "scr_YtS9IeG3LjNu5g",
+      "charge_ref": "ch_Cu6GyoJJm5OMKA",
+      "customer_email": "nina.brooks.set5@example.com",
+      "amount": 300.0,
+      "currency": "usd",
+      "plan": "annual_300",
+      "is_renewal": true,
+      "risk_score": 12,
+      "country_match": true,
+      "card_age_days": 225,
+      "decision": "approve",
+      "rule_id": "R-APPROVE-LE75",
+      "screened_at": "2026-06-08T01:42:58Z"
+     }
+    },
+    {
+     "event_id": "evt_YqOPfqQMAyG0eO",
+     "source_system": "stripe",
+     "event_type": "charge.succeeded",
+     "occurred_at": "2026-06-08T01:43:00Z",
+     "payload": {
+      "id": "evt_YqOPfqQMAyG0eO",
+      "object": "event",
+      "api_version": "2026-06-30",
+      "type": "charge.succeeded",
+      "created": 1780882980,
+      "livemode": false,
+      "data": {
+       "object": {
+        "id": "ch_Cu6GyoJJm5OMKA",
+        "object": "charge",
+        "amount": 30000,
+        "currency": "usd",
+        "customer": "cus_xyIwJMCQR1cabn",
+        "billing_details": {
+         "email": "nina.brooks.set5@example.com",
+         "name": "Nina Brooks"
+        },
+        "metadata": {
+         "plan": "annual_300",
+         "subscription_id": "sub_BoCZ7kkNNvSGAH"
+        },
+        "status": "succeeded",
+        "created": 1780882980
+       }
+      }
+     }
+    },
+    {
+     "event_id": "evt_2gQhZ9KuKJZjJA",
+     "source_system": "stripe",
+     "event_type": "charge.dispute.created",
+     "occurred_at": "2026-06-19T15:00:00Z",
+     "payload": {
+      "id": "evt_2gQhZ9KuKJZjJA",
+      "object": "event",
+      "api_version": "2026-06-30",
+      "type": "charge.dispute.created",
+      "created": 1781881200,
+      "livemode": false,
+      "data": {
+       "object": {
+        "id": "dp_xOaHyfcuECNMQ3",
+        "object": "dispute",
+        "amount": 30000,
+        "currency": "usd",
+        "charge": "ch_Cu6GyoJJm5OMKA",
+        "reason": "subscription_canceled",
+        "status": "needs_response",
+        "balance_transactions": [
+         {
+          "type": "adjustment",
+          "fee": 1500,
+          "description": "Dispute fee"
+         }
+        ],
+        "created": 1781881200
+       }
+      }
+     }
+    },
+    {
+     "event_id": "call_CI11lbGKQW7Azm",
+     "source_system": "mcp_gateway",
+     "event_type": "tool_call",
+     "occurred_at": "2026-06-20T18:12:38Z",
+     "payload": {
+      "call_id": "call_CI11lbGKQW7Azm",
+      "session_id": "sess_myHu0Q95A3yvPi",
+      "agent_id": "streamly-support-agent",
+      "agent_version": "v2",
+      "server": "streamly-ops",
+      "tool": "get_dispute_evidence",
+      "arguments": {
+       "dispute_id": "dp_xOaHyfcuECNMQ3"
+      },
+      "result": {
+       "dispute_id": "dp_xOaHyfcuECNMQ3",
+       "charge_id": "ch_Cu6GyoJJm5OMKA",
+       "category": "subscription_canceled",
+       "amount_usd": 300.0,
+       "customer_email": "nina.brooks.set5@example.com",
+       "customer_tenure_months": 34,
+       "prior_complaint": false,
+       "available_evidence": [
+        "tos_acceptance",
+        "usage_logs",
+        "delivery_confirmation"
+       ]
+      },
+      "called_at": "2026-06-20T18:12:38Z"
+     }
+    },
+    {
+     "event_id": "call_anEghJQLH6aHr0",
+     "source_system": "mcp_gateway",
+     "event_type": "tool_call",
+     "occurred_at": "2026-06-20T18:20:20Z",
+     "payload": {
+      "call_id": "call_anEghJQLH6aHr0",
+      "session_id": "sess_myHu0Q95A3yvPi",
+      "agent_id": "streamly-support-agent",
+      "agent_version": "v2",
+      "server": "streamly-ops",
+      "tool": "respond_to_dispute",
+      "arguments": {
+       "dispute_id": "dp_xOaHyfcuECNMQ3",
+       "action": "contest",
+       "evidence": [
+        "usage_logs",
+        "tos_acceptance"
+       ],
+       "rationale": "Contest with available evidence."
+      },
+      "result": {
+       "status": "submitted"
+      },
+      "called_at": "2026-06-20T18:20:20Z"
+     }
+    }
+   ],
+   "rows": {
+    "events": [
+     {
+      "event_id": "story:nina|subevt_6M8HTq2A9TCFJr",
+      "source_system": "subscriptions",
+      "event_type": "subscription.created",
+      "occurred_at": "2023-08-08T10:00:00Z",
+      "payload_json": "{\"subscription_id\":\"sub_BoCZ7kkNNvSGAH\",\"stripe_customer_id\":\"cus_xyIwJMCQR1cabn\",\"email\":\"nina.brooks.set5@example.com\",\"plan\":\"annual_300\",\"started_at\":\"2023-08-08T10:00:00Z\"}",
+      "charge_id": null,
+      "ticket_id": null,
+      "dispute_id": null,
+      "stripe_customer_id": "cus_xyIwJMCQR1cabn",
+      "email": "nina.brooks.set5@example.com",
+      "scenario_id": "story:nina"
+     },
+     {
+      "event_id": "story:nina|scr_TOL8xMZDA1uQkS",
+      "source_system": "fraudguard",
+      "event_type": "charge.screened",
+      "occurred_at": "2026-06-08T01:42:58Z",
+      "payload_json": "{\"screening_id\":\"scr_YtS9IeG3LjNu5g\",\"charge_ref\":\"ch_Cu6GyoJJm5OMKA\",\"customer_email\":\"nina.brooks.set5@example.com\",\"amount\":300.0,\"currency\":\"usd\",\"plan\":\"annual_300\",\"is_renewal\":true,\"risk_score\":12,\"country_match\":true,\"card_age_days\":225,\"decision\":\"approve\",\"rule_id\":\"R-APPROVE-LE75\",\"screened_at\":\"2026-06-08T01:42:58Z\"}",
+      "charge_id": "ch_Cu6GyoJJm5OMKA",
+      "ticket_id": null,
+      "dispute_id": null,
+      "stripe_customer_id": null,
+      "email": "nina.brooks.set5@example.com",
+      "scenario_id": "story:nina"
+     },
+     {
+      "event_id": "story:nina|evt_YqOPfqQMAyG0eO",
+      "source_system": "stripe",
+      "event_type": "charge.succeeded",
+      "occurred_at": "2026-06-08T01:43:00Z",
+      "payload_json": "{\"id\":\"evt_YqOPfqQMAyG0eO\",\"object\":\"event\",\"api_version\":\"2026-06-30\",\"type\":\"charge.succeeded\",\"created\":1780882980,\"livemode\":false,\"data\":{\"object\":{\"id\":\"ch_Cu6GyoJJm5OMKA\",\"object\":\"charge\",\"amount\":30000,\"currency\":\"usd\",\"customer\":\"cus_xyIwJMCQR1cabn\",\"billing_details\":{\"email\":\"nina.brooks.set5@example.com\",\"name\":\"Nina Brooks\"},\"metadata\":{\"plan\":\"annual_300\",\"subscription_id\":\"sub_BoCZ7kkNNvSGAH\"},\"status\":\"succeeded\",\"created\":1780882980}}}",
+      "charge_id": "ch_Cu6GyoJJm5OMKA",
+      "ticket_id": null,
+      "dispute_id": null,
+      "stripe_customer_id": "cus_xyIwJMCQR1cabn",
+      "email": "nina.brooks.set5@example.com",
+      "scenario_id": "story:nina"
+     },
+     {
+      "event_id": "story:nina|evt_2gQhZ9KuKJZjJA",
+      "source_system": "stripe",
+      "event_type": "charge.dispute.created",
+      "occurred_at": "2026-06-19T15:00:00Z",
+      "payload_json": "{\"id\":\"evt_2gQhZ9KuKJZjJA\",\"object\":\"event\",\"api_version\":\"2026-06-30\",\"type\":\"charge.dispute.created\",\"created\":1781881200,\"livemode\":false,\"data\":{\"object\":{\"id\":\"dp_xOaHyfcuECNMQ3\",\"object\":\"dispute\",\"amount\":30000,\"currency\":\"usd\",\"charge\":\"ch_Cu6GyoJJm5OMKA\",\"reason\":\"subscription_canceled\",\"status\":\"needs_response\",\"balance_transactions\":[{\"type\":\"adjustment\",\"fee\":1500,\"description\":\"Dispute fee\"}],\"created\":1781881200}}}",
+      "charge_id": "ch_Cu6GyoJJm5OMKA",
+      "ticket_id": null,
+      "dispute_id": "dp_xOaHyfcuECNMQ3",
+      "stripe_customer_id": null,
+      "email": null,
+      "scenario_id": "story:nina"
+     },
+     {
+      "event_id": "story:nina|call_CI11lbGKQW7Azm",
+      "source_system": "mcp_gateway",
+      "event_type": "tool_call",
+      "occurred_at": "2026-06-20T18:12:38Z",
+      "payload_json": "{\"call_id\":\"call_CI11lbGKQW7Azm\",\"session_id\":\"sess_myHu0Q95A3yvPi\",\"agent_id\":\"streamly-support-agent\",\"agent_version\":\"v2\",\"server\":\"streamly-ops\",\"tool\":\"get_dispute_evidence\",\"arguments\":{\"dispute_id\":\"dp_xOaHyfcuECNMQ3\"},\"result\":{\"dispute_id\":\"dp_xOaHyfcuECNMQ3\",\"charge_id\":\"ch_Cu6GyoJJm5OMKA\",\"category\":\"subscription_canceled\",\"amount_usd\":300.0,\"customer_email\":\"nina.brooks.set5@example.com\",\"customer_tenure_months\":34,\"prior_complaint\":false,\"available_evidence\":[\"tos_acceptance\",\"usage_logs\",\"delivery_confirmation\"]},\"called_at\":\"2026-06-20T18:12:38Z\"}",
+      "charge_id": "ch_Cu6GyoJJm5OMKA",
+      "ticket_id": null,
+      "dispute_id": "dp_xOaHyfcuECNMQ3",
+      "stripe_customer_id": null,
+      "email": "nina.brooks.set5@example.com",
+      "scenario_id": "story:nina"
+     },
+     {
+      "event_id": "story:nina|call_anEghJQLH6aHr0",
+      "source_system": "mcp_gateway",
+      "event_type": "tool_call",
+      "occurred_at": "2026-06-20T18:20:20Z",
+      "payload_json": "{\"call_id\":\"call_anEghJQLH6aHr0\",\"session_id\":\"sess_myHu0Q95A3yvPi\",\"agent_id\":\"streamly-support-agent\",\"agent_version\":\"v2\",\"server\":\"streamly-ops\",\"tool\":\"respond_to_dispute\",\"arguments\":{\"dispute_id\":\"dp_xOaHyfcuECNMQ3\",\"action\":\"contest\",\"evidence\":[\"usage_logs\",\"tos_acceptance\"],\"rationale\":\"Contest with available evidence.\"},\"result\":{\"status\":\"submitted\"},\"called_at\":\"2026-06-20T18:20:20Z\"}",
+      "charge_id": null,
+      "ticket_id": null,
+      "dispute_id": "dp_xOaHyfcuECNMQ3",
+      "stripe_customer_id": null,
+      "email": null,
+      "scenario_id": "story:nina"
+     }
+    ],
+    "entities": [
+     {
+      "entity_id": "story:nina|stripe:cus_xyIwJMCQR1cabn",
+      "label": "Customer",
+      "source_system": "stripe",
+      "source_key": "cus_xyIwJMCQR1cabn",
+      "props": {
+       "email": "nina.brooks.set5@example.com",
+       "name": "Nina Brooks"
+      },
+      "scenario_id": "story:nina"
+     },
+     {
+      "entity_id": "story:nina|stripe:ch_Cu6GyoJJm5OMKA",
+      "label": "Charge",
+      "source_system": "stripe",
+      "source_key": "ch_Cu6GyoJJm5OMKA",
+      "props": {
+       "amount_usd": 300.0,
+       "plan": "annual_300"
+      },
+      "scenario_id": "story:nina"
+     },
+     {
+      "entity_id": "story:nina|stripe:dp_xOaHyfcuECNMQ3",
+      "label": "Dispute",
+      "source_system": "stripe",
+      "source_key": "dp_xOaHyfcuECNMQ3",
+      "props": {
+       "category": "subscription_canceled",
+       "amount_usd": 300.0
+      },
+      "scenario_id": "story:nina"
+     }
+    ],
+    "same_as": [],
+    "actors": [
+     {
+      "actor_id": "story:nina|system:fraudguard",
+      "kind": "SYSTEM",
+      "version": "rules-2026.1",
+      "name": "FraudGuard rules",
+      "team": null,
+      "scenario_id": "story:nina"
+     },
+     {
+      "actor_id": "story:nina|agent:streamly-support-agent:v2",
+      "kind": "AI_AGENT",
+      "version": "v2",
+      "name": "Streamly support agent v2",
+      "team": null,
+      "scenario_id": "story:nina"
+     }
+    ],
+    "decisions": [
+     {
+      "decision_id": "story:nina|dec:scr_TOL8xMZDA1uQkS",
+      "decision_type": "charge.fraud_screen",
+      "stage": "FINAL",
+      "decided_at": "2026-06-08T01:42:58Z",
+      "detection_method": "RULE",
+      "detection_confidence": 1.0,
+      "source_system": "fraudguard",
+      "scenario_id": "story:nina"
+     },
+     {
+      "decision_id": "story:nina|dec:call_anEghJQLH6aHr0",
+      "decision_type": "dispute.response",
+      "stage": "FINAL",
+      "decided_at": "2026-06-20T18:20:20Z",
+      "detection_method": "RULE",
+      "detection_confidence": 1.0,
+      "source_system": "mcp_gateway",
+      "scenario_id": "story:nina"
+     },
+     {
+      "decision_id": "story:nina|dec:call_anEghJQLH6aHr0:evidence",
+      "decision_type": "dispute.evidence",
+      "stage": "FINAL",
+      "decided_at": "2026-06-20T18:20:20Z",
+      "detection_method": "RULE",
+      "detection_confidence": 1.0,
+      "source_system": "mcp_gateway",
+      "scenario_id": "story:nina"
+     }
+    ],
+    "contexts": [
+     {
+      "context_id": "story:nina|ctx:scr_TOL8xMZDA1uQkS",
+      "decision_id": "story:nina|dec:scr_TOL8xMZDA1uQkS",
+      "attrs": {
+       "charge.risk_score": 12,
+       "charge.plan": "annual_300",
+       "charge.is_renewal": true,
+       "charge.country_match": true,
+       "charge.card_age_days": 225
+      },
+      "summary_text": "Charge screening: renewal on annual_300, $300, risk score 12, card age 225 days, country matches.",
+      "scenario_id": "story:nina"
+     },
+     {
+      "context_id": "story:nina|ctx:call_anEghJQLH6aHr0",
+      "decision_id": "story:nina|dec:call_anEghJQLH6aHr0",
+      "attrs": {
+       "dispute.amount_usd": 300.0,
+       "dispute.category": "subscription_canceled",
+       "dispute.tenure_months": 34,
+       "dispute.prior_complaint": false,
+       "dispute.usage_logs_available": true
+      },
+      "summary_text": "Dispute (subscription_canceled), $300, tenure 34 months, no prior complaint, usage logs available. AI v2 chose to contest.",
+      "scenario_id": "story:nina"
+     },
+     {
+      "context_id": "story:nina|ctx:call_anEghJQLH6aHr0:evidence",
+      "decision_id": "story:nina|dec:call_anEghJQLH6aHr0:evidence",
+      "attrs": {
+       "dispute.amount_usd": 300.0,
+       "dispute.category": "subscription_canceled",
+       "dispute.tenure_months": 34,
+       "dispute.prior_complaint": false,
+       "dispute.usage_logs_available": true
+      },
+      "summary_text": "Dispute (subscription_canceled), $300, tenure 34 months, no prior complaint, usage logs available. AI v2 submitted evidence: usage_logs, tos_acceptance.",
+      "scenario_id": "story:nina"
+     }
+    ],
+    "considered": [
+     {
+      "decision_id": "story:nina|dec:scr_TOL8xMZDA1uQkS",
+      "decision_type": "charge.fraud_screen",
+      "option_key": "approve",
+      "status": "CHOSEN",
+      "amount_usd": null
+     },
+     {
+      "decision_id": "story:nina|dec:scr_TOL8xMZDA1uQkS",
+      "decision_type": "charge.fraud_screen",
+      "option_key": "decline",
+      "status": "AVAILABLE",
+      "amount_usd": null
+     },
+     {
+      "decision_id": "story:nina|dec:scr_TOL8xMZDA1uQkS",
+      "decision_type": "charge.fraud_screen",
+      "option_key": "review",
+      "status": "AVAILABLE",
+      "amount_usd": null
+     },
+     {
+      "decision_id": "story:nina|dec:call_anEghJQLH6aHr0",
+      "decision_type": "dispute.response",
+      "option_key": "contest",
+      "status": "CHOSEN",
+      "amount_usd": null
+     },
+     {
+      "decision_id": "story:nina|dec:call_anEghJQLH6aHr0",
+      "decision_type": "dispute.response",
+      "option_key": "accept",
+      "status": "AVAILABLE",
+      "amount_usd": null
+     },
+     {
+      "decision_id": "story:nina|dec:call_anEghJQLH6aHr0:evidence",
+      "decision_type": "dispute.evidence",
+      "option_key": "usage_logs",
+      "status": "CHOSEN",
+      "amount_usd": null
+     },
+     {
+      "decision_id": "story:nina|dec:call_anEghJQLH6aHr0:evidence",
+      "decision_type": "dispute.evidence",
+      "option_key": "tos_acceptance",
+      "status": "CHOSEN",
+      "amount_usd": null
+     },
+     {
+      "decision_id": "story:nina|dec:call_anEghJQLH6aHr0:evidence",
+      "decision_type": "dispute.evidence",
+      "option_key": "delivery_confirmation",
+      "status": "AVAILABLE",
+      "amount_usd": null
+     }
+    ],
+    "made_by": [
+     {
+      "decision_id": "story:nina|dec:scr_TOL8xMZDA1uQkS",
+      "actor_id": "story:nina|system:fraudguard",
+      "role": "DECIDER"
+     },
+     {
+      "decision_id": "story:nina|dec:call_anEghJQLH6aHr0",
+      "actor_id": "story:nina|agent:streamly-support-agent:v2",
+      "role": "DECIDER"
+     },
+     {
+      "decision_id": "story:nina|dec:call_anEghJQLH6aHr0:evidence",
+      "actor_id": "story:nina|agent:streamly-support-agent:v2",
+      "role": "DECIDER"
+     }
+    ],
+    "about": [
+     {
+      "decision_id": "story:nina|dec:scr_TOL8xMZDA1uQkS",
+      "entity_id": "story:nina|stripe:ch_Cu6GyoJJm5OMKA"
+     },
+     {
+      "decision_id": "story:nina|dec:scr_TOL8xMZDA1uQkS",
+      "entity_id": "story:nina|stripe:cus_xyIwJMCQR1cabn"
+     },
+     {
+      "decision_id": "story:nina|dec:call_anEghJQLH6aHr0",
+      "entity_id": "story:nina|stripe:dp_xOaHyfcuECNMQ3"
+     },
+     {
+      "decision_id": "story:nina|dec:call_anEghJQLH6aHr0",
+      "entity_id": "story:nina|stripe:ch_Cu6GyoJJm5OMKA"
+     },
+     {
+      "decision_id": "story:nina|dec:call_anEghJQLH6aHr0",
+      "entity_id": "story:nina|stripe:cus_xyIwJMCQR1cabn"
+     },
+     {
+      "decision_id": "story:nina|dec:call_anEghJQLH6aHr0:evidence",
+      "entity_id": "story:nina|stripe:dp_xOaHyfcuECNMQ3"
+     },
+     {
+      "decision_id": "story:nina|dec:call_anEghJQLH6aHr0:evidence",
+      "entity_id": "story:nina|stripe:ch_Cu6GyoJJm5OMKA"
+     },
+     {
+      "decision_id": "story:nina|dec:call_anEghJQLH6aHr0:evidence",
+      "entity_id": "story:nina|stripe:cus_xyIwJMCQR1cabn"
+     }
+    ],
+    "preceded_by": [
+     {
+      "from": "story:nina|dec:call_anEghJQLH6aHr0",
+      "to": "story:nina|dec:scr_TOL8xMZDA1uQkS"
+     },
+     {
+      "from": "story:nina|dec:call_anEghJQLH6aHr0:evidence",
+      "to": "story:nina|dec:call_anEghJQLH6aHr0"
+     }
+    ],
+    "overrides": [],
+    "under_policy": [
+     {
+      "decision_id": "story:nina|dec:scr_TOL8xMZDA1uQkS",
+      "policy_id": "fraud-screening",
+      "version": "2025.1"
+     },
+     {
+      "decision_id": "story:nina|dec:call_anEghJQLH6aHr0",
+      "policy_id": "streamly-disputes",
+      "version": "2025.1"
+     },
+     {
+      "decision_id": "story:nina|dec:call_anEghJQLH6aHr0:evidence",
+      "policy_id": "streamly-disputes",
+      "version": "2025.1"
+     }
+    ],
+    "evidenced_by": [
+     {
+      "node_id": "story:nina|dec:scr_TOL8xMZDA1uQkS",
+      "kind": "Decision",
+      "event_id": "story:nina|scr_TOL8xMZDA1uQkS"
+     },
+     {
+      "node_id": "story:nina|out:evt_2gQhZ9KuKJZjJA",
+      "kind": "Outcome",
+      "event_id": "story:nina|evt_2gQhZ9KuKJZjJA"
+     },
+     {
+      "node_id": "story:nina|dec:call_anEghJQLH6aHr0",
+      "kind": "Decision",
+      "event_id": "story:nina|evt_2gQhZ9KuKJZjJA"
+     },
+     {
+      "node_id": "story:nina|dec:call_anEghJQLH6aHr0",
+      "kind": "Decision",
+      "event_id": "story:nina|call_CI11lbGKQW7Azm"
+     },
+     {
+      "node_id": "story:nina|dec:call_anEghJQLH6aHr0",
+      "kind": "Decision",
+      "event_id": "story:nina|call_anEghJQLH6aHr0"
+     },
+     {
+      "node_id": "story:nina|dec:call_anEghJQLH6aHr0:evidence",
+      "kind": "Decision",
+      "event_id": "story:nina|call_CI11lbGKQW7Azm"
+     },
+     {
+      "node_id": "story:nina|dec:call_anEghJQLH6aHr0:evidence",
+      "kind": "Decision",
+      "event_id": "story:nina|call_anEghJQLH6aHr0"
+     }
+    ],
+    "outcomes": [
+     {
+      "outcome_id": "story:nina|out:evt_2gQhZ9KuKJZjJA",
+      "outcome_type": "dispute_filed",
+      "occurred_at": "2026-06-19T15:00:00Z",
+      "value_usd": 300.0,
+      "scenario_id": "story:nina"
+     }
+    ],
+    "led_to": [
+     {
+      "decision_id": "story:nina|dec:scr_TOL8xMZDA1uQkS",
+      "outcome_id": "story:nina|out:evt_2gQhZ9KuKJZjJA",
+      "confidence": 1.0,
+      "attribution_method": "EXPLICIT_REF",
+      "window_days": 60
+     }
+    ],
+    "schema_proposals": []
+   }
+  },
+  {
+   "name": "60 days later",
+   "events": [
+    {
+     "event_id": "evt_RaciRNAdGkE0K9",
+     "source_system": "stripe",
+     "event_type": "charge.dispute.closed",
+     "occurred_at": "2026-08-15T03:49:12Z",
+     "payload": {
+      "id": "evt_RaciRNAdGkE0K9",
+      "object": "event",
+      "api_version": "2026-06-30",
+      "type": "charge.dispute.closed",
+      "created": 1786765752,
+      "livemode": false,
+      "data": {
+       "object": {
+        "id": "dp_xOaHyfcuECNMQ3",
+        "object": "dispute",
+        "amount": 30000,
+        "currency": "usd",
+        "charge": "ch_Cu6GyoJJm5OMKA",
+        "reason": "subscription_canceled",
+        "status": "won",
+        "created": 1786765752
+       }
+      }
+     }
+    }
+   ],
+   "rows": {
+    "events": [
+     {
+      "event_id": "story:nina|evt_RaciRNAdGkE0K9",
+      "source_system": "stripe",
+      "event_type": "charge.dispute.closed",
+      "occurred_at": "2026-08-15T03:49:12Z",
+      "payload_json": "{\"id\":\"evt_RaciRNAdGkE0K9\",\"object\":\"event\",\"api_version\":\"2026-06-30\",\"type\":\"charge.dispute.closed\",\"created\":1786765752,\"livemode\":false,\"data\":{\"object\":{\"id\":\"dp_xOaHyfcuECNMQ3\",\"object\":\"dispute\",\"amount\":30000,\"currency\":\"usd\",\"charge\":\"ch_Cu6GyoJJm5OMKA\",\"reason\":\"subscription_canceled\",\"status\":\"won\",\"created\":1786765752}}}",
+      "charge_id": "ch_Cu6GyoJJm5OMKA",
+      "ticket_id": null,
+      "dispute_id": "dp_xOaHyfcuECNMQ3",
+      "stripe_customer_id": null,
+      "email": null,
+      "scenario_id": "story:nina"
+     }
+    ],
+    "entities": [],
+    "same_as": [],
+    "actors": [],
+    "decisions": [],
+    "contexts": [],
+    "considered": [],
+    "made_by": [],
+    "about": [],
+    "preceded_by": [],
+    "overrides": [],
+    "under_policy": [],
+    "evidenced_by": [
+     {
+      "node_id": "story:nina|out:evt_RaciRNAdGkE0K9",
+      "kind": "Outcome",
+      "event_id": "story:nina|evt_RaciRNAdGkE0K9"
+     }
+    ],
+    "outcomes": [
+     {
+      "outcome_id": "story:nina|out:evt_RaciRNAdGkE0K9",
+      "outcome_type": "dispute_won",
+      "occurred_at": "2026-08-15T03:49:12Z",
+      "value_usd": 15.0,
+      "scenario_id": "story:nina"
+     }
+    ],
+    "led_to": [
+     {
+      "decision_id": "story:nina|dec:call_anEghJQLH6aHr0",
+      "outcome_id": "story:nina|out:evt_RaciRNAdGkE0K9",
+      "confidence": 1.0,
+      "attribution_method": "EXPLICIT_REF",
+      "window_days": 120
+     },
+     {
+      "decision_id": "story:nina|dec:call_anEghJQLH6aHr0:evidence",
+      "outcome_id": "story:nina|out:evt_RaciRNAdGkE0K9",
+      "confidence": 1.0,
+      "attribution_method": "EXPLICIT_REF",
+      "window_days": 120
+     }
+    ],
+    "schema_proposals": []
+   }
+  }
+ ],
+ "became": {
+  "subevt_6M8HTq2A9TCFJr": [],
+  "scr_TOL8xMZDA1uQkS": [
+   "Decision \u00b7 fraud screen \u00b7 final: approve \u00b7 by FraudGuard rules"
+  ],
+  "evt_YqOPfqQMAyG0eO": [],
+  "evt_2gQhZ9KuKJZjJA": [
+   "Outcome \u00b7 dispute filed ($300)"
+  ],
+  "call_CI11lbGKQW7Azm": [],
+  "call_anEghJQLH6aHr0": [
+   "Decision \u00b7 response \u00b7 final: contest \u00b7 by AI v2",
+   "Decision \u00b7 evidence \u00b7 final: usage logs, tos acceptance \u00b7 by AI v2"
+  ],
+  "evt_RaciRNAdGkE0K9": [
+   "Outcome \u00b7 dispute won ($300 kept, $15 fee)"
+  ]
+ }
+}

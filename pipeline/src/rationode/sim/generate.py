@@ -190,9 +190,11 @@ class Sim:
 
         complaint_rate = self.w.COMPLAINT_RATE_RENEWAL if renewal else self.w.COMPLAINT_RATE_SIGNUP
         if force.get("no_complaint") or not (force.get("complaint") or rng.random() < complaint_rate):
-            if not force.get("no_dispute") and rng.random() < self.w.FRIENDLY_DISPUTE_RATE:
-                ev += self.dispute(c, rec, charge_id, amount, pick(rng, self.w.FRIENDLY_CATEGORY),
-                                   self.later(charge_at, 5, 60), prior_complaint=False, loop=loop, force=force)
+            if not force.get("no_dispute") and (force.get("friendly_dispute") or rng.random() < self.w.FRIENDLY_DISPUTE_RATE):
+                ev += self.dispute(c, rec, charge_id, amount,
+                                   force.get("dispute_category") or pick(rng, self.w.FRIENDLY_CATEGORY),
+                                   force.get("dispute_at") or self.later(charge_at, 5, 60),
+                                   prior_complaint=False, loop=loop, force=force)
             else:
                 ev += self.lifecycle(c, rec, charge_at, churn_prob=0.05)
             return ev, rec

@@ -1,0 +1,829 @@
+{
+ "set": 6,
+ "key": "theo",
+ "scenario_id": "story:theo",
+ "title": "The generous rep",
+ "point": "A Team B rep refunded a 3-month customer the AI would have denied; he cancelled anyway. GDS picked out Team B's peer group for calls like this.",
+ "message": "I forgot to cancel and didn't watch anything this period. Please refund me.",
+ "customer": {
+  "name": "Theo Grant",
+  "email": "theo.grant.set6@example.com",
+  "plan": "monthly_25",
+  "tenure_months": 3
+ },
+ "phases": [
+  {
+   "name": "events",
+   "events": [
+    {
+     "event_id": "subevt_NPFI0epA7EN8Ee",
+     "source_system": "subscriptions",
+     "event_type": "subscription.created",
+     "occurred_at": "2026-03-10T10:00:00Z",
+     "payload": {
+      "subscription_id": "sub_Ji3ycCBexptzky",
+      "stripe_customer_id": "cus_ZKG9xkwf07fdDU",
+      "email": "theo.grant.set6@example.com",
+      "plan": "monthly_25",
+      "started_at": "2026-03-10T10:00:00Z"
+     }
+    },
+    {
+     "event_id": "scr_a85xOlHveDxHby",
+     "source_system": "fraudguard",
+     "event_type": "charge.screened",
+     "occurred_at": "2026-06-10T18:07:58Z",
+     "payload": {
+      "screening_id": "scr_btxAoa7aOPrdDy",
+      "charge_ref": "ch_nIdEOwaqHNiqfU",
+      "customer_email": "theo.grant.set6@example.com",
+      "amount": 25.0,
+      "currency": "usd",
+      "plan": "monthly_25",
+      "is_renewal": true,
+      "risk_score": 25,
+      "country_match": true,
+      "card_age_days": 1626,
+      "decision": "approve",
+      "rule_id": "R-APPROVE-LE75",
+      "screened_at": "2026-06-10T18:07:58Z"
+     }
+    },
+    {
+     "event_id": "evt_qotdQflZkB61cJ",
+     "source_system": "stripe",
+     "event_type": "charge.succeeded",
+     "occurred_at": "2026-06-10T18:08:00Z",
+     "payload": {
+      "id": "evt_qotdQflZkB61cJ",
+      "object": "event",
+      "api_version": "2026-06-30",
+      "type": "charge.succeeded",
+      "created": 1781114880,
+      "livemode": false,
+      "data": {
+       "object": {
+        "id": "ch_nIdEOwaqHNiqfU",
+        "object": "charge",
+        "amount": 2500,
+        "currency": "usd",
+        "customer": "cus_ZKG9xkwf07fdDU",
+        "billing_details": {
+         "email": "theo.grant.set6@example.com",
+         "name": "Theo Grant"
+        },
+        "metadata": {
+         "plan": "monthly_25",
+         "subscription_id": "sub_Ji3ycCBexptzky"
+        },
+        "status": "succeeded",
+        "created": 1781114880
+       }
+      }
+     }
+    },
+    {
+     "event_id": "zdevt_0IEeyOB7Nt8qFz",
+     "source_system": "zendesk",
+     "event_type": "ticket.created",
+     "occurred_at": "2026-06-13T11:00:00Z",
+     "payload": {
+      "type": "ticket.created",
+      "ticket": {
+       "id": "400001",
+       "subject": "I forgot to cancel and didn't watch anything this period",
+       "description": "I forgot to cancel and didn't watch anything this period. Please refund me.",
+       "requester": {
+        "email": "theo.grant.set6@example.com",
+        "name": "Theo Grant"
+       },
+       "via": {
+        "channel": "chat"
+       },
+       "tags": [
+        "didnt_use"
+       ],
+       "status": "new",
+       "custom_fields": [
+        {
+         "id": "stripe_charge_id",
+         "value": "ch_nIdEOwaqHNiqfU"
+        }
+       ],
+       "created_at": "2026-06-13T11:00:00Z"
+      }
+     }
+    },
+    {
+     "event_id": "call_wVjWSF2C8Jhmpf",
+     "source_system": "mcp_gateway",
+     "event_type": "tool_call",
+     "occurred_at": "2026-06-13T11:03:52Z",
+     "payload": {
+      "call_id": "call_wVjWSF2C8Jhmpf",
+      "session_id": "sess_mfNlClC5GF1fAP",
+      "agent_id": "streamly-support-agent",
+      "agent_version": "v2",
+      "server": "streamly-ops",
+      "tool": "get_customer",
+      "arguments": {
+       "ticket_id": "400001"
+      },
+      "result": {
+       "customer_email": "theo.grant.set6@example.com",
+       "tenure_months": 3,
+       "plan": "monthly_25",
+       "prior_refunds_90d": 0,
+       "subscription_status": "active",
+       "charge_id": "ch_nIdEOwaqHNiqfU",
+       "charge_amount_usd": 25.0
+      },
+      "called_at": "2026-06-13T11:03:52Z"
+     }
+    },
+    {
+     "event_id": "call_4j8MPPOxA1N9K8",
+     "source_system": "mcp_gateway",
+     "event_type": "tool_call",
+     "occurred_at": "2026-06-13T11:05:49Z",
+     "payload": {
+      "call_id": "call_4j8MPPOxA1N9K8",
+      "session_id": "sess_mfNlClC5GF1fAP",
+      "agent_id": "streamly-support-agent",
+      "agent_version": "v2",
+      "server": "streamly-ops",
+      "tool": "propose_resolution",
+      "arguments": {
+       "ticket_id": "400001",
+       "option": "deny",
+       "amount_usd": 0.0,
+       "rationale": "Policy does not support a refund for this request; reducing refunds."
+      },
+      "result": {
+       "status": "pending_review"
+      },
+      "called_at": "2026-06-13T11:05:49Z"
+     }
+    },
+    {
+     "event_id": "zdevt_H1c7PxtMJnr4eo",
+     "source_system": "zendesk",
+     "event_type": "macro.applied",
+     "occurred_at": "2026-06-14T01:24:42Z",
+     "payload": {
+      "type": "macro.applied",
+      "ticket_id": "400001",
+      "macro": {
+       "id": 34791,
+       "title": "Refund: full"
+      },
+      "actor": {
+       "id": "zd_b01",
+       "name": "Ivan Cohen",
+       "group": "Team B",
+       "role": "agent"
+      },
+      "applied_at": "2026-06-14T01:24:42Z"
+     }
+    },
+    {
+     "event_id": "evt_j7GVJFeZkiFTmS",
+     "source_system": "stripe",
+     "event_type": "refund.created",
+     "occurred_at": "2026-06-14T01:25:42Z",
+     "payload": {
+      "id": "evt_j7GVJFeZkiFTmS",
+      "object": "event",
+      "api_version": "2026-06-30",
+      "type": "refund.created",
+      "created": 1781400342,
+      "livemode": false,
+      "data": {
+       "object": {
+        "id": "re_fvlePRSFExO84k",
+        "object": "refund",
+        "amount": 2500,
+        "currency": "usd",
+        "charge": "ch_nIdEOwaqHNiqfU",
+        "status": "succeeded",
+        "metadata": {
+         "zendesk_ticket_id": "400001",
+         "initiated_by": "zd_b01"
+        },
+        "created": 1781400342
+       }
+      }
+     }
+    },
+    {
+     "event_id": "zdevt_fL3zynsMgaZXR3",
+     "source_system": "zendesk",
+     "event_type": "ticket.updated",
+     "occurred_at": "2026-06-14T01:27:42Z",
+     "payload": {
+      "type": "ticket.updated",
+      "ticket_id": "400001",
+      "changes": {
+       "status": {
+        "from": "open",
+        "to": "solved"
+       }
+      },
+      "actor": {
+       "id": "zd_b01"
+      },
+      "updated_at": "2026-06-14T01:27:42Z"
+     }
+    }
+   ],
+   "rows": {
+    "events": [
+     {
+      "event_id": "story:theo|subevt_NPFI0epA7EN8Ee",
+      "source_system": "subscriptions",
+      "event_type": "subscription.created",
+      "occurred_at": "2026-03-10T10:00:00Z",
+      "payload_json": "{\"subscription_id\":\"sub_Ji3ycCBexptzky\",\"stripe_customer_id\":\"cus_ZKG9xkwf07fdDU\",\"email\":\"theo.grant.set6@example.com\",\"plan\":\"monthly_25\",\"started_at\":\"2026-03-10T10:00:00Z\"}",
+      "charge_id": null,
+      "ticket_id": null,
+      "dispute_id": null,
+      "stripe_customer_id": "cus_ZKG9xkwf07fdDU",
+      "email": "theo.grant.set6@example.com",
+      "scenario_id": "story:theo"
+     },
+     {
+      "event_id": "story:theo|scr_a85xOlHveDxHby",
+      "source_system": "fraudguard",
+      "event_type": "charge.screened",
+      "occurred_at": "2026-06-10T18:07:58Z",
+      "payload_json": "{\"screening_id\":\"scr_btxAoa7aOPrdDy\",\"charge_ref\":\"ch_nIdEOwaqHNiqfU\",\"customer_email\":\"theo.grant.set6@example.com\",\"amount\":25.0,\"currency\":\"usd\",\"plan\":\"monthly_25\",\"is_renewal\":true,\"risk_score\":25,\"country_match\":true,\"card_age_days\":1626,\"decision\":\"approve\",\"rule_id\":\"R-APPROVE-LE75\",\"screened_at\":\"2026-06-10T18:07:58Z\"}",
+      "charge_id": "ch_nIdEOwaqHNiqfU",
+      "ticket_id": null,
+      "dispute_id": null,
+      "stripe_customer_id": null,
+      "email": "theo.grant.set6@example.com",
+      "scenario_id": "story:theo"
+     },
+     {
+      "event_id": "story:theo|evt_qotdQflZkB61cJ",
+      "source_system": "stripe",
+      "event_type": "charge.succeeded",
+      "occurred_at": "2026-06-10T18:08:00Z",
+      "payload_json": "{\"id\":\"evt_qotdQflZkB61cJ\",\"object\":\"event\",\"api_version\":\"2026-06-30\",\"type\":\"charge.succeeded\",\"created\":1781114880,\"livemode\":false,\"data\":{\"object\":{\"id\":\"ch_nIdEOwaqHNiqfU\",\"object\":\"charge\",\"amount\":2500,\"currency\":\"usd\",\"customer\":\"cus_ZKG9xkwf07fdDU\",\"billing_details\":{\"email\":\"theo.grant.set6@example.com\",\"name\":\"Theo Grant\"},\"metadata\":{\"plan\":\"monthly_25\",\"subscription_id\":\"sub_Ji3ycCBexptzky\"},\"status\":\"succeeded\",\"created\":1781114880}}}",
+      "charge_id": "ch_nIdEOwaqHNiqfU",
+      "ticket_id": null,
+      "dispute_id": null,
+      "stripe_customer_id": "cus_ZKG9xkwf07fdDU",
+      "email": "theo.grant.set6@example.com",
+      "scenario_id": "story:theo"
+     },
+     {
+      "event_id": "story:theo|zdevt_0IEeyOB7Nt8qFz",
+      "source_system": "zendesk",
+      "event_type": "ticket.created",
+      "occurred_at": "2026-06-13T11:00:00Z",
+      "payload_json": "{\"type\":\"ticket.created\",\"ticket\":{\"id\":\"400001\",\"subject\":\"I forgot to cancel and didn't watch anything this period\",\"description\":\"I forgot to cancel and didn't watch anything this period. Please refund me.\",\"requester\":{\"email\":\"theo.grant.set6@example.com\",\"name\":\"Theo Grant\"},\"via\":{\"channel\":\"chat\"},\"tags\":[\"didnt_use\"],\"status\":\"new\",\"custom_fields\":[{\"id\":\"stripe_charge_id\",\"value\":\"ch_nIdEOwaqHNiqfU\"}],\"created_at\":\"2026-06-13T11:00:00Z\"}}",
+      "charge_id": "ch_nIdEOwaqHNiqfU",
+      "ticket_id": "400001",
+      "dispute_id": null,
+      "stripe_customer_id": null,
+      "email": "theo.grant.set6@example.com",
+      "scenario_id": "story:theo"
+     },
+     {
+      "event_id": "story:theo|call_wVjWSF2C8Jhmpf",
+      "source_system": "mcp_gateway",
+      "event_type": "tool_call",
+      "occurred_at": "2026-06-13T11:03:52Z",
+      "payload_json": "{\"call_id\":\"call_wVjWSF2C8Jhmpf\",\"session_id\":\"sess_mfNlClC5GF1fAP\",\"agent_id\":\"streamly-support-agent\",\"agent_version\":\"v2\",\"server\":\"streamly-ops\",\"tool\":\"get_customer\",\"arguments\":{\"ticket_id\":\"400001\"},\"result\":{\"customer_email\":\"theo.grant.set6@example.com\",\"tenure_months\":3,\"plan\":\"monthly_25\",\"prior_refunds_90d\":0,\"subscription_status\":\"active\",\"charge_id\":\"ch_nIdEOwaqHNiqfU\",\"charge_amount_usd\":25.0},\"called_at\":\"2026-06-13T11:03:52Z\"}",
+      "charge_id": "ch_nIdEOwaqHNiqfU",
+      "ticket_id": "400001",
+      "dispute_id": null,
+      "stripe_customer_id": null,
+      "email": "theo.grant.set6@example.com",
+      "scenario_id": "story:theo"
+     },
+     {
+      "event_id": "story:theo|call_4j8MPPOxA1N9K8",
+      "source_system": "mcp_gateway",
+      "event_type": "tool_call",
+      "occurred_at": "2026-06-13T11:05:49Z",
+      "payload_json": "{\"call_id\":\"call_4j8MPPOxA1N9K8\",\"session_id\":\"sess_mfNlClC5GF1fAP\",\"agent_id\":\"streamly-support-agent\",\"agent_version\":\"v2\",\"server\":\"streamly-ops\",\"tool\":\"propose_resolution\",\"arguments\":{\"ticket_id\":\"400001\",\"option\":\"deny\",\"amount_usd\":0.0,\"rationale\":\"Policy does not support a refund for this request; reducing refunds.\"},\"result\":{\"status\":\"pending_review\"},\"called_at\":\"2026-06-13T11:05:49Z\"}",
+      "charge_id": null,
+      "ticket_id": "400001",
+      "dispute_id": null,
+      "stripe_customer_id": null,
+      "email": null,
+      "scenario_id": "story:theo"
+     },
+     {
+      "event_id": "story:theo|zdevt_H1c7PxtMJnr4eo",
+      "source_system": "zendesk",
+      "event_type": "macro.applied",
+      "occurred_at": "2026-06-14T01:24:42Z",
+      "payload_json": "{\"type\":\"macro.applied\",\"ticket_id\":\"400001\",\"macro\":{\"id\":34791,\"title\":\"Refund: full\"},\"actor\":{\"id\":\"zd_b01\",\"name\":\"Ivan Cohen\",\"group\":\"Team B\",\"role\":\"agent\"},\"applied_at\":\"2026-06-14T01:24:42Z\"}",
+      "charge_id": null,
+      "ticket_id": "400001",
+      "dispute_id": null,
+      "stripe_customer_id": null,
+      "email": null,
+      "scenario_id": "story:theo"
+     },
+     {
+      "event_id": "story:theo|evt_j7GVJFeZkiFTmS",
+      "source_system": "stripe",
+      "event_type": "refund.created",
+      "occurred_at": "2026-06-14T01:25:42Z",
+      "payload_json": "{\"id\":\"evt_j7GVJFeZkiFTmS\",\"object\":\"event\",\"api_version\":\"2026-06-30\",\"type\":\"refund.created\",\"created\":1781400342,\"livemode\":false,\"data\":{\"object\":{\"id\":\"re_fvlePRSFExO84k\",\"object\":\"refund\",\"amount\":2500,\"currency\":\"usd\",\"charge\":\"ch_nIdEOwaqHNiqfU\",\"status\":\"succeeded\",\"metadata\":{\"zendesk_ticket_id\":\"400001\",\"initiated_by\":\"zd_b01\"},\"created\":1781400342}}}",
+      "charge_id": "ch_nIdEOwaqHNiqfU",
+      "ticket_id": "400001",
+      "dispute_id": null,
+      "stripe_customer_id": null,
+      "email": null,
+      "scenario_id": "story:theo"
+     },
+     {
+      "event_id": "story:theo|zdevt_fL3zynsMgaZXR3",
+      "source_system": "zendesk",
+      "event_type": "ticket.updated",
+      "occurred_at": "2026-06-14T01:27:42Z",
+      "payload_json": "{\"type\":\"ticket.updated\",\"ticket_id\":\"400001\",\"changes\":{\"status\":{\"from\":\"open\",\"to\":\"solved\"}},\"actor\":{\"id\":\"zd_b01\"},\"updated_at\":\"2026-06-14T01:27:42Z\"}",
+      "charge_id": null,
+      "ticket_id": "400001",
+      "dispute_id": null,
+      "stripe_customer_id": null,
+      "email": null,
+      "scenario_id": "story:theo"
+     }
+    ],
+    "entities": [
+     {
+      "entity_id": "story:theo|stripe:cus_ZKG9xkwf07fdDU",
+      "label": "Customer",
+      "source_system": "stripe",
+      "source_key": "cus_ZKG9xkwf07fdDU",
+      "props": {
+       "email": "theo.grant.set6@example.com",
+       "name": "Theo Grant"
+      },
+      "scenario_id": "story:theo"
+     },
+     {
+      "entity_id": "story:theo|stripe:ch_nIdEOwaqHNiqfU",
+      "label": "Charge",
+      "source_system": "stripe",
+      "source_key": "ch_nIdEOwaqHNiqfU",
+      "props": {
+       "amount_usd": 25.0,
+       "plan": "monthly_25"
+      },
+      "scenario_id": "story:theo"
+     },
+     {
+      "entity_id": "story:theo|zendesk:ticket:400001",
+      "label": "Ticket",
+      "source_system": "zendesk",
+      "source_key": "ticket:400001",
+      "props": {
+       "category": "didnt_use",
+       "channel": "chat",
+       "subject": "I forgot to cancel and didn't watch anything this period"
+      },
+      "scenario_id": "story:theo"
+     },
+     {
+      "entity_id": "story:theo|zendesk:user:theo.grant.set6@example.com",
+      "label": "Customer",
+      "source_system": "zendesk",
+      "source_key": "user:theo.grant.set6@example.com",
+      "props": {
+       "email": "theo.grant.set6@example.com",
+       "name": "Theo Grant"
+      },
+      "scenario_id": "story:theo"
+     }
+    ],
+    "same_as": [
+     {
+      "from": "story:theo|zendesk:user:theo.grant.set6@example.com",
+      "to": "story:theo|stripe:cus_ZKG9xkwf07fdDU",
+      "confidence": 0.98,
+      "method": "EMAIL"
+     }
+    ],
+    "actors": [
+     {
+      "actor_id": "story:theo|system:fraudguard",
+      "kind": "SYSTEM",
+      "version": "rules-2026.1",
+      "name": "FraudGuard rules",
+      "team": null,
+      "scenario_id": "story:theo"
+     },
+     {
+      "actor_id": "story:theo|agent:streamly-support-agent:v2",
+      "kind": "AI_AGENT",
+      "version": "v2",
+      "name": "Streamly support agent v2",
+      "team": null,
+      "scenario_id": "story:theo"
+     },
+     {
+      "actor_id": "story:theo|zendesk:zd_b01",
+      "kind": "HUMAN",
+      "version": null,
+      "name": "Ivan Cohen",
+      "team": "Team B",
+      "scenario_id": "story:theo"
+     }
+    ],
+    "decisions": [
+     {
+      "decision_id": "story:theo|dec:scr_a85xOlHveDxHby",
+      "decision_type": "charge.fraud_screen",
+      "stage": "FINAL",
+      "decided_at": "2026-06-10T18:07:58Z",
+      "detection_method": "RULE",
+      "detection_confidence": 1.0,
+      "source_system": "fraudguard",
+      "scenario_id": "story:theo"
+     },
+     {
+      "decision_id": "story:theo|dec:call_4j8MPPOxA1N9K8",
+      "decision_type": "support.complaint_resolution",
+      "stage": "PROPOSAL",
+      "decided_at": "2026-06-13T11:05:49Z",
+      "detection_method": "RULE",
+      "detection_confidence": 1.0,
+      "source_system": "mcp_gateway",
+      "scenario_id": "story:theo"
+     },
+     {
+      "decision_id": "story:theo|dec:zdevt_H1c7PxtMJnr4eo",
+      "decision_type": "support.complaint_resolution",
+      "stage": "FINAL",
+      "decided_at": "2026-06-14T01:24:42Z",
+      "detection_method": "RULE",
+      "detection_confidence": 1.0,
+      "source_system": "zendesk",
+      "scenario_id": "story:theo"
+     }
+    ],
+    "contexts": [
+     {
+      "context_id": "story:theo|ctx:scr_a85xOlHveDxHby",
+      "decision_id": "story:theo|dec:scr_a85xOlHveDxHby",
+      "attrs": {
+       "charge.risk_score": 25,
+       "charge.plan": "monthly_25",
+       "charge.is_renewal": true,
+       "charge.country_match": true,
+       "charge.card_age_days": 1626
+      },
+      "summary_text": "Charge screening: renewal on monthly_25, $25, risk score 25, card age 1626 days, country matches.",
+      "scenario_id": "story:theo"
+     },
+     {
+      "context_id": "story:theo|ctx:call_4j8MPPOxA1N9K8",
+      "decision_id": "story:theo|dec:call_4j8MPPOxA1N9K8",
+      "attrs": {
+       "support.tenure_months": 3,
+       "support.plan": "monthly_25",
+       "support.amount_usd": 25.0,
+       "support.complaint_category": "didnt_use",
+       "support.prior_refunds_90d": 0,
+       "support.channel": "chat"
+      },
+      "summary_text": "Complaint (didnt_use) via chat: customer tenure 3 months on monthly_25, $25 charge, 0 refunds in last 90 days. AI v2 proposed deny.",
+      "scenario_id": "story:theo"
+     },
+     {
+      "context_id": "story:theo|ctx:zdevt_H1c7PxtMJnr4eo",
+      "decision_id": "story:theo|dec:zdevt_H1c7PxtMJnr4eo",
+      "attrs": {
+       "support.tenure_months": 3,
+       "support.plan": "monthly_25",
+       "support.amount_usd": 25.0,
+       "support.complaint_category": "didnt_use",
+       "support.prior_refunds_90d": 0,
+       "support.channel": "chat"
+      },
+      "summary_text": "Complaint (didnt_use) via chat: customer tenure 3 months on monthly_25, $25 charge, 0 refunds in last 90 days. Team B rep chose full_refund, overriding AI proposal deny.",
+      "scenario_id": "story:theo"
+     }
+    ],
+    "considered": [
+     {
+      "decision_id": "story:theo|dec:scr_a85xOlHveDxHby",
+      "decision_type": "charge.fraud_screen",
+      "option_key": "approve",
+      "status": "CHOSEN",
+      "amount_usd": null
+     },
+     {
+      "decision_id": "story:theo|dec:scr_a85xOlHveDxHby",
+      "decision_type": "charge.fraud_screen",
+      "option_key": "decline",
+      "status": "AVAILABLE",
+      "amount_usd": null
+     },
+     {
+      "decision_id": "story:theo|dec:scr_a85xOlHveDxHby",
+      "decision_type": "charge.fraud_screen",
+      "option_key": "review",
+      "status": "AVAILABLE",
+      "amount_usd": null
+     },
+     {
+      "decision_id": "story:theo|dec:call_4j8MPPOxA1N9K8",
+      "decision_type": "support.complaint_resolution",
+      "option_key": "deny",
+      "status": "PROPOSED",
+      "amount_usd": 0.0
+     },
+     {
+      "decision_id": "story:theo|dec:call_4j8MPPOxA1N9K8",
+      "decision_type": "support.complaint_resolution",
+      "option_key": "full_refund",
+      "status": "AVAILABLE",
+      "amount_usd": null
+     },
+     {
+      "decision_id": "story:theo|dec:call_4j8MPPOxA1N9K8",
+      "decision_type": "support.complaint_resolution",
+      "option_key": "partial_refund",
+      "status": "AVAILABLE",
+      "amount_usd": null
+     },
+     {
+      "decision_id": "story:theo|dec:call_4j8MPPOxA1N9K8",
+      "decision_type": "support.complaint_resolution",
+      "option_key": "voucher",
+      "status": "AVAILABLE",
+      "amount_usd": null
+     },
+     {
+      "decision_id": "story:theo|dec:zdevt_H1c7PxtMJnr4eo",
+      "decision_type": "support.complaint_resolution",
+      "option_key": "full_refund",
+      "status": "CHOSEN",
+      "amount_usd": 25.0
+     },
+     {
+      "decision_id": "story:theo|dec:zdevt_H1c7PxtMJnr4eo",
+      "decision_type": "support.complaint_resolution",
+      "option_key": "deny",
+      "status": "REJECTED",
+      "amount_usd": null
+     },
+     {
+      "decision_id": "story:theo|dec:zdevt_H1c7PxtMJnr4eo",
+      "decision_type": "support.complaint_resolution",
+      "option_key": "partial_refund",
+      "status": "AVAILABLE",
+      "amount_usd": null
+     },
+     {
+      "decision_id": "story:theo|dec:zdevt_H1c7PxtMJnr4eo",
+      "decision_type": "support.complaint_resolution",
+      "option_key": "voucher",
+      "status": "AVAILABLE",
+      "amount_usd": null
+     }
+    ],
+    "made_by": [
+     {
+      "decision_id": "story:theo|dec:scr_a85xOlHveDxHby",
+      "actor_id": "story:theo|system:fraudguard",
+      "role": "DECIDER"
+     },
+     {
+      "decision_id": "story:theo|dec:call_4j8MPPOxA1N9K8",
+      "actor_id": "story:theo|agent:streamly-support-agent:v2",
+      "role": "PROPOSER"
+     },
+     {
+      "decision_id": "story:theo|dec:zdevt_H1c7PxtMJnr4eo",
+      "actor_id": "story:theo|zendesk:zd_b01",
+      "role": "DECIDER"
+     }
+    ],
+    "about": [
+     {
+      "decision_id": "story:theo|dec:scr_a85xOlHveDxHby",
+      "entity_id": "story:theo|stripe:ch_nIdEOwaqHNiqfU"
+     },
+     {
+      "decision_id": "story:theo|dec:scr_a85xOlHveDxHby",
+      "entity_id": "story:theo|stripe:cus_ZKG9xkwf07fdDU"
+     },
+     {
+      "decision_id": "story:theo|dec:call_4j8MPPOxA1N9K8",
+      "entity_id": "story:theo|zendesk:ticket:400001"
+     },
+     {
+      "decision_id": "story:theo|dec:call_4j8MPPOxA1N9K8",
+      "entity_id": "story:theo|stripe:ch_nIdEOwaqHNiqfU"
+     },
+     {
+      "decision_id": "story:theo|dec:call_4j8MPPOxA1N9K8",
+      "entity_id": "story:theo|stripe:cus_ZKG9xkwf07fdDU"
+     },
+     {
+      "decision_id": "story:theo|dec:zdevt_H1c7PxtMJnr4eo",
+      "entity_id": "story:theo|zendesk:ticket:400001"
+     },
+     {
+      "decision_id": "story:theo|dec:zdevt_H1c7PxtMJnr4eo",
+      "entity_id": "story:theo|stripe:ch_nIdEOwaqHNiqfU"
+     },
+     {
+      "decision_id": "story:theo|dec:zdevt_H1c7PxtMJnr4eo",
+      "entity_id": "story:theo|stripe:cus_ZKG9xkwf07fdDU"
+     }
+    ],
+    "preceded_by": [
+     {
+      "from": "story:theo|dec:call_4j8MPPOxA1N9K8",
+      "to": "story:theo|dec:scr_a85xOlHveDxHby"
+     },
+     {
+      "from": "story:theo|dec:zdevt_H1c7PxtMJnr4eo",
+      "to": "story:theo|dec:call_4j8MPPOxA1N9K8"
+     }
+    ],
+    "overrides": [
+     {
+      "from": "story:theo|dec:zdevt_H1c7PxtMJnr4eo",
+      "to": "story:theo|dec:call_4j8MPPOxA1N9K8",
+      "detected_at": "2026-06-14T01:24:42Z"
+     }
+    ],
+    "under_policy": [
+     {
+      "decision_id": "story:theo|dec:scr_a85xOlHveDxHby",
+      "policy_id": "fraud-screening",
+      "version": "2025.1"
+     },
+     {
+      "decision_id": "story:theo|dec:call_4j8MPPOxA1N9K8",
+      "policy_id": "streamly-refunds",
+      "version": "2025.1"
+     },
+     {
+      "decision_id": "story:theo|dec:zdevt_H1c7PxtMJnr4eo",
+      "policy_id": "streamly-refunds",
+      "version": "2025.1"
+     }
+    ],
+    "evidenced_by": [
+     {
+      "node_id": "story:theo|dec:scr_a85xOlHveDxHby",
+      "kind": "Decision",
+      "event_id": "story:theo|scr_a85xOlHveDxHby"
+     },
+     {
+      "node_id": "story:theo|dec:call_4j8MPPOxA1N9K8",
+      "kind": "Decision",
+      "event_id": "story:theo|zdevt_0IEeyOB7Nt8qFz"
+     },
+     {
+      "node_id": "story:theo|dec:call_4j8MPPOxA1N9K8",
+      "kind": "Decision",
+      "event_id": "story:theo|call_wVjWSF2C8Jhmpf"
+     },
+     {
+      "node_id": "story:theo|dec:call_4j8MPPOxA1N9K8",
+      "kind": "Decision",
+      "event_id": "story:theo|call_4j8MPPOxA1N9K8"
+     },
+     {
+      "node_id": "story:theo|dec:zdevt_H1c7PxtMJnr4eo",
+      "kind": "Decision",
+      "event_id": "story:theo|zdevt_H1c7PxtMJnr4eo"
+     },
+     {
+      "node_id": "story:theo|out:evt_j7GVJFeZkiFTmS",
+      "kind": "Outcome",
+      "event_id": "story:theo|evt_j7GVJFeZkiFTmS"
+     }
+    ],
+    "outcomes": [
+     {
+      "outcome_id": "story:theo|out:evt_j7GVJFeZkiFTmS",
+      "outcome_type": "refund_cost",
+      "occurred_at": "2026-06-14T01:25:42Z",
+      "value_usd": 25.0,
+      "scenario_id": "story:theo"
+     }
+    ],
+    "led_to": [
+     {
+      "decision_id": "story:theo|dec:zdevt_H1c7PxtMJnr4eo",
+      "outcome_id": "story:theo|out:evt_j7GVJFeZkiFTmS",
+      "confidence": 1.0,
+      "attribution_method": "EXPLICIT_REF",
+      "window_days": 1
+     }
+    ],
+    "schema_proposals": []
+   }
+  },
+  {
+   "name": "60 days later",
+   "events": [
+    {
+     "event_id": "subevt_b97DjurJrZwUP0",
+     "source_system": "subscriptions",
+     "event_type": "subscription.canceled",
+     "occurred_at": "2026-07-20T04:22:07Z",
+     "payload": {
+      "subscription_id": "sub_Ji3ycCBexptzky",
+      "stripe_customer_id": "cus_ZKG9xkwf07fdDU",
+      "plan": "monthly_25",
+      "at": "2026-07-20T04:22:07Z",
+      "reason": "customer_request"
+     }
+    }
+   ],
+   "rows": {
+    "events": [
+     {
+      "event_id": "story:theo|subevt_b97DjurJrZwUP0",
+      "source_system": "subscriptions",
+      "event_type": "subscription.canceled",
+      "occurred_at": "2026-07-20T04:22:07Z",
+      "payload_json": "{\"subscription_id\":\"sub_Ji3ycCBexptzky\",\"stripe_customer_id\":\"cus_ZKG9xkwf07fdDU\",\"plan\":\"monthly_25\",\"at\":\"2026-07-20T04:22:07Z\",\"reason\":\"customer_request\"}",
+      "charge_id": null,
+      "ticket_id": null,
+      "dispute_id": null,
+      "stripe_customer_id": "cus_ZKG9xkwf07fdDU",
+      "email": null,
+      "scenario_id": "story:theo"
+     }
+    ],
+    "entities": [],
+    "same_as": [],
+    "actors": [],
+    "decisions": [],
+    "contexts": [],
+    "considered": [],
+    "made_by": [],
+    "about": [],
+    "preceded_by": [],
+    "overrides": [],
+    "under_policy": [],
+    "evidenced_by": [
+     {
+      "node_id": "story:theo|out:subevt_b97DjurJrZwUP0",
+      "kind": "Outcome",
+      "event_id": "story:theo|subevt_b97DjurJrZwUP0"
+     }
+    ],
+    "outcomes": [
+     {
+      "outcome_id": "story:theo|out:subevt_b97DjurJrZwUP0",
+      "outcome_type": "churn",
+      "occurred_at": "2026-07-20T04:22:07Z",
+      "value_usd": null,
+      "scenario_id": "story:theo"
+     }
+    ],
+    "led_to": [
+     {
+      "decision_id": "story:theo|dec:zdevt_H1c7PxtMJnr4eo",
+      "outcome_id": "story:theo|out:subevt_b97DjurJrZwUP0",
+      "confidence": 1.0,
+      "attribution_method": "SAME_ENTITY_WINDOW",
+      "window_days": 400
+     }
+    ],
+    "schema_proposals": []
+   }
+  }
+ ],
+ "became": {
+  "subevt_NPFI0epA7EN8Ee": [],
+  "scr_a85xOlHveDxHby": [
+   "Decision \u00b7 fraud screen \u00b7 final: approve \u00b7 by FraudGuard rules"
+  ],
+  "evt_qotdQflZkB61cJ": [],
+  "zdevt_0IEeyOB7Nt8qFz": [
+   "Identity \u00b7 Zendesk requester SAME_AS Stripe customer (email match)"
+  ],
+  "call_wVjWSF2C8Jhmpf": [],
+  "call_4j8MPPOxA1N9K8": [
+   "Decision \u00b7 complaint resolution \u00b7 proposal: deny \u00b7 by AI v2"
+  ],
+  "zdevt_H1c7PxtMJnr4eo": [
+   "Decision \u00b7 complaint resolution \u00b7 final: full refund \u00b7 by Ivan Cohen (Team B) \u00b7 OVERRIDES the AI proposal"
+  ],
+  "evt_j7GVJFeZkiFTmS": [
+   "Outcome \u00b7 refund cost ($25)"
+  ],
+  "zdevt_fL3zynsMgaZXR3": [],
+  "subevt_b97DjurJrZwUP0": [
+   "Outcome \u00b7 churn"
+  ]
+ }
+}

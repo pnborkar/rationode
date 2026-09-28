@@ -4,6 +4,7 @@
  "scenario_id": "story:leo",
  "title": "Denied, disputed, lost",
  "point": "A costly chain across Zendesk, the agent, and Stripe: the Dana pattern, live.",
+ "message": "I was charged for a renewal but I haven't used the service at all. Can I get a refund?",
  "customer": {
   "name": "Leo Marsh",
   "email": "leo.marsh.set2@example.com",

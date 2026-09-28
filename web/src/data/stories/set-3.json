@@ -4,6 +4,7 @@
  "scenario_id": "story:mei",
  "title": "The pause that saved a customer",
  "point": "The newer pause_subscription option (still PROPOSED in the schema registry) showing up in fresh events.",
+ "message": "I can't justify paying this much anymore. Is there anything you can do?",
  "customer": {
   "name": "Mei Tanaka",
   "email": "mei.tanaka.set3@example.com",
