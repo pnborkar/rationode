@@ -2,7 +2,7 @@
 // reported as events (thinking, tool calls, results, text) for the demo UI.
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
-import { getCustomer } from "./customer";
+import { checkUsage, getCustomer } from "./customer";
 import type { Context } from "./features";
 import { checkBeforeAct } from "./precedent";
 
@@ -63,8 +63,15 @@ const ProposeResolution = z.object({
 const TOOLS: Record<string, Anthropic.Beta.BetaTool> = {
   get_customer: {
     name: "get_customer",
-    description: "Look up a customer by email: tenure in months, plan, latest charge, refunds in the last 90 days, " +
-      "and hours watched in the last 30 days from the Streamly app (null when there is no usage data).",
+    description: "Look up a customer by email: tenure in months, plan, latest charge, refunds in the last 90 days.",
+    eager_input_streaming: true,
+    input_schema: { type: "object", properties: { email: { type: "string" } }, required: ["email"] },
+  },
+  check_usage_patterns: {
+    name: "check_usage_patterns",
+    description: "Check the customer's viewing in the Streamly app: weekly hours for recent weeks, hours since " +
+      "their latest charge, last week watched, and the trend. Use it when a complaint or claim depends on " +
+      "whether the customer used the service.",
     eager_input_streaming: true,
     input_schema: { type: "object", properties: { email: { type: "string" } }, required: ["email"] },
   },
@@ -122,6 +129,12 @@ async function runTool(name: string, input: unknown): Promise<ToolRun> {
     const customer = await getCustomer(p.data.email);
     return customer ? { result: customer } : { result: "No customer with that email", is_error: true };
   }
+  if (name === "check_usage_patterns") {
+    const p = GetCustomer.safeParse(input);
+    if (!p.success) return { result: { INVALID_INPUT: p.error.message }, is_error: true };
+    const usage = await checkUsage(p.data.email);
+    return usage ? { result: usage } : { result: "No customer with that email", is_error: true };
+  }
   if (name === "check_before_act") {
     const p = CheckBeforeAct.safeParse(input);
     if (!p.success) return { result: { INVALID_INPUT: p.error.message }, is_error: true };
@@ -145,10 +158,10 @@ export type ChatInput = {
 };
 
 export async function* runSupportAgent(input: ChatInput): AsyncGenerator<AgentEvent> {
-  // Graph off removes only the graph tool; the prompt and everything else stay the same.
+  // Graph off removes only decision precedent (check_before_act); customer data and usage stay.
   const tools = input.graph
-    ? [TOOLS.get_customer, TOOLS.check_before_act, TOOLS.propose_resolution]
-    : [TOOLS.get_customer, TOOLS.propose_resolution];
+    ? [TOOLS.get_customer, TOOLS.check_usage_patterns, TOOLS.check_before_act, TOOLS.propose_resolution]
+    : [TOOLS.get_customer, TOOLS.check_usage_patterns, TOOLS.propose_resolution];
   const messages: Anthropic.Beta.BetaMessageParam[] = [{
     role: "user",
     content: `New ${input.channel} ticket ${input.ticket_id} from ${input.customer_email}:\n\n${input.message}`,

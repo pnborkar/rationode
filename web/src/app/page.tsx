@@ -20,8 +20,15 @@ type Precedent = {
   neighbours: { decision_id: string; score: number; option: string | null; outcomes: string[] }[];
 };
 type Proposal = { ticket_id: string; option: string; amount_usd: number; rationale: string };
+type Usage = {
+  usage_data: boolean; note?: string;
+  weeks?: { week_start: string; hours: number; titles: number; after_charge: boolean }[];
+  latest_charge?: { date: string; amount_usd: number };
+  hours_since_charge?: number; weeks_since_charge?: number; last_watched_week?: string | null; trend?: string;
+};
 type Step =
   | { kind: "customer"; data: Record<string, unknown> }
+  | { kind: "usage"; data: Usage }
   | { kind: "precedent"; data: Precedent }
   | { kind: "proposal"; data: Proposal };
 
@@ -61,6 +68,40 @@ function StepCard({ step }: { step: Step }) {
         <p className="text-xs text-zinc-500">get_customer</p>
         <p>Looked up <b>{String(c.name)}</b>: {String(c.tenure_months)} months, {words(String(c.plan))},
           last charge ${String(c.charge_amount_usd)}, {String(c.prior_refunds_90d)} refunds in 90 days.</p>
+      </div>
+    );
+  }
+  if (step.kind === "usage") {
+    const u = step.data;
+    if (!u.usage_data) {
+      return (
+        <div className="rounded-lg border border-teal-900 bg-teal-950/30 p-3 text-sm">
+          <p className="text-xs text-teal-400">check_usage_patterns · Streamly app</p>
+          <p>{u.note}</p>
+        </div>
+      );
+    }
+    const max = Math.max(1, ...u.weeks!.map((w) => w.hours));
+    return (
+      <div className="rounded-lg border border-teal-900 bg-teal-950/30 p-3 text-sm">
+        <p className="text-xs text-teal-400">check_usage_patterns · Streamly app</p>
+        <div className="mt-2 flex h-16 items-end gap-1.5">
+          {u.weeks!.map((w) => (
+            <div key={w.week_start} className="flex flex-1 flex-col items-center gap-1">
+              <span className="text-[10px] text-zinc-400">{w.hours}h</span>
+              <div className={`w-full rounded-t ${w.after_charge ? "bg-teal-400" : "bg-zinc-600"}`}
+                   style={{ height: `${Math.max(3, (w.hours / max) * 40)}px` }}
+                   title={`week of ${w.week_start}: ${w.hours} h, ${w.titles} titles`} />
+              <span className="text-[9px] text-zinc-500">{w.week_start.slice(5)}</span>
+            </div>
+          ))}
+        </div>
+        <p className="mt-2">
+          Since the ${u.latest_charge!.amount_usd} charge on {u.latest_charge!.date}: <b>{u.hours_since_charge} h</b> across
+          {" "}{u.weeks_since_charge} weeks · last watched {u.last_watched_week ? `week of ${u.last_watched_week}` : "—"} ·
+          trend: {u.trend}
+        </p>
+        <p className="text-[10px] text-zinc-500">Highlighted bars: weeks after the latest charge.</p>
       </div>
     );
   }
@@ -223,6 +264,8 @@ export default function StreamlyLive() {
           setChat([{ from: "sam", text: message }]);
         } else if (e.type === "tool_result" && e.name === "get_customer" && !e.is_error) {
           setSteps((s) => [...s, { kind: "customer", data: e.result as Record<string, unknown> }]);
+        } else if (e.type === "tool_result" && e.name === "check_usage_patterns" && !e.is_error) {
+          setSteps((s) => [...s, { kind: "usage", data: e.result as Usage }]);
         } else if (e.type === "tool_result" && e.name === "check_before_act" && !e.is_error) {
           const p = e.result as Precedent;
           setSteps((s) => [...s, { kind: "precedent", data: p }]);

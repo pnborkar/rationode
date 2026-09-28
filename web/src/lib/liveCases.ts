@@ -14,7 +14,7 @@ export type LiveCase = {
 export const LIVE_CASES: LiveCase[] = [
   {
     key: "sam", name: "Sam Okafor", email: "sam.okafor26002@example.com", ticket_id: "500001",
-    blurb: "Loyal (28 months, annual $180), didn't use it. The graph changes the decision: off → deny; on → refund, never deny.",
+    blurb: "Loyal (28 months, annual $180), didn't use it (usage confirms 0 h). The graph changes the decision: off → deny; on → voucher or refund, never deny.",
     message: "Hi, I was charged $180 for my annual renewal but I haven't used Streamly at all this year. Can I get a refund?",
   },
   {
