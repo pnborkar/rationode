@@ -7,13 +7,14 @@ import { useEffect, useState } from "react";
 import type { ViewNode, ViewRel } from "@/components/GraphView";
 
 const GraphView = dynamic(() => import("@/components/GraphView"), { ssr: false });
+const GraphTable = dynamic(() => import("@/components/GraphTable"), { ssr: false });
 
 type AgentEvent = { type: string; [key: string]: unknown };
 type Option = { option: string; n: number; dispute_rate: number; churn_rate: number; avg_cost: number };
 type WhatIf = { action: string; branch: string; support: number; dispute_rate: number; churn_rate: number };
 type Precedent = {
   similar_decisions: number; search: string; options: Option[]; what_if: WhatIf[];
-  neighbours: { decision_id: string; option: string | null; outcomes: string[] }[];
+  neighbours: { decision_id: string; score: number; option: string | null; outcomes: string[] }[];
 };
 type Proposal = { ticket_id: string; option: string; amount_usd: number; rationale: string };
 type Step =
@@ -117,6 +118,15 @@ export default function StreamlyLive() {
   const [running, setRunning] = useState(false);
   const [base, setBase] = useState<{ nodes: ViewNode[]; rels: ViewRel[] }>({ nodes: [], rels: [] });
   const [live, setLive] = useState<{ nodes: ViewNode[]; rels: ViewRel[] }>({ nodes: [], rels: [] });
+  const [graphMode, setGraphMode] = useState<"graph" | "table">("graph");
+  const [expanded, setExpanded] = useState(false);
+
+  // Esc closes the expanded graph.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setExpanded(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   // Sam's existing neighbourhood in the graph (charges, past decisions), read from AuraDB.
   useEffect(() => {
@@ -142,8 +152,7 @@ export default function StreamlyLive() {
     setRunning(true);
     setChat([{ from: "sam", text: message }]);
     const caseId = `case:${TICKET}`;
-    addLive([{ id: caseId, kind: "case", label: "Sam's complaint", live: true }],
-            customerId ? [{ id: `${caseId}->${customerId}`, from: caseId, to: customerId, type: "ABOUT" }] : []);
+    addLive([{ id: caseId, kind: "case", label: "Sam's complaint", live: true }], []);
 
     const res = await fetch("/api/agent", {
       method: "POST",
@@ -177,7 +186,8 @@ export default function StreamlyLive() {
           const p = e.result as Precedent;
           setSteps((s) => [...s, { kind: "precedent", data: p }]);
           addLive(p.neighbours.map((n) => ({ id: n.decision_id, kind: "precedent", label: "past decision",
-                                             option: n.option, outcomes: n.outcomes })),
+                                             option: n.option, outcomes: n.outcomes,
+                                             detail: `similarity ${n.score.toFixed(3)} · ${n.decision_id}` })),
                   p.neighbours.map((n) => ({ id: `${caseId}~${n.decision_id}`, from: caseId, to: n.decision_id,
                                              type: "SIMILAR_TO" })));
         } else if (e.type === "proposal") {
@@ -202,7 +212,37 @@ export default function StreamlyLive() {
   }
 
   const nodes = [...base.nodes, ...live.nodes];
-  const rels = [...base.rels, ...live.rels];
+  // Link the live case to Sam at render time, so it holds even if Sam's history loads after Send.
+  const caseLink: ViewRel[] = customerId && live.nodes.some((n) => n.kind === "case")
+    ? [{ id: `case:${TICKET}->${customerId}`, from: `case:${TICKET}`, to: customerId, type: "ABOUT" }] : [];
+  const rels = [...base.rels, ...live.rels, ...caseLink];
+
+  const legend = (
+    <span className="flex gap-3 text-[10px] text-zinc-400">
+      <span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-green-500" />no dispute</span>
+      <span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-amber-500" />churned</span>
+      <span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-red-500" />disputed</span>
+    </span>
+  );
+  const graphControls = (
+    <span className="flex items-center gap-3">
+      {graphMode === "graph" && legend}
+      <span className="flex overflow-hidden rounded-md border border-zinc-700 text-xs">
+        {(["graph", "table"] as const).map((m) => (
+          <button key={m} onClick={() => setGraphMode(m)}
+                  className={`px-2 py-0.5 capitalize ${graphMode === m ? "bg-zinc-700 text-zinc-100" : "text-zinc-400"}`}>
+            {m}
+          </button>
+        ))}
+      </span>
+      <button onClick={() => setExpanded((x) => !x)} title={expanded ? "Close (Esc)" : "Expand"}
+              className="rounded-md border border-zinc-700 px-2 py-0.5 text-xs text-zinc-300 hover:bg-zinc-800">
+        {expanded ? "✕ Close" : "⤢ Expand"}
+      </button>
+    </span>
+  );
+  const graphBody = nodes.length === 0 ? null
+    : graphMode === "graph" ? <GraphView nodes={nodes} rels={rels} /> : <GraphTable nodes={nodes} rels={rels} />;
 
   return (
     <main className="flex h-screen flex-col gap-3 p-3">
@@ -290,17 +330,20 @@ export default function StreamlyLive() {
           )}
         </Panel>
 
-        <Panel title="Decision graph · live from Neo4j" className="overflow-hidden" badge={
-          <span className="flex gap-3 text-[10px] text-zinc-400">
-            <span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-green-500" />no dispute</span>
-            <span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-amber-500" />churned</span>
-            <span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-red-500" />disputed</span>
-          </span>}>
-          <div className="-m-4 h-[calc(100%+2rem)]">
-            {nodes.length > 0 && <GraphView nodes={nodes} rels={rels} />}
-          </div>
+        <Panel title="Decision graph · live from Neo4j" className="overflow-hidden" badge={graphControls}>
+          <div className="-m-4 h-[calc(100%+2rem)]">{!expanded && graphBody}</div>
         </Panel>
       </div>
+
+      {expanded && (
+        <div className="fixed inset-0 z-50 flex flex-col bg-zinc-950/95 p-4 backdrop-blur">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-300">Decision graph · live from Neo4j</h2>
+            {graphControls}
+          </div>
+          <div className="min-h-0 flex-1 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/60">{graphBody}</div>
+        </div>
+      )}
     </main>
   );
 }

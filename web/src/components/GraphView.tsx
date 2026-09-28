@@ -30,8 +30,8 @@ function toNvl(n: ViewNode): Node {
     caption,
     color: isDecision ? decisionColor(n.outcomes) : (KIND_COLOR[n.kind] ?? "#94a3b8"),
     size: n.kind === "customer" ? 38 : n.kind === "case" || n.kind === "proposal" || n.kind === "final" ? 32
-      : n.kind === "precedent" ? 18 : 24,
-    captionSize: n.kind === "precedent" ? 2 : 3,
+      : n.kind === "precedent" ? 28 : 28,
+    captionSize: 3,
     selected: n.live,
   };
 }
