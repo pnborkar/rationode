@@ -3,14 +3,28 @@ import { query } from "./neo4j";
 export type GraphNode = { id: string; kind: string; label: string; detail?: string; option?: string | null; outcomes?: string[] };
 export type GraphRel = { id: string; from: string; to: string; type: string };
 
+// Captions that say what happened, including the money.
+function outcomeLabel(type: string, value: number | null): string {
+  const usd = value != null ? ` $${value}` : "";
+  switch (type) {
+    case "refund_cost": return `Refunded${usd}`;
+    case "dispute_filed": return `Dispute filed${usd}`;
+    case "dispute_lost": return `Dispute lost${usd}`;
+    case "dispute_won": return "Dispute won";
+    case "churn": return "Churned";
+    case "renewal": return "Renewed";
+    default: return type.replace("_", " ");
+  }
+}
+
 // A customer's neighbourhood in the decision graph: the customer, their charges and tickets,
 // every decision about them, and what those decisions led to.
 export async function customerGraph(email: string) {
   const rows = await query<{
     customer: string; name: string;
     decisions: { id: string; type: string; stage: string; at: string; actor: string; option: string | null;
-                 about: string[]; outcomes: { id: string; type: string; value: number | null }[] }[];
-    entities: { id: string; kind: string; key: string }[];
+                 about: string[]; outcomes: { id: string; type: string; value: number | null; charge: string | null }[] }[];
+    entities: { id: string; kind: string; key: string; amount: number | null }[];
   }>(
     `MATCH (c:Customer:Entity {source_system: 'stripe', email: $email})
      OPTIONAL MATCH (d:Decision)-[:ABOUT]->(c)
@@ -23,9 +37,10 @@ export async function customerGraph(email: string) {
      WITH c, collect(CASE WHEN d IS NULL THEN null ELSE {
             id: d.decision_id, type: d.decision_type, stage: d.stage, at: toString(d.decided_at), actor: a.name,
             option: option, about: [x IN ents | x.entity_id],
-            outcomes: [x IN outs | {id: x.outcome_id, type: x.outcome_type, value: x.value_usd}]} END) AS decisions,
+            outcomes: [x IN outs | {id: x.outcome_id, type: x.outcome_type, value: x.value_usd,
+                                    charge: [(x)-[:EVIDENCED_BY]->(ev:Event) | ev.charge_id][0]}]} END) AS decisions,
           apoc.coll.toSet(apoc.coll.flatten(collect([x IN ents | {id: x.entity_id, kind: head([l IN labels(x) WHERE l <> 'Entity']),
-                                                                   key: x.source_key}]))) AS entities
+                                                                   key: x.source_key, amount: x.amount_usd}]))) AS entities
      RETURN c.entity_id AS customer, c.name AS name, decisions, entities`,
     { email },
   );
@@ -34,7 +49,11 @@ export async function customerGraph(email: string) {
 
   const nodes: GraphNode[] = [{ id: r.customer, kind: "customer", label: r.name, detail: email }];
   const rels: GraphRel[] = [];
-  for (const e of r.entities) nodes.push({ id: e.id, kind: e.kind.toLowerCase(), label: e.kind, detail: e.key });
+  for (const e of r.entities) {
+    const label = e.kind === "Charge" && e.amount != null ? `Charge $${e.amount}` : e.kind;
+    nodes.push({ id: e.id, kind: e.kind.toLowerCase(), label, detail: e.key });
+  }
+  const chargeEntity = new Map(r.entities.filter((e) => e.kind === "Charge").map((e) => [e.key, e.id]));
   const seenOutcomes = new Set<string>();
   for (const d of r.decisions.sort((a, b) => a.at.localeCompare(b.at))) {
     nodes.push({ id: d.id, kind: "decision", label: d.type.split(".")[1].replace("_", " "), option: d.option,
@@ -44,8 +63,11 @@ export async function customerGraph(email: string) {
     for (const o of d.outcomes) {
       if (!seenOutcomes.has(o.id)) {
         seenOutcomes.add(o.id);
-        nodes.push({ id: o.id, kind: "outcome", label: o.type.replace("_", " "),
-                     detail: o.value != null ? `$${o.value}` : undefined });
+        nodes.push({ id: o.id, kind: "outcome", label: outcomeLabel(o.type, o.value),
+                     detail: o.value != null ? `${o.type.replace("_", " ")} · $${o.value}` : o.type.replace("_", " ") });
+        // A refund points at the charge it refunded, so "already refunded" is visible in the graph.
+        const refunded = o.type === "refund_cost" && o.charge ? chargeEntity.get(o.charge) : undefined;
+        if (refunded) rels.push({ id: `${o.id}->${refunded}`, from: o.id, to: refunded, type: "REFUNDS" });
       }
       rels.push({ id: `${d.id}->${o.id}`, from: d.id, to: o.id, type: "LED_TO" });
     }
