@@ -1,6 +1,9 @@
 import { z } from "zod";
 import { runSupportAgent } from "@/lib/agent";
 
+// An agent run takes ~20 s; allow headroom so a slow run isn't cut off mid-demo.
+export const maxDuration = 60;
+
 const Body = z.object({
   ticket_id: z.string(),
   customer_email: z.string(),
