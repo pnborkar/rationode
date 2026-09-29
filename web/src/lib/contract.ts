@@ -5,7 +5,7 @@
 export const CANONICAL_TYPES = [
   "charge.screened", "charge.identifiers", "charge.succeeded", "refund.created", "dispute.created", "dispute.closed",
   "ticket.created", "rep.decision", "ticket.closed",
-  "agent.customer_lookup", "agent.proposal", "agent.dispute_lookup", "agent.dispute_response",
+  "agent.customer_lookup", "agent.proposal", "agent.dispute_lookup", "agent.dispute_response", "agent.tool_call",
   "subscription.created", "subscription.renewed", "subscription.canceled", "subscription.paused",
   "usage.weekly",
 ] as const;
@@ -53,9 +53,10 @@ export const DATA_FIELDS: Record<CanonicalType, { required: string[]; optional?:
   "rep.decision": { required: ["option"], optional: ["macro"] },
   "ticket.closed": { required: [], optional: ["status"] },
   "agent.customer_lookup": { required: ["tenure_months", "plan", "charge_amount_usd", "prior_refunds_90d"] },
-  "agent.proposal": { required: ["option"], optional: ["amount_usd"] },
+  "agent.proposal": { required: ["option"], optional: ["amount_usd", "category"] },
   "agent.dispute_lookup": { required: ["category", "amount_usd", "tenure_months", "prior_complaint", "available_evidence"] },
   "agent.dispute_response": { required: ["action"], optional: ["evidence"] },
+  "agent.tool_call": { required: [], optional: ["tool"] },   // any other tool call: recorded, not a decision
   "subscription.created": { required: [], optional: ["plan", "started_at"] },
   "subscription.renewed": { required: [], optional: ["plan"] },
   "subscription.canceled": { required: [], optional: ["plan", "reason"] },

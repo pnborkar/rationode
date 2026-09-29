@@ -21,7 +21,7 @@ export async function POST(request: Request) {
   const stream = new ReadableStream({
     async start(controller) {
       try {
-        for await (const event of runSupportAgent(parsed.data)) {
+        for await (const event of runSupportAgent({ ...parsed.data, origin: new URL(request.url).origin })) {
           controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
         }
       } catch (err) {

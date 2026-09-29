@@ -252,7 +252,7 @@ class Detector:
                     self.rows.review.append({"event_id": e.event_id, "reason": "proposal without customer lookup or ticket"})
                     continue
                 res, args = info.data["result"], e.data["args"]
-                ctx = self.complaint_context(res, ticket)
+                ctx = self.complaint_context(res, ticket, args)
                 actor = self.agent_actor(e)
                 proposal = {"id": None, "option": args["option"], "amount": args["amount_usd"], "ctx": ctx,
                             "evidence": [ticket, info, e], "actor": actor}
@@ -345,9 +345,11 @@ class Detector:
         return self.actor(f"agent:{e.data['agent_id']}:{v}", "AI_AGENT", v, f"Streamly support agent {v}")
 
     @staticmethod
-    def complaint_context(res: dict, ticket: Ev) -> dict:
+    def complaint_context(res: dict, ticket: Ev, args: dict) -> dict:
+        # The ticket's tag, or (live chats have none yet) the category the agent tagged when proposing.
+        category = ticket.data["category"] or args.get("category")
         return {"support.tenure_months": res["tenure_months"], "support.plan": res["plan"],
-                "support.amount_usd": res["charge_amount_usd"], "support.complaint_category": ticket.data["category"],
+                "support.amount_usd": res["charge_amount_usd"], "support.complaint_category": category,
                 "support.prior_refunds_90d": res["prior_refunds_90d"], "support.channel": ticket.data["channel"]}
 
     @staticmethod

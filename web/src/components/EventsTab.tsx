@@ -53,15 +53,18 @@ export default function EventsTab({ active, onChanged }: { active: boolean; onCh
   const [connect, setConnect] = useState(false);
   const [setsOpen, setSetsOpen] = useState(true);
   const [uploads, setUploads] = useState<{ scenario: string; events: number; decisions: number; customers: number }[]>([]);
+  const [live, setLive] = useState<{ decisions: number; proposals: number; finals: number; overrides: number; tickets: number } | null>(null);
 
   const refresh = () => Promise.all([
     fetch("/api/stories").then((r) => r.json()).then(setSets),
     fetch("/api/upload").then((r) => r.json()).then(setUploads),
+    fetch("/api/live").then((r) => r.json()).then(setLive),
   ]);
   useEffect(() => {
     let alive = true;
     fetch("/api/stories").then((r) => r.json()).then((s) => { if (alive) setSets(s); });
     fetch("/api/upload").then((r) => r.json()).then((u) => { if (alive) setUploads(u); });
+    fetch("/api/live").then((r) => r.json()).then((l) => { if (alive) setLive(l); });
     return () => { alive = false; };
   }, []);
 
@@ -148,6 +151,17 @@ export default function EventsTab({ active, onChanged }: { active: boolean; onCh
                   {busy === `remove-${u.scenario}` ? "…" : "Remove"}</button>
               </div>
             ))}
+          </div>
+          <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-3">
+            <div className="flex items-baseline justify-between">
+              <p className="font-semibold">Live · MCP gateway</p>
+              <button onClick={() => refresh()} className="text-[10px] text-zinc-400 hover:text-zinc-200">refresh</button>
+            </div>
+            <p className="mt-1 text-xs text-zinc-500">The live agent&apos;s tool calls pass through Rationode&apos;s gateway; the rep&apos;s
+              Approve comes in by Zendesk webhook. Both land in the graph as they happen.</p>
+            <p className="mt-1 text-xs">{live && live.decisions
+              ? <>{live.proposals} AI proposal(s), {live.finals} rep decision(s), {live.overrides} override(s) across {live.tickets} ticket(s)</>
+              : <span className="text-zinc-500">Nothing captured yet: run a case on the Streamly live tab.</span>}</p>
           </div>
           <div className="rounded-lg border border-zinc-800">
             <button onClick={() => setSetsOpen(!setsOpen)} className="flex w-full items-center justify-between px-3 py-2 text-left">

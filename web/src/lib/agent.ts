@@ -2,9 +2,9 @@
 // reported as events (thinking, tool calls, results, text) for the demo UI.
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
-import { checkUsage, getCustomer } from "./customer";
 import type { Context } from "./features";
 import { checkFraudPatterns } from "./fraud";
+import { appAuth, jsonResult, withMcp } from "./mcpClient";
 import { checkBeforeAct } from "./precedent";
 
 const client = new Anthropic();
@@ -15,7 +15,7 @@ export type AgentEvent =
   | { type: "thinking"; text: string }
   | { type: "text"; text: string }
   | { type: "tool_call"; id: string; name: string; input: unknown }
-  | { type: "tool_result"; id: string; name: string; result: unknown; is_error?: boolean }
+  | { type: "tool_result"; id: string; name: string; result: unknown; is_error?: boolean; via?: string; ms?: number }
   | { type: "proposal"; ticket_id: string; option: string; amount_usd: number; rationale: string }
   | { type: "done"; stop_reason: string | null; model: string }
   | { type: "error"; message: string };
@@ -62,6 +62,7 @@ const ProposeResolution = z.object({
   option: z.enum(["full_refund", "partial_refund", "voucher", "deny", "pause_subscription"]),
   amount_usd: z.number(),
   rationale: z.string(),
+  category: z.enum(["too_expensive", "didnt_use", "billing_error", "content_issue", "not_recognized"]).optional(),
 });
 
 const TOOLS: Record<string, Anthropic.Beta.BetaTool> = {
@@ -122,7 +123,8 @@ const TOOLS: Record<string, Anthropic.Beta.BetaTool> = {
   },
   propose_resolution: {
     name: "propose_resolution",
-    description: "Propose a resolution for the ticket. A human support rep reviews it before anything happens.",
+    description: "Propose a resolution for the ticket and tag the ticket with the complaint category. A human " +
+      "support rep reviews it before anything happens.",
     eager_input_streaming: true,
     input_schema: {
       type: "object",
@@ -131,26 +133,48 @@ const TOOLS: Record<string, Anthropic.Beta.BetaTool> = {
         option: { type: "string", enum: ["full_refund", "partial_refund", "voucher", "deny", "pause_subscription"] },
         amount_usd: { type: "number", description: "Refund or credit amount in USD; 0 for deny or pause" },
         rationale: { type: "string" },
+        category: { type: "string", enum: ["too_expensive", "didnt_use", "billing_error", "content_issue", "not_recognized"],
+                    description: "The complaint category, tagged on the ticket" },
       },
       required: ["ticket_id", "option", "amount_usd", "rationale"],
     },
   },
 };
 
-type ToolRun = { result: unknown; is_error?: boolean; proposal?: z.infer<typeof ProposeResolution> };
+type ToolRun = { result: unknown; is_error?: boolean; proposal?: z.infer<typeof ProposeResolution>; via?: string; ms?: number };
+type RunContext = { origin: string; session: string };
 
-async function runTool(name: string, input: unknown): Promise<ToolRun> {
-  if (name === "get_customer") {
-    const p = GetCustomer.safeParse(input);
-    if (!p.success) return { result: { INVALID_INPUT: p.error.message }, is_error: true };
-    const customer = await getCustomer(p.data.email);
-    return customer ? { result: customer } : { result: "No customer with that email", is_error: true };
+// Streamly's own tools, called over MCP through Rationode's gateway (demo spec §19), as any company's agent
+// would after pointing its tool server URL at the gateway. If the gateway can't be reached, the agent's
+// calls go straight to the tool server: capture must never break the agent.
+const STREAMLY_TOOLS = new Set(["get_customer", "check_usage_patterns", "propose_resolution"]);
+
+async function streamlyTool(ctx: RunContext, name: string, args: Record<string, unknown>): Promise<ToolRun> {
+  const started = Date.now();
+  const call = (url: string, headers: Record<string, string>) =>
+    withMcp(url, headers, (c) => c.callTool({ name, arguments: args }));
+  let via = "Rationode gateway";
+  let r: Record<string, unknown>;
+  try {
+    r = await call(`${ctx.origin}/api/gateway`, { ...appAuth(), "x-agent-id": "streamly-support-agent",
+                                                   "x-agent-version": AGENT_VERSION, "x-agent-session": ctx.session });
+  } catch {
+    via = "direct (gateway unreachable)";
+    r = await call(`${ctx.origin}/api/streamly/mcp`, appAuth());
   }
-  if (name === "check_usage_patterns") {
+  return { result: jsonResult(r), is_error: r.isError === true, via, ms: Date.now() - started };
+}
+
+async function runTool(ctx: RunContext, name: string, input: unknown): Promise<ToolRun> {
+  if (name === "propose_resolution") {
+    const p = ProposeResolution.safeParse(input);
+    if (!p.success) return { result: { INVALID_INPUT: p.error.message }, is_error: true };
+    return { ...(await streamlyTool(ctx, name, p.data)), proposal: p.data };
+  }
+  if (STREAMLY_TOOLS.has(name)) {
     const p = GetCustomer.safeParse(input);
     if (!p.success) return { result: { INVALID_INPUT: p.error.message }, is_error: true };
-    const usage = await checkUsage(p.data.email);
-    return usage ? { result: usage } : { result: "No customer with that email", is_error: true };
+    return streamlyTool(ctx, name, p.data);
   }
   if (name === "check_fraud_patterns") {
     const p = GetCustomer.safeParse(input);
@@ -163,12 +187,6 @@ async function runTool(name: string, input: unknown): Promise<ToolRun> {
     if (!p.success) return { result: { INVALID_INPUT: p.error.message }, is_error: true };
     return { result: await checkBeforeAct(p.data.decision_type, p.data.context as Context, 150, p.data.customer_email) };
   }
-  if (name === "propose_resolution") {
-    const p = ProposeResolution.safeParse(input);
-    if (!p.success) return { result: { INVALID_INPUT: p.error.message }, is_error: true };
-    // Milestone 8 turns this into an MCP-gateway event that the live pipeline ingests.
-    return { result: { status: "pending_review" }, proposal: p.data };
-  }
   return { result: `Unknown tool ${name}`, is_error: true };
 }
 
@@ -178,9 +196,11 @@ export type ChatInput = {
   channel: "chat" | "email";
   message: string;
   graph: boolean;
+  origin: string;    // where this app is served, for MCP calls through the gateway
 };
 
 export async function* runSupportAgent(input: ChatInput): AsyncGenerator<AgentEvent> {
+  const ctx: RunContext = { origin: input.origin, session: `sess_${crypto.randomUUID().replaceAll("-", "").slice(0, 14)}` };
   // Graph off removes what only the graph knows (decision precedent, identity patterns); customer data and usage stay.
   const tools = input.graph
     ? [TOOLS.get_customer, TOOLS.check_usage_patterns, TOOLS.check_before_act, TOOLS.check_fraud_patterns, TOOLS.propose_resolution]
@@ -237,8 +257,8 @@ export async function* runSupportAgent(input: ChatInput): AsyncGenerator<AgentEv
     const results: Anthropic.Beta.BetaToolResultBlockParam[] = [];
     for (const call of toolUses) {
       yield { type: "tool_call", id: call.id, name: call.name, input: call.input };
-      const run = await runTool(call.name, call.input);
-      yield { type: "tool_result", id: call.id, name: call.name, result: run.result, is_error: run.is_error };
+      const run = await runTool(ctx, call.name, call.input);
+      yield { type: "tool_result", id: call.id, name: call.name, result: run.result, is_error: run.is_error, via: run.via, ms: run.ms };
       if (run.proposal) yield { type: "proposal", ...run.proposal };
       results.push({ type: "tool_result", tool_use_id: call.id, content: JSON.stringify(run.result),
                      is_error: run.is_error });

@@ -81,6 +81,7 @@ def parse(raw: dict) -> Ev:
         e.dispute_id = args.get("dispute_id")
         e.charge_id = result.get("charge_id")
         e.email = result.get("customer_email")
+        e.stripe_customer_id = result.get("stripe_customer_id")   # live get_customer results carry it
         e.data = {"agent_id": p["agent_id"], "agent_version": p["agent_version"], "args": args, "result": result}
     elif src == "streamly_app":
         e.stripe_customer_id, e.email = p["stripe_customer_id"], p.get("email")

@@ -8,6 +8,11 @@ import type { ViewNode, ViewRel } from "@/components/GraphView";
 import EventsTab from "@/components/EventsTab";
 import ThemeToggle from "@/components/ThemeToggle";
 import { LIVE_CASES, type LiveCase } from "@/lib/liveCases";
+import { MACRO_OPTION } from "@/lib/nativeAdapter";
+
+// The Zendesk macro for each option (the rep's action, sent through the Zendesk webhook).
+const MACRO_FOR = Object.fromEntries(Object.entries(MACRO_OPTION).map(([title, option]) => [option, title]));
+type Recorded = { decisions: { id: string; type: string; stage: string }[]; overrides: number };
 
 const GraphView = dynamic(() => import("@/components/GraphView"), { ssr: false });
 const GraphTable = dynamic(() => import("@/components/GraphTable"), { ssr: false });
@@ -31,12 +36,12 @@ type Usage = {
   latest_charge?: { date: string; amount_usd: number };
   hours_since_charge?: number; weeks_since_charge?: number; last_watched_week?: string | null; trend?: string;
 };
-type Step =
-  | { kind: "customer"; data: Record<string, unknown> }
+type Step = ({
+    kind: "customer"; data: Record<string, unknown> }
   | { kind: "usage"; data: Usage }
   | { kind: "precedent"; data: Precedent }
   | { kind: "fraud"; data: FraudPatterns }
-  | { kind: "proposal"; data: Proposal };
+  | { kind: "proposal"; data: Proposal }) & { via?: string; ms?: number };
 type FraudPatterns = { facts: string[]; cluster: { accounts: number; unauthorized_disputes: number };
                        history_baseline: { unauthorized_dispute_rate: number } };
 
@@ -223,6 +228,8 @@ export default function StreamlyLive() {
   const [steps, setSteps] = useState<Step[]>([]);
   const [proposal, setProposal] = useState<Proposal | null>(null);
   const [final, setFinal] = useState<{ option: string; overridden: boolean } | null>(null);
+  const [recorded, setRecorded] = useState<Recorded | null>(null);
+  const proposalVia = useRef<{ via?: string; ms?: number }>({});
   const [overrideTo, setOverrideTo] = useState("full_refund");
   const [running, setRunning] = useState(false);
   const [base, setBase] = useState<{ nodes: ViewNode[]; rels: ViewRel[] }>({ nodes: [], rels: [] });
@@ -290,7 +297,7 @@ export default function StreamlyLive() {
   }
 
   function reset() {
-    setChat([]); setThinking(""); setSteps([]); setProposal(null); setFinal(null);
+    setChat([]); setThinking(""); setSteps([]); setProposal(null); setFinal(null); setRecorded(null);
     setLive({ nodes: [], rels: [] });
   }
 
@@ -301,6 +308,14 @@ export default function StreamlyLive() {
     const caseId = `case:${TICKET}`;
     addLive([{ id: caseId, kind: "case", label: `${current.name.split(" ")[0]}'s complaint`, live: true }], []);
 
+    // The chat opens a Zendesk ticket (webhook); re-running a case starts its ticket afresh.
+    await fetch("/api/webhooks/zendesk", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ type: "ticket.created", ticket: {
+        id: TICKET, subject: message.split(/[.?!]/)[0].slice(0, 60), description: message,
+        requester: { email: current.email, name: current.name }, via: { channel: "chat" }, tags: [], custom_fields: [] } }),
+    }).catch(() => {});
+    proposalVia.current = {};
     const res = await fetch("/api/agent", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -328,9 +343,11 @@ export default function StreamlyLive() {
           reply = "";
           setChat([{ from: "sam", text: message }]);
         } else if (e.type === "tool_result" && e.name === "get_customer" && !e.is_error) {
-          setSteps((s) => [...s, { kind: "customer", data: e.result as Record<string, unknown> }]);
+          setSteps((s) => [...s, { kind: "customer", data: e.result as Record<string, unknown>, via: e.via as string, ms: e.ms as number }]);
         } else if (e.type === "tool_result" && e.name === "check_usage_patterns" && !e.is_error) {
-          setSteps((s) => [...s, { kind: "usage", data: e.result as Usage }]);
+          setSteps((s) => [...s, { kind: "usage", data: e.result as Usage, via: e.via as string, ms: e.ms as number }]);
+        } else if (e.type === "tool_result" && e.name === "propose_resolution" && !e.is_error) {
+          proposalVia.current = { via: e.via as string, ms: e.ms as number };
         } else if (e.type === "tool_result" && e.name === "check_fraud_patterns" && !e.is_error) {
           setSteps((s) => [...s, { kind: "fraud", data: e.result as FraudPatterns }]);
         } else if (e.type === "tool_result" && e.name === "check_before_act" && !e.is_error) {
@@ -344,7 +361,8 @@ export default function StreamlyLive() {
         } else if (e.type === "proposal") {
           const p = e as unknown as Proposal;
           setProposal(p);
-          setSteps((s) => [...s, { kind: "proposal", data: p }]);
+          const via = proposalVia.current;
+          setSteps((s) => [...s, { kind: "proposal", data: p, ...via }]);
           addLive([{ id: `proposal:${TICKET}`, kind: "proposal", label: `AI: ${words(p.option)}`, option: p.option,
                      detail: `AI proposal · $${p.amount_usd}`, live: true }],
                   [{ id: `${caseId}->proposal`, from: caseId, to: `proposal:${TICKET}`, type: "PROPOSED" }]);
@@ -354,10 +372,23 @@ export default function StreamlyLive() {
     setRunning(false);
   }
 
-  function decide(option: string) {
+  async function decide(option: string) {
     if (!proposal) return;
     const overridden = option !== proposal.option;
     setFinal({ option, overridden });
+    // The rep's macro goes to Zendesk; its webhook brings the human decision into the graph.
+    const res = await fetch("/api/webhooks/zendesk", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ type: "macro.applied", ticket_id: TICKET, macro: { id: 0, title: MACRO_FOR[option] },
+                             actor: { id: "zd_live_rep", name: REP.name, group: REP.team, role: "agent" } }),
+    }).catch(() => null);
+    if (res?.ok) {
+      setRecorded(await res.json());
+      // Show what the graph now holds: the recorded proposal and final decision, read back from Neo4j.
+      const g = await fetch(`/api/graph/customer?email=${encodeURIComponent(current.email)}`);
+      if (g.ok) { setBase(await g.json()); setLive({ nodes: [], rels: [] }); }
+      return;
+    }
     const finalId = `final:${TICKET}`;
     addLive([{ id: finalId, kind: "final", label: words(option).replace(/^./, (c) => c.toUpperCase()), option,
                detail: `${overridden ? "overrode the AI proposal" : "approved the AI proposal"} · ${REP.name} (${REP.team})`,
@@ -484,7 +515,13 @@ export default function StreamlyLive() {
             {!graphOn && steps.length > 0 && (
               <p className="text-xs text-zinc-500">Decision graph off: the agent has only its instructions.</p>
             )}
-            {steps.map((s, i) => <StepCard key={i} step={s} />)}
+            {steps.map((s, i) => (
+              <div key={i}>
+                <StepCard step={s} />
+                {s.via && <p className="mt-0.5 text-right text-[10px] text-zinc-500">
+                  via {s.via}{s.ms != null ? ` · ${s.ms} ms` : ""}{s.via === "Rationode gateway" ? " · recorded for the decision graph" : ""}</p>}
+              </div>
+            ))}
             {!steps.length && !running && <p className="text-sm text-zinc-500">Send {current.name.split(" ")[0]}&apos;s message to start.</p>}
           </div>
         </Panel>
@@ -508,8 +545,10 @@ export default function StreamlyLive() {
                     {final.overridden && <> · the AI proposed {words(proposal.option)}</>} · by {REP.name}
                   </p>
                   <p className="text-xs opacity-60">
-                    Shown in the graph view{final.overridden ? ", linked to the AI proposal it overrides" : ""}
-                    {" "}(written to Neo4j once the live pipeline is connected).
+                    {recorded
+                      ? `Recorded in Neo4j (scenario live): the AI proposal via the Rationode gateway, and this decision via ` +
+                        `the Zendesk webhook${recorded.overrides ? ", with OVERRIDES on the AI proposal" : ""}. The graph now shows it.`
+                      : "Recording…"}
                   </p>
                 </div>
               ) : (

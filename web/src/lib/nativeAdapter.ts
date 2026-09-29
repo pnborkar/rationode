@@ -19,7 +19,7 @@ const STRIPE_CATEGORY: Record<string, string> = {
   fraudulent: "unauthorized", duplicate: "duplicate_charge",
 };
 
-const MACRO_OPTION: Record<string, string> = {
+export const MACRO_OPTION: Record<string, string> = {
   "Refund: full": "full_refund", "Refund: partial (50%)": "partial_refund",
   "Voucher: 20% credit": "voucher", "Deny refund": "deny", "Pause subscription": "pause_subscription",
 };
@@ -92,21 +92,23 @@ export function toContract(r: RawEvent): ContractEvent | null {
         : { kind: "HUMAN", id: `zendesk:${p.actor.id}`, name: p.actor.name ?? null };
     }
   } else if (src === "mcp_gateway") {
-    type = AGENT_TOOL[p.tool] ?? null;
+    type = AGENT_TOOL[p.tool] ?? "agent.tool_call";   // every call through the gateway is on record
     const args = p.arguments, res = p.result;
     refs = {
       session_id: p.session_id, ticket_id: "ticket_id" in args ? String(args.ticket_id) : null,
       dispute_id: args.dispute_id ?? null, charge_id: res.charge_id ?? null, customer_email: res.customer_email ?? null,
+      stripe_customer_id: res.stripe_customer_id ?? null,   // live get_customer results carry it
     };
     const v = p.agent_version;
     actor = { kind: "AI_AGENT", id: `agent:${p.agent_id}:${v}`, version: v, name: `Streamly support agent ${v}` };
     if (type === "agent.customer_lookup") data = pick(res, ["tenure_months", "plan", "charge_amount_usd", "prior_refunds_90d"]);
-    else if (type === "agent.proposal") data = { option: args.option, amount_usd: args.amount_usd };
+    else if (type === "agent.proposal") data = { option: args.option, amount_usd: args.amount_usd, category: args.category ?? null };
     else if (type === "agent.dispute_lookup") data = {
       category: res.category, amount_usd: res.amount_usd, tenure_months: res.customer_tenure_months,
       prior_complaint: res.prior_complaint, available_evidence: res.available_evidence,
     };
     else if (type === "agent.dispute_response") data = { action: args.action, evidence: args.evidence ?? [] };
+    else data = { tool: p.tool, args, result: res };
   } else if (src === "streamly_app") {
     type = "usage.weekly";
     refs = { stripe_customer_id: p.stripe_customer_id, customer_email: p.email ?? null };

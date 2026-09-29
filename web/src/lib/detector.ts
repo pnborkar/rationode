@@ -297,7 +297,7 @@ export class Detector {
             this.rows.review.push({ event_id: e.event_id, reason: "proposal without customer lookup or ticket" });
             break;
           }
-          const ctx = complaintContext(info.data, ticket.data);
+          const ctx = complaintContext(info.data, ticket.data, d);
           const actor = this.actor(e.actor!);
           const amount = (d.amount_usd ?? null) as number | null;
           const id = this.decision(e, "support.complaint_resolution", "PROPOSAL", {
@@ -414,9 +414,10 @@ export class Detector {
   }
 }
 
-function complaintContext(res: Data, ticket: Data): Data {
+function complaintContext(res: Data, ticket: Data, proposal: Data): Data {
+  // The ticket's tag, or (live chats have none yet) the category the agent tagged when proposing.
   return { "support.tenure_months": res.tenure_months, "support.plan": res.plan, "support.amount_usd": res.charge_amount_usd,
-           "support.complaint_category": ticket.category, "support.prior_refunds_90d": res.prior_refunds_90d,
+           "support.complaint_category": ticket.category || proposal.category || null, "support.prior_refunds_90d": res.prior_refunds_90d,
            "support.channel": ticket.channel };
 }
 

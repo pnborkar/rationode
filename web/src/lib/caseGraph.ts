@@ -73,6 +73,14 @@ export async function customerGraph(email: string) {
       rels.push({ id: `${d.id}->${o.id}`, from: d.id, to: o.id, type: "LED_TO" });
     }
   }
+  // A human decision that overrode the AI's proposal (e.g. captured live by the gateway + Zendesk webhook).
+  const ids = r.decisions.map((d) => d.id);
+  if (ids.length) {
+    const overrides = await query<{ from: string; to: string }>(
+      `MATCH (a:Decision)-[:OVERRIDES]->(b:Decision) WHERE a.decision_id IN $ids AND b.decision_id IN $ids
+       RETURN a.decision_id AS from, b.decision_id AS to`, { ids });
+    for (const o of overrides) rels.push({ id: `${o.from}~overrides`, from: o.from, to: o.to, type: "OVERRIDES" });
+  }
   await addUsage(r.customer, nodes, rels);
   await addPolicyGap(email, nodes, rels);
   await addIdentity(r.customer, nodes, rels);

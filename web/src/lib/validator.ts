@@ -21,6 +21,7 @@ const REFS_REQUIRED: Record<CanonicalType, string[]> = {
   "agent.proposal": ["session_id", "ticket_id"],
   "agent.dispute_lookup": ["session_id", "dispute_id", "charge_id"],
   "agent.dispute_response": ["session_id", "dispute_id"],
+  "agent.tool_call": ["session_id"],
   "subscription.created": ["stripe_customer_id"],
   "subscription.renewed": ["stripe_customer_id"],
   "subscription.canceled": ["stripe_customer_id"],
