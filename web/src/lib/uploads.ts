@@ -27,8 +27,39 @@ export function parseAll(files: UploadedFile[]): ParsedFile[] {
   });
 }
 
+// Records already in Neo4j under another scenario (another batch, a set, or the history). IDs are
+// deterministic per source record, but each scenario prefixes them, so the same files loaded as a
+// second batch would duplicate every customer and decision. Same batch name = replace, which is fine.
+async function alreadyLoaded(eventIds: string[], scenario: string) {
+  const scenarios = (await query<{ s: string }>(
+    `MATCH (e:Event) WITH DISTINCT e.scenario_id AS s WHERE s <> $scenario AND s <> 'live' RETURN s`, { scenario },
+  )).map((r) => r.s);
+  if (!scenarios.length || !eventIds.length) return [];
+  return query<{ scenario: string; n: number }>(
+    `UNWIND $scenarios AS s
+     UNWIND $ids AS id
+     MATCH (e:Event {event_id: CASE s WHEN 'history' THEN id ELSE s + '|' + id END})
+     RETURN s AS scenario, count(*) AS n ORDER BY n DESC`,
+    { scenarios, ids: eventIds },
+  );
+}
+
+async function validateAll(files: UploadedFile[], mappings: FileMapping[], name: string, registry: Registry) {
+  const scenario = scenarioFor(name);
+  const report = validate(parseAll(files), mappings, registry, scenario);
+  const overlap = await alreadyLoaded(report.events.map((e) => e.event_id).filter(Boolean), scenario);
+  for (const o of overlap) {
+    report.checks.unshift({ level: "error", message: `${o.n} of ${report.events.length} records are already loaded as ` +
+      `${o.scenario}. Loading them again would duplicate those customers and decisions: ` +
+      (o.scenario.startsWith("upload:") ? `use the batch name "${o.scenario.slice(7)}" to replace it, or remove it first.`
+        : "these records are already in the graph.") });
+    report.ok = false;
+  }
+  return report;
+}
+
 export async function check(files: UploadedFile[], mappings: FileMapping[], name: string) {
-  const report: Partial<Validation> = validate(parseAll(files), mappings, await loadRegistry(), scenarioFor(name));
+  const report: Partial<Validation> = await validateAll(files, mappings, name, await loadRegistry());
   delete report.events;   // the client gets the report, not every mapped event
   return report;
 }
@@ -37,7 +68,7 @@ export async function check(files: UploadedFile[], mappings: FileMapping[], name
 export async function run(files: UploadedFile[], mappings: FileMapping[], name: string) {
   const scenario = scenarioFor(name);
   const registry = await loadRegistry();
-  const report = validate(parseAll(files), mappings, registry, scenario);
+  const report = await validateAll(files, mappings, name, registry);
   if (!report.ok) return { ok: false as const, error: "The mapping has validation errors", report: { ...report, events: undefined } };
   const touched = await touchedPoints(scenario);
   if (touched.length || (await query(`MATCH (e:Event {scenario_id: $scenario}) RETURN e LIMIT 1`, { scenario })).length) {
