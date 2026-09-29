@@ -2,7 +2,7 @@
 import liveEmbeddings from "../data/live-embeddings.json";
 import { checkUsage } from "./customer";
 import { contextText, encode, type Context } from "./features";
-import { query, SCENARIO } from "./neo4j";
+import { IS_DEMO, query, SCENARIO } from "./neo4j";
 
 const COST_OUTCOMES = ["refund_cost", "dispute_won", "dispute_lost"];
 const EMBEDDINGS = liveEmbeddings as Record<string, number[]>;
@@ -98,13 +98,13 @@ async function linkUsage(email: string, whatIfs: { action: string; dispute_rate:
   const watched = usage.hours_since_charge > 0;
   const [p] = await query<{ n: number; won: number }>(
     `MATCH (d:Decision {decision_type: 'dispute.evidence'})-[:HAD_CONTEXT]->(c:Context {\`dispute.category\`: 'subscription_canceled'})
-     WHERE (d.scenario_id = 'history' OR d.scenario_id STARTS WITH 'story:')
+     WHERE (d.scenario_id = $scenario OR ($stories AND d.scenario_id STARTS WITH 'story:'))
        AND c.\`dispute.usage_logs_available\` = $watched
      WITH d, EXISTS { (d)-[:CONSIDERED {status: 'CHOSEN'}]->(:Option {option_key: 'usage_logs'}) } AS sent
      WHERE sent = $watched
      MATCH (d)-[:LED_TO]->(o:Outcome) WHERE o.outcome_type IN ['dispute_won', 'dispute_lost']
      RETURN count(o) AS n, sum(CASE o.outcome_type WHEN 'dispute_won' THEN 1 ELSE 0 END) AS won`,
-    { watched },
+    { watched, scenario: SCENARIO, stories: IS_DEMO },
   );
   const winRate = p && p.n ? Math.round((p.won / p.n) * 1000) / 1000 : null;
   const deny = whatIfs.find((w) => w.action === "deny");
@@ -151,8 +151,8 @@ export async function checkBeforeAct(decisionType: string, context: Context, k =
          RETURN d.decision_id AS id, null AS text_score, c.features AS features, properties(c) AS ctx`,
         { type: decisionType, scenario: SCENARIO },
       );
-  // Decisions from loaded Events-tab sets are evidence too (they have features but no embedding).
-  candidates.push(...await query<Candidate>(
+  // Decisions from loaded Events-tab sets are evidence too (they have features but no embedding); demo only.
+  if (IS_DEMO) candidates.push(...await query<Candidate>(
     `MATCH (d:Decision {decision_type: $type, stage: 'FINAL'})-[:HAD_CONTEXT]->(c:Context)
      WHERE d.scenario_id STARTS WITH 'story:'
      RETURN d.decision_id AS id, null AS text_score, c.features AS features, properties(c) AS ctx`,

@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { AGENT_MODEL } from "./agent";
 import { Detector, REGISTRY_CYPHER, registryFrom, rowsDict, type Registry } from "./detector";
 import { parseFile, type FileMapping, type ParsedFile } from "./mapping";
-import { query } from "./neo4j";
+import { IS_DEMO, query, SCENARIO } from "./neo4j";
 import { placeScenario, recomputePoints, touchedPoints } from "./storyTrees";
 import { removeScenario, writeRows } from "./storyWriter";
 import { validate, type Validation } from "./validator";
@@ -17,7 +17,10 @@ export async function loadRegistry(): Promise<Registry> {
   return registryFrom(await query(REGISTRY_CYPHER));
 }
 
+// In the demo, each load is its own removable batch (upload:<name>). For another tenant (cold start), loads
+// are that tenant's own history: they land in its base scenario, and its trees are built from them.
 export function scenarioFor(name: string): string {
+  if (!IS_DEMO) return SCENARIO;
   const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "batch";
   return `upload:${slug}`;
 }
@@ -174,7 +177,8 @@ export async function run(files: UploadedFile[], mappings: FileMapping[], name: 
     new: t ? t.new : report.events.length, changed: t?.changed ?? 0, unchanged: t?.unchanged ?? 0, removed: t?.removed ?? 0,
     editedFiles,
   });
-  const branches = await placeScenario(scenario);
+  // A tenant's own history isn't placed into trees: its trees are built from it (pipeline, per tenant).
+  const branches = scenario === SCENARIO && !IS_DEMO ? [] : await placeScenario(scenario);
   const customers = rows.entities.filter((e) => e.label === "Customer" && e.source_system === "stripe")
     .map((e) => (e.props as { email: string; name: string | null }))
     .map((p) => ({ email: p.email, name: p.name }));
@@ -184,17 +188,18 @@ export async function run(files: UploadedFile[], mappings: FileMapping[], name: 
 
 export async function listUploads() {
   return query<{ scenario: string; events: number; decisions: number; customers: number }>(
-    `MATCH (e:Event) WHERE e.scenario_id STARTS WITH 'upload:'
+    `MATCH (e:Event) WHERE ($demo AND e.scenario_id STARTS WITH 'upload:') OR (NOT $demo AND e.scenario_id = $base)
      WITH e.scenario_id AS scenario, count(*) AS events
      OPTIONAL MATCH (d:Decision {scenario_id: scenario})
      WITH scenario, events, count(d) AS decisions
      OPTIONAL MATCH (c:Customer:Entity {scenario_id: scenario, source_system: 'stripe'})
      RETURN scenario, events, decisions, count(c) AS customers ORDER BY scenario`,
+    { demo: IS_DEMO, base: SCENARIO },
   );
 }
 
 export async function removeUpload(scenario: string) {
-  if (!scenario.startsWith("upload:")) throw new Error("not an upload scenario");
+  if (!scenario.startsWith("upload:") && (IS_DEMO || scenario !== SCENARIO)) throw new Error("not an upload scenario");
   const touched = await touchedPoints(scenario);
   const removed = await removeScenario(scenario);
   await removeBatches(scenario);
@@ -215,7 +220,8 @@ const BANK_MESSAGE: Record<string, (usd: string) => string> = {
 export async function uploadedCases() {
   const rows = await query<{ scenario: string; email: string; name: string; subject: string | null;
                              dispute: string | null; amount: number | null }>(
-    `MATCH (c:Customer:Entity {source_system: 'stripe'}) WHERE c.scenario_id STARTS WITH 'upload:'
+    `MATCH (c:Customer:Entity {source_system: 'stripe'})
+     WHERE ($demo AND c.scenario_id STARTS WITH 'upload:') OR (NOT $demo AND c.scenario_id = $base)
      OPTIONAL MATCH (c)<-[:ABOUT]-(:Decision)-[:ABOUT]->(t:Ticket)
      OPTIONAL MATCH (c)<-[:ABOUT]-(:Decision)-[:ABOUT]->(dp:Dispute)
      OPTIONAL MATCH (c)<-[:ABOUT]-(:Decision)-[:ABOUT]->(ch:Charge)
@@ -224,6 +230,7 @@ export async function uploadedCases() {
      WHERE subject IS NOT NULL OR dispute IS NOT NULL
      RETURN c.scenario_id AS scenario, c.email AS email, c.name AS name, subject, dispute, amount
      ORDER BY scenario, name`,
+    { demo: IS_DEMO, base: SCENARIO },
   );
   return rows.map((r) => {
     const usd = r.amount != null ? `$${Math.round(r.amount)}` : "this";

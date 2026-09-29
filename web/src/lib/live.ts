@@ -4,11 +4,12 @@ import { rowsDict, Detector } from "./detector";
 import type { ContractEvent } from "./contract";
 import { DEMO_NOW } from "./customer";
 import { toContract, type RawEvent } from "./nativeAdapter";
-import { query } from "./neo4j";
+import { IS_DEMO, query, SCENARIO } from "./neo4j";
 import { writeRows } from "./storyWriter";
 import { loadRegistry } from "./uploads";
 
-export const LIVE = "live";
+// Live data per tenant: the demo's is "live", another tenant's "<tenant>:live".
+export const LIVE = IS_DEMO ? "live" : `${SCENARIO}:live`;
 
 // Live events sit on the demo's day (DEMO_NOW's date) at the current time of day, in the story's timeline.
 export function demoClock(): string {
@@ -29,10 +30,11 @@ async function resolveEntities(rows: Record<string, Record<string, unknown>[]>) 
   if (!keys.length) return;
   const found = await query<{ id: string; existing: string }>(
     `UNWIND $keys AS k
-     MATCH (e:Entity {source_system: k.s, source_key: k.k}) WHERE e.scenario_id <> $live
-     WITH k, e ORDER BY CASE e.scenario_id WHEN 'history' THEN 0 ELSE 1 END
+     MATCH (e:Entity {source_system: k.s, source_key: k.k})
+     WHERE e.scenario_id <> $live AND ($demo OR e.scenario_id = $base)   // a tenant resolves only to its own nodes
+     WITH k, e ORDER BY CASE e.scenario_id WHEN $base THEN 0 ELSE 1 END
      RETURN k.id AS id, collect(e.entity_id)[0] AS existing`,
-    { keys, live: LIVE },
+    { keys, live: LIVE, demo: IS_DEMO, base: SCENARIO },
   );
   const map = new Map(found.map((f) => [f.id, f.existing]));
   const to = (id: unknown) => map.get(id as string) ?? id;

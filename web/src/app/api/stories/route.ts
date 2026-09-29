@@ -1,7 +1,9 @@
+import { IS_DEMO } from "@/lib/neo4j";
 import { complaintText, SETS, status } from "@/lib/stories";
 
 // Sets with their load status; loaded sets also carry what the live tab needs.
 export async function GET() {
+  if (!IS_DEMO) return Response.json([]);   // the Events-tab sets are the Streamly demo's
   const st = await status();
   return Response.json(SETS.map((s) => {
     const x = st.find((y) => y.set === s.set)!;

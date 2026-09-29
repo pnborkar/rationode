@@ -1,5 +1,5 @@
 import { isType } from "./eventFields";
-import { query } from "./neo4j";
+import { FRAUD_POLICY_TREE, query, SCENARIO } from "./neo4j";
 
 export type GraphNode = { id: string; kind: string; label: string; detail?: string; option?: string | null; outcomes?: string[] };
 export type GraphRel = { id: string; from: string; to: string; type: string };
@@ -181,7 +181,7 @@ async function addPolicyGap(email: string, nodes: GraphNode[], rels: GraphRel[])
   }>(
     `MATCH (:Customer:Entity {source_system: 'stripe', email: $email})<-[:ABOUT]-(d:Decision {decision_type: 'charge.fraud_screen'})
      MATCH (d)-[:HAD_CONTEXT]->(c:Context), (d)-[:CONSIDERED {status: 'CHOSEN'}]->(o:Option), (d)-[:EVIDENCED_BY]->(e:Event)
-     MATCH (d)-[:AT_POINT]->(p:DecisionPoint {tree_id: 'tree:charge.fraud_screen:policy:policy'})
+     MATCH (d)-[:AT_POINT]->(p:DecisionPoint {tree_id: $policyTree})
      OPTIONAL MATCH (d)-[:UNDER_POLICY]->(pol:Policy)
      OPTIONAL MATCH (t:DecisionTree {tree_id: p.tree_id})
      WITH d, c, o, e, p, pol, t WHERE p.policy_option <> o.option_key
@@ -189,26 +189,26 @@ async function addPolicyGap(email: string, nodes: GraphNode[], rels: GraphRel[])
             c.\`charge.card_age_days\` AS card_age, c.\`charge.country_match\` AS country, coalesce(e.data_json, e.payload_json) AS payload,
             t.policy_text AS policy, p.path_label AS branch, p.policy_option AS policy_option, p.point_id AS point
      LIMIT 1`,
-    { email },
+    { email, policyTree: FRAUD_POLICY_TREE },
   );
   if (!g) return;
   const rule = (JSON.parse(g.payload) as { rule_id?: string }).rule_id ?? "rule";
   const [pattern] = await query<{ n: number; disputed: number }>(
-    `MATCH (h:Decision {scenario_id: 'history'})-[:AT_POINT]->(:DecisionPoint {point_id: $point})
+    `MATCH (h:Decision {scenario_id: $base})-[:AT_POINT]->(:DecisionPoint {point_id: $point})
      MATCH (h)-[:CONSIDERED {status: 'CHOSEN'}]->(:Option {option_key: $chosen})
      WITH h, EXISTS { (h)-[:LED_TO]->(:Outcome {outcome_type: 'dispute_filed'}) } AS disputed
      RETURN count(h) AS n, sum(CASE WHEN disputed THEN 1 ELSE 0 END) AS disputed`,
-    { point: g.point, chosen: g.chosen },
+    { point: g.point, chosen: g.chosen, base: SCENARIO },
   );
   const sample = await query<{ id: string; outcomes: string[]; risk: number }>(
-    `MATCH (h:Decision {scenario_id: 'history'})-[:AT_POINT]->(:DecisionPoint {point_id: $point})
+    `MATCH (h:Decision {scenario_id: $base})-[:AT_POINT]->(:DecisionPoint {point_id: $point})
      MATCH (h)-[:CONSIDERED {status: 'CHOSEN'}]->(:Option {option_key: $chosen})
      MATCH (h)-[:LED_TO]->(:Outcome {outcome_type: 'dispute_filed'})
      MATCH (h)-[:HAD_CONTEXT]->(c:Context)
      OPTIONAL MATCH (h)-[:LED_TO]->(o:Outcome)
      RETURN h.decision_id AS id, collect(DISTINCT o.outcome_type) AS outcomes, c.\`charge.risk_score\` AS risk
      ORDER BY abs(c.\`charge.risk_score\` - $risk), id LIMIT 10`,
-    { point: g.point, chosen: g.chosen, risk: g.risk },
+    { point: g.point, chosen: g.chosen, risk: g.risk, base: SCENARIO },
   );
 
   const id = (k: string) => `${g.decision}~${k}`;

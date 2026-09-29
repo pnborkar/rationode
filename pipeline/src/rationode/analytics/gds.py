@@ -126,7 +126,11 @@ def q(driver: Driver, db: str, query: str, **params):
 
 def write_features(driver: Driver, db: str, encoder: Encoder, scenario: str) -> int:
     rows = q(driver, db, Q_ALL_CONTEXTS, scenario=scenario)
-    encoder.fit_scales(driver, db, [r["ctx"] for r in rows])
+    # The attribute scales live on the shared schema registry: only the base history fits them, so another
+    # tenant's run can't change how the demo's contexts are encoded (a real multi-tenant install would keep
+    # scales per tenant).
+    if scenario == "history":
+        encoder.fit_scales(driver, db, [r["ctx"] for r in rows])
     batch = [{"id": r["id"], "features": encoder.vector(r["type"], r["ctx"])} for r in rows]
     for i in range(0, len(batch), 5000):
         q(driver, db, Q_WRITE_FEATURES, rows=batch[i:i + 5000])

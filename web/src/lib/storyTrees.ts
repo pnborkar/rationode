@@ -1,7 +1,7 @@
 // Place a loaded scenario's decisions into the existing history trees (AT_POINT) and recompute the
 // touched branches' statistics, with the same formulas as pipeline/src/rationode/trees/build.py.
 import type { Context } from "./features";
-import { query } from "./neo4j";
+import { query, SCENARIO } from "./neo4j";
 import { holds } from "./precedent";
 
 const COST = ["refund_cost", "dispute_won", "dispute_lost"];
@@ -114,8 +114,9 @@ export async function placeScenario(scenario: string): Promise<BranchChange[]> {
   const approved = new Set((await query<{ key: string }>(
     `MATCH (s:SchemaElement {kind: 'OPTION', status: 'APPROVED'}) RETURN s.key AS key`)).map((r) => r.key));
   const trees = await query<{ tree_id: string; decision_type: string; stage: string; kind: string }>(
-    `MATCH (t:DecisionTree {scenario_id: 'history'}) WHERE t.scope IN ['ALL', 'POLICY']
+    `MATCH (t:DecisionTree {scenario_id: $base}) WHERE t.scope IN ['ALL', 'POLICY']
      RETURN t.tree_id AS tree_id, t.decision_type AS decision_type, t.stage AS stage, t.kind AS kind`,
+    { base: SCENARIO },
   );
 
   const placements: { decision_id: string; point_id: string }[] = [];

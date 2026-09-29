@@ -34,4 +34,10 @@ export async function query<T = Record<string, unknown>>(
   return result.records.map((r) => plain(r.toObject()) as T);
 }
 
-export const SCENARIO = "history";
+// The tenant this app serves (demo spec §21): its base scenario. "history" is the Streamly demo; another
+// tenant (e.g. "dbx", loaded from Databricks) sees only its own data, trees and precedent.
+export const SCENARIO = process.env.RATIONODE_TENANT?.trim() || "history";
+export const IS_DEMO = SCENARIO === "history";   // the demo's sets and prepared live customers are Streamly-only
+// A tenant's IDs carry its prefix (as the pipeline writes them), e.g. its trees: "dbx|tree:…".
+export const tenantId = (id: string) => (IS_DEMO ? id : `${SCENARIO}|${id}`);
+export const FRAUD_POLICY_TREE = tenantId("tree:charge.fraud_screen:policy:policy");

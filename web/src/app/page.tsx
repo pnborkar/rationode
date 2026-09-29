@@ -8,6 +8,15 @@ import type { ViewNode, ViewRel } from "@/components/GraphView";
 import EventsTab from "@/components/EventsTab";
 import ThemeToggle from "@/components/ThemeToggle";
 import { LIVE_CASES, type LiveCase } from "@/lib/liveCases";
+
+// The tenant this app serves (demo spec §21). The Streamly demo ("history") has prepared live customers
+// and Events-tab sets; another tenant (e.g. loaded from Databricks) shows only its own customers.
+const DEMO = (process.env.NEXT_PUBLIC_RATIONODE_TENANT ?? "history") === "history";
+const PREPARED: LiveCase[] = DEMO ? LIVE_CASES : [];
+const EMPTY: LiveCase = {
+  key: "none", name: "No customers yet", email: "", ticket_id: "", message: "",
+  blurb: "This tenant has no customers yet: load its data on the Events tab (Connect a source), then build its trees.",
+};
 import { MACRO_OPTION } from "@/lib/nativeAdapter";
 
 // The Zendesk macro for each option (the rep's action, sent through the Zendesk webhook).
@@ -218,12 +227,12 @@ export default function StreamlyLive() {
   const [tab, setTab] = useState<"live" | "events">("live");
   const [storyCases, setStoryCases] = useState<LiveCase[]>([]);
   const [uploadCases, setUploadCases] = useState<LiveCase[]>([]);
-  const cases = [...LIVE_CASES, ...storyCases, ...uploadCases];
-  const [caseKey, setCaseKey] = useState(LIVE_CASES[0].key);
-  const current = cases.find((c) => c.key === caseKey) ?? LIVE_CASES[0];
+  const cases = [...PREPARED, ...storyCases, ...uploadCases];
+  const [caseKey, setCaseKey] = useState((PREPARED[0] ?? EMPTY).key);
+  const current = cases.find((c) => c.key === caseKey) ?? PREPARED[0] ?? cases[0] ?? EMPTY;
   const TICKET = current.ticket_id;
   const [graphOn, setGraphOn] = useState(true);
-  const [message, setMessage] = useState(LIVE_CASES[0].message);
+  const [message, setMessage] = useState((PREPARED[0] ?? EMPTY).message);
   const [chat, setChat] = useState<{ from: "sam" | "agent"; text: string }[]>([]);
   const [thinking, setThinking] = useState("");
   const [steps, setSteps] = useState<Step[]>([]);
@@ -250,9 +259,10 @@ export default function StreamlyLive() {
     setStoryCases(s);
     setUploadCases(u);
     // The selected customer's set or batch was removed: start over on the first live case.
-    if (![...LIVE_CASES, ...s, ...u].some((c) => c.key === caseKeyRef.current)) {
-      setCaseKey(LIVE_CASES[0].key);
-      setMessage(LIVE_CASES[0].message);
+    if (![...PREPARED, ...s, ...u].some((c) => c.key === caseKeyRef.current)) {
+      const first = PREPARED[0] ?? u[0] ?? EMPTY;
+      setCaseKey(first.key);
+      setMessage(first.message);
       setBase({ nodes: [], rels: [] });
       reset();
     }
@@ -260,14 +270,20 @@ export default function StreamlyLive() {
   useEffect(() => {
     let alive = true;
     fetch("/api/stories").then((r) => r.json()).then((sets: SetInfo[]) => { if (alive) setStoryCases(toCases(sets)); });
-    fetch("/api/upload/cases").then((r) => r.json()).then((rows: UploadedCase[]) => { if (alive) setUploadCases(toUploadCases(rows)); });
+    fetch("/api/upload/cases").then((r) => r.json()).then((rows: UploadedCase[]) => {
+      if (!alive) return;
+      const u = toUploadCases(rows);
+      setUploadCases(u);
+      // Another tenant has no prepared customers: start on its first customer with a case.
+      if (!DEMO && u[0] && caseKeyRef.current === "none") { setCaseKey(u[0].key); setMessage(u[0].message); }
+    });
     return () => { alive = false; };
   }, []);
 
   async function removeStory(n: number) {
     await fetch(`/api/stories/${n}`, { method: "DELETE" });
     await refreshStories();
-    pickCase(LIVE_CASES[0].key);
+    pickCase((PREPARED[0] ?? EMPTY).key);
   }
 
   // Esc closes the expanded graph or thinking panel.
@@ -314,7 +330,7 @@ export default function StreamlyLive() {
                       rels: [...g.rels, ...rels.filter((r) => !g.rels.some((x) => x.id === r.id))] }));
 
   function pickCase(key: string) {
-    const next = cases.find((c) => c.key === key) ?? LIVE_CASES[0];
+    const next = cases.find((c) => c.key === key) ?? PREPARED[0] ?? cases[0] ?? EMPTY;
     setCaseKey(key);
     setMessage(next.message);
     setBase({ nodes: [], rels: [] });
@@ -525,7 +541,8 @@ export default function StreamlyLive() {
         <Panel title="Streamly help chat" badge={
           <select value={caseKey} onChange={(e) => pickCase(e.target.value)} disabled={running}
                   className="rounded-md border border-zinc-700 bg-zinc-950 px-2 py-0.5 text-xs text-zinc-200">
-            {[...LIVE_CASES, ...storyCases].map((c) => <option key={c.key} value={c.key}>{c.name}{c.setNumber ? ` (Set ${c.setNumber})` : ""}</option>)}
+            {current.key === "none" && <option value="none">No customers yet</option>}
+            {[...PREPARED, ...storyCases].map((c) => <option key={c.key} value={c.key}>{c.name}{c.setNumber ? ` (Set ${c.setNumber})` : ""}</option>)}
             {[...new Set(uploadCases.map((c) => c.scenario))].map((sc) => (
               <optgroup key={sc} label={`Uploaded · ${sc}`}>
                 {uploadCases.filter((c) => c.scenario === sc).map((c) => <option key={c.key} value={c.key}>{c.name}</option>)}
@@ -564,7 +581,7 @@ export default function StreamlyLive() {
             <div className="mt-3 flex gap-2">
               <textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={2}
                         className="flex-1 resize-none rounded-lg border border-zinc-700 bg-zinc-950 p-2 text-sm" />
-              <button onClick={send} disabled={running}
+              <button onClick={send} disabled={running || current.key === "none"}
                       className="rounded-lg bg-violet-600 px-4 text-sm font-semibold text-white disabled:opacity-50">Send</button>
             </div>
           </div>

@@ -3,7 +3,7 @@
 // the cluster they form, and what the fraud tool decided. Facts, not a verdict.
 import { DEMO_NOW } from "./customer";
 import { isType } from "./eventFields";
-import { query } from "./neo4j";
+import { FRAUD_POLICY_TREE, query, SCENARIO } from "./neo4j";
 
 type Flags = { accounts: number; unauthorized_disputes: number; any_dispute: number; fraud_declines: number };
 type Other = { name: string; scenario: string; unauthorized: boolean; disputed: boolean; declined: boolean };
@@ -25,9 +25,9 @@ let baseline: { accounts: number; unauthorized: number } | null = null;
 async function historyBaseline() {
   if (!baseline) {
     const [b] = await query<{ accounts: number; unauthorized: number }>(
-      `MATCH (o:Customer:Entity {source_system: 'stripe', scenario_id: 'history'})
+      `MATCH (o:Customer:Entity {source_system: 'stripe', scenario_id: $base})
        WITH o, EXISTS { (o)<-[:ABOUT]-(:Decision)-[:ABOUT]->(:Dispute {category: 'unauthorized'}) } AS u
-       RETURN count(o) AS accounts, sum(CASE WHEN u THEN 1 ELSE 0 END) AS unauthorized`);
+       RETURN count(o) AS accounts, sum(CASE WHEN u THEN 1 ELSE 0 END) AS unauthorized`, { base: SCENARIO });
     baseline = b;
   }
   return baseline;
@@ -57,12 +57,12 @@ export async function checkFraudPatterns(rawEmail: string, chargeId?: string) {
      OPTIONAL MATCH (d:Decision {decision_type: 'charge.fraud_screen'})-[:ABOUT]->(ch)
      OPTIONAL MATCH (d)-[:HAD_CONTEXT]->(x:Context)
      OPTIONAL MATCH (d)-[:CONSIDERED {status: 'CHOSEN'}]->(o:Option)
-     OPTIONAL MATCH (d)-[:AT_POINT]->(p:DecisionPoint {tree_id: 'tree:charge.fraud_screen:policy:policy'})
+     OPTIONAL MATCH (d)-[:AT_POINT]->(p:DecisionPoint {tree_id: $policyTree})
      RETURN card.source_key AS card, card.country AS card_country, dev.source_key AS device, fd.ip_country AS ip_country,
             x.\`charge.risk_score\` AS risk, x.\`charge.card_age_days\` AS card_age, x.\`charge.country_match\` AS country_match,
             x.\`charge.is_renewal\` AS renewal, o.option_key AS decision, p.policy_option AS policy_option,
             p.path_label AS policy_branch LIMIT 1`,
-    { charge: c.charge, scenario: c.scenario },
+    { charge: c.charge, scenario: c.scenario, policyTree: FRAUD_POLICY_TREE },
   );
 
   // Every card and device this account used, and the other accounts on the same ones (in any scenario:

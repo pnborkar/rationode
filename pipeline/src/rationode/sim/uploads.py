@@ -60,20 +60,20 @@ def ts(iso: str) -> str:
     return iso.replace("T", " ").removesuffix("Z")   # "2026-03-14 10:22:05" (UTC, per the column name)
 
 
-def write_csv(name: str, columns: list[str], rows: list[dict]) -> None:
+def write_csv(name: str, columns: list[str], rows: list[dict], out_dir=OUT_DIR) -> None:
     buf = io.StringIO()
     w = csv.DictWriter(buf, fieldnames=columns, lineterminator="\n")
     w.writeheader()
     for r in rows:
         w.writerow({k: ("" if r.get(k) is None else r[k]) for k in columns})
-    (OUT_DIR / name).write_text(buf.getvalue())
+    (out_dir / name).write_text(buf.getvalue())
 
 
 def yn(b: bool) -> str:
     return "Y" if b else "N"
 
 
-def export(events: list[dict]) -> dict[str, int]:
+def export(events: list[dict], out_dir=OUT_DIR) -> dict[str, int]:
     zd, stripe, calls, fraud, subs, usage = [], [], [], [], [], []
     for e in events:
         p, at = e["payload"], e["occurred_at"]
@@ -131,21 +131,21 @@ def export(events: list[dict]) -> dict[str, int]:
                           "week_of": p["week_start"], "watch_hours": p["hours_watched"],
                           "titles": p["titles_watched"], "generated_at": at})
 
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    out_dir.mkdir(parents=True, exist_ok=True)
     write_csv("zendesk_ticket_events.csv", ["Ticket ID", "Audit ID", "Event Type", "Timestamp (UTC)", "Requester Email",
               "Requester Name", "Subject", "Tags", "Channel", "Stripe Charge ID", "Macro Title", "Updater ID",
-              "Updater Name", "Group", "Status From", "Status To"], zd)
+              "Updater Name", "Group", "Status From", "Status To"], zd, out_dir)
     write_csv("stripe_activity.csv", ["Event ID", "Type", "id", "Created (UTC)", "Amount", "Currency", "Customer ID",
               "Customer Email", "Customer Name", "Charge ID", "Dispute Reason", "Status", "Plan (metadata)",
-              "Zendesk Ticket (metadata)", "Initiated By (metadata)"], stripe)
-    (OUT_DIR / "support_agent_tool_calls.jsonl").write_text("".join(json.dumps(c) + "\n" for c in calls))
+              "Zendesk Ticket (metadata)", "Initiated By (metadata)"], stripe, out_dir)
+    (out_dir / "support_agent_tool_calls.jsonl").write_text("".join(json.dumps(c) + "\n" for c in calls))
     write_csv("fraudguard_screening.csv", ["screen_id", "screened_at", "charge_reference", "email", "amount", "plan",
               "renewal", "risk_score", "ip_country_match", "card_age_days", "outcome", "rule", "card_fingerprint",
-              "card_country", "device_id", "ip_country"], fraud)
+              "card_country", "device_id", "ip_country"], fraud, out_dir)
     write_csv("subscriptions.csv", ["event_id", "subscription_id", "customer_id", "customer_email", "plan", "event",
-              "event_at", "started_at", "cancel_reason"], subs)
+              "event_at", "started_at", "cancel_reason"], subs, out_dir)
     write_csv("app_usage_weekly.csv", ["row_id", "account_id", "account_email", "week_of", "watch_hours", "titles",
-              "generated_at"], usage)
+              "generated_at"], usage, out_dir)
     return {"zendesk": len(zd), "stripe": len(stripe), "tool calls": len(calls), "fraud": len(fraud),
             "subscriptions": len(subs), "usage": len(usage)}
 
