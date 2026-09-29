@@ -57,7 +57,7 @@ def reset(scenario: str) -> None:
 
 
 def remove_tenant(tenant: str) -> None:
-    """A tenant other than the demo (demo spec §21): its history, trees, loads and live data."""
+    """A tenant other than the demo (demo spec §21): its history, trees, loads, live data and saved settings."""
     if tenant == "history" or tenant.startswith(("story:", "upload:")) or tenant == "live":
         raise SystemExit("refusing: that is the demo's data, not a tenant")
     for scenario in (tenant, f"{tenant}:live"):
@@ -66,6 +66,7 @@ def remove_tenant(tenant: str) -> None:
     with driver() as d:
         d.execute_query("MATCH (m:Mapping) WHERE NOT EXISTS { (:UploadBatch)-[:USED_MAPPING]->(m) } DELETE m",
                         database_=database())
+        d.execute_query("MATCH (t:TenantConfig {tenant: $tenant}) DELETE t", tenant=tenant, database_=database())
 
 
 def stats() -> None:

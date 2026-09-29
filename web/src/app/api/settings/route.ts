@@ -1,0 +1,55 @@
+import Anthropic from "@anthropic-ai/sdk";
+import { z } from "zod";
+import { AGENT_MODEL } from "@/lib/agent";
+import { listTables } from "@/lib/databricks";
+import { query, SCENARIO } from "@/lib/neo4j";
+import { candidateDatabricks, databricksStatus, settingsKeySet } from "@/lib/settings";
+import { listUploads } from "@/lib/uploads";
+
+export const maxDuration = 120;
+
+// GET: what this deployment is connected to (values masked, never secrets), for the Settings tab.
+export async function GET(request: Request) {
+  const env = (n: string) => Boolean(process.env[n]?.trim());
+  const origin = new URL(request.url).origin;
+  return Response.json({
+    tenant: SCENARIO,
+    neo4j: { configured: env("NEO4J_URI") && env("NEO4J_PASSWORD"), uri: process.env.NEO4J_URI ?? "",
+             database: process.env.NEO4J_DATABASE ?? "neo4j" },
+    anthropic: { configured: env("ANTHROPIC_API_KEY"), model: AGENT_MODEL },
+    databricks: await databricksStatus(),
+    settingsKey: settingsKeySet(),
+    accessCode: env("DEMO_ACCESS_CODE"),
+    endpoints: { gateway: `${origin}/api/gateway`, zendesk: `${origin}/api/webhooks/zendesk`, mcp: `${origin}/api/mcp` },
+    loads: await listUploads(),
+  });
+}
+
+const Test = z.object({
+  test: z.enum(["neo4j", "anthropic", "databricks"]),
+  databricks: z.object({ host: z.string(), warehouse: z.string(), schema: z.string(), token: z.string().optional() }).optional(),
+});
+
+// POST {test}: a real round trip to one service; Databricks with the form's values (saved or not).
+export async function POST(request: Request) {
+  const body = Test.safeParse(await request.json());
+  if (!body.success) return Response.json({ error: body.error.message }, { status: 400 });
+  const started = Date.now();
+  try {
+    let detail: string;
+    if (body.data.test === "neo4j") {
+      const [r] = await query<{ n: number }>("MATCH (e:Event) WHERE e.scenario_id = $s RETURN count(e) AS n", { s: SCENARIO });
+      detail = `${r.n.toLocaleString()} events in ${SCENARIO}`;
+    } else if (body.data.test === "anthropic") {
+      await new Anthropic().messages.create({ model: AGENT_MODEL, max_tokens: 1, messages: [{ role: "user", content: "ping" }] });
+      detail = `${AGENT_MODEL} answered`;
+    } else {
+      const cfg = body.data.databricks ? await candidateDatabricks(body.data.databricks) : undefined;
+      const tables = await listTables(cfg);
+      detail = `${tables.length} tables: ${tables.map((t) => `${t.table} (${t.rows.toLocaleString()})`).join(", ")}`;
+    }
+    return Response.json({ ok: true, detail, ms: Date.now() - started });
+  } catch (err) {
+    return Response.json({ ok: false, error: (err as Error).message, ms: Date.now() - started });
+  }
+}

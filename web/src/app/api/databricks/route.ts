@@ -5,7 +5,7 @@ export const maxDuration = 120;
 
 // GET: whether Databricks is configured (?check=1: just that), and the schema's tables with row counts.
 export async function GET(request: Request) {
-  const cfg = databricksConfig();
+  const cfg = await databricksConfig();
   if (!cfg) return Response.json({ configured: false });
   if (new URL(request.url).searchParams.has("check")) return Response.json({ configured: true, schema: cfg.schema });
   try {
