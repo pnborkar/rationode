@@ -230,6 +230,7 @@ export default function StreamlyLive() {
   const [proposal, setProposal] = useState<Proposal | null>(null);
   const [final, setFinal] = useState<{ option: string; overridden: boolean } | null>(null);
   const [recorded, setRecorded] = useState<Recorded | null>(null);
+  const [liveOfCustomer, setLiveOfCustomer] = useState<{ tickets: string[]; decisions: number }>({ tickets: [], decisions: 0 });
   const proposalVia = useRef<{ via?: string; ms?: number }>({});
   const [overrideTo, setOverrideTo] = useState("full_refund");
   const [running, setRunning] = useState(false);
@@ -275,14 +276,36 @@ export default function StreamlyLive() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  // The customer's existing neighbourhood in the graph (charges, past decisions), read from AuraDB.
+  // The customer's existing neighbourhood in the graph (charges, past decisions), read from AuraDB,
+  // and how many live decisions (gateway + webhook) are recorded for them.
   useEffect(() => {
     let alive = true;
     fetch(`/api/graph/customer?email=${encodeURIComponent(current.email)}`)
       .then((res) => (res.ok ? res.json() : null))
       .then((graph) => { if (alive && graph) setBase(graph); });
+    fetch(`/api/live?email=${encodeURIComponent(current.email)}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((l) => { if (alive && l) setLiveOfCustomer(l); });
     return () => { alive = false; };
   }, [current.email]);
+
+  const refreshLiveOfCustomer = async () => {
+    const res = await fetch(`/api/live?email=${encodeURIComponent(current.email)}`);
+    if (res.ok) setLiveOfCustomer(await res.json());
+  };
+
+  // "Clear <customer>'s live decisions": all their live tickets in Neo4j; history, sets, uploads untouched.
+  async function clearLive() {
+    const first = current.name.split(" ")[0];
+    if (!window.confirm(`Delete ${first}'s live decisions from Neo4j (${liveOfCustomer.decisions} decisions on ` +
+                        `${liveOfCustomer.tickets.length} ticket(s))? Their history, other customers, sets and uploads stay.`)) return;
+    const res = await fetch(`/api/live?email=${encodeURIComponent(current.email)}`, { method: "DELETE" });
+    if (!res.ok) return;
+    reset();
+    setLiveOfCustomer({ tickets: [], decisions: 0 });
+    const g = await fetch(`/api/graph/customer?email=${encodeURIComponent(current.email)}`);
+    if (g.ok) setBase(await g.json());
+  }
 
   const customerId = base.nodes.find((n) => n.kind === "customer")?.id;
   const addLive = (nodes: ViewNode[], rels: ViewRel[]) =>
@@ -371,6 +394,7 @@ export default function StreamlyLive() {
       }
     }
     setRunning(false);
+    setTimeout(refreshLiveOfCustomer, 1500);   // the gateway records after replying
   }
 
   async function decide(option: string) {
@@ -386,6 +410,7 @@ export default function StreamlyLive() {
     if (res?.ok) {
       const rec = await res.json() as Recorded;
       setRecorded(rec);
+      refreshLiveOfCustomer();
       // Show what the graph now holds, read back from Neo4j: the recorded AI proposal and the rep's decision
       // (linked APPROVED or OVERRIDES). The drawn complaint and its precedent stay, now pointing at the
       // recorded proposal instead of the one drawn in the browser.
@@ -499,6 +524,12 @@ export default function StreamlyLive() {
                 <button onClick={() => removeStory(current.setNumber!)} disabled={running}
                         className="shrink-0 rounded border border-zinc-700 px-2 py-0.5 text-zinc-300 hover:bg-zinc-800">
                   Remove {current.name.split(" ")[0]}&apos;s story</button>
+              )}
+              {liveOfCustomer.decisions > 0 && (
+                <button onClick={clearLive} disabled={running}
+                        title={`Live tickets: ${liveOfCustomer.tickets.join(", ")}`}
+                        className="shrink-0 rounded border border-zinc-700 px-2 py-0.5 text-zinc-300 hover:bg-zinc-800 disabled:opacity-40">
+                  Clear {current.name.split(" ")[0]}&apos;s live decisions ({liveOfCustomer.decisions})</button>
               )}
             </div>
             <div className="flex-1 space-y-3">

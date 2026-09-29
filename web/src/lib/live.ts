@@ -42,8 +42,25 @@ async function resolveEntities(rows: Record<string, Record<string, unknown>[]>) 
   rows.links = (rows.links ?? []).map((r) => ({ ...r, from: to(r.from), to: to(r.to) }));
 }
 
+// Recordings run one at a time in this server: each reads everything captured so far, so two calls arriving
+// together (a lookup and a proposal a few ms apart) can't each miss the other.
+let queue: Promise<unknown> = Promise.resolve();
+
 // Record raw events and re-detect the live scenario (small: a demo's worth of tickets), idempotently.
-export async function ingestLive(raws: RawEvent[]) {
+// prune: also remove live decisions a re-run no longer produces (only for an explicit re-run).
+export function ingestLive(raws: RawEvent[], opts: { prune?: boolean } = {}) {
+  const run = queue.then(() => ingestNow(raws, opts));
+  queue = run.catch(() => {});
+  return run;
+}
+
+async function ingestNow(raws: RawEvent[], opts: { prune?: boolean }) {
+  // Write the incoming events first, so any other recording that reads after this sees them.
+  if (raws.length) {
+    const registry = await loadRegistry();
+    const own = rowsDict(new Detector(registry, LIVE).run(raws.map(toContract).filter((e): e is ContractEvent => !!e)));
+    await writeRows({ events: own.events });
+  }
   const stored = await query<{ id: string; source: string; type: string; at: string; payload: string }>(
     `MATCH (e:Event {scenario_id: $live})
      RETURN e.event_id AS id, e.source_system AS source, e.event_type AS type, toString(e.occurred_at) AS at,
@@ -78,13 +95,15 @@ export async function ingestLive(raws: RawEvent[]) {
   }
   const rows = rowsDict(new Detector(await loadRegistry(), LIVE).run(events));
   await resolveEntities(rows);
-  // Live decisions a re-run no longer produces (e.g. after a correction) are removed, so none linger.
-  await query(
-    `MATCH (d:Decision {scenario_id: $live}) WHERE NOT d.decision_id IN $ids
-     OPTIONAL MATCH (d)-[:HAD_CONTEXT]->(c:Context)
-     DETACH DELETE d, c`,
-    { live: LIVE, ids: rows.decisions.map((d) => d.decision_id) },
-  );
+  // On an explicit re-run, live decisions it no longer produces (e.g. after a correction) are removed.
+  if (opts.prune) {
+    await query(
+      `MATCH (d:Decision {scenario_id: $live}) WHERE NOT d.decision_id IN $ids
+       OPTIONAL MATCH (d)-[:HAD_CONTEXT]->(c:Context)
+       DETACH DELETE d, c`,
+      { live: LIVE, ids: rows.decisions.map((d) => d.decision_id) },
+    );
+  }
   await writeRows(rows);
   return {
     events: rows.events.length,
@@ -135,6 +154,39 @@ export async function liveEvents() {
                                    (b.overrides ? " · OVERRIDES the AI proposal" : "")),
     })),
   };
+}
+
+// One customer's live tickets (found through the ticket and lookup events that carry their email).
+async function liveTicketsOf(email: string): Promise<string[]> {
+  return (await query<{ t: string }>(
+    `MATCH (e:Event {scenario_id: $live, email: $email}) WHERE e.ticket_id IS NOT NULL RETURN DISTINCT e.ticket_id AS t`,
+    { live: LIVE, email },
+  )).map((r) => r.t);
+}
+
+export async function liveCustomerSummary(rawEmail: string) {
+  const email = rawEmail.trim().toLowerCase();
+  const tickets = await liveTicketsOf(email);
+  const [r] = await query<{ decisions: number }>(
+    `MATCH (d:Decision {scenario_id: $live})-[:EVIDENCED_BY]->(e:Event {scenario_id: $live}) WHERE e.ticket_id IN $tickets
+     RETURN count(DISTINCT d) AS decisions`,
+    { live: LIVE, tickets },
+  );
+  return { tickets, decisions: r?.decisions ?? 0 };
+}
+
+// "Clear <customer>'s live decisions": everything live for one customer (all their tickets, events,
+// decisions, contexts, ticket nodes). Their history, other customers, sets and uploads are untouched.
+export async function removeLiveCustomer(rawEmail: string) {
+  const email = rawEmail.trim().toLowerCase();
+  const before = await liveCustomerSummary(email);
+  for (const t of before.tickets) await removeLiveTicket(t);
+  // Anything left for them outside a ticket (e.g. a lookup that never led to a proposal), and their live
+  // Zendesk identity node if one was created.
+  await query(`MATCH (e:Event {scenario_id: $live, email: $email}) DETACH DELETE e`, { live: LIVE, email });
+  await query(`MATCH (u:Entity {scenario_id: $live, source_system: 'zendesk', source_key: $key}) DETACH DELETE u`,
+              { live: LIVE, key: `user:${email}` });
+  return { cleared_tickets: before.tickets, cleared_decisions: before.decisions };
 }
 
 export async function liveSummary() {
