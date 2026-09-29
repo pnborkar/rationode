@@ -57,8 +57,17 @@ export async function customerGraph(email: string) {
   const chargeEntity = new Map(r.entities.filter((e) => e.kind === "Charge").map((e) => [e.key, e.id]));
   const seenOutcomes = new Set<string>();
   for (const d of r.decisions.sort((a, b) => a.at.localeCompare(b.at))) {
-    nodes.push({ id: d.id, kind: "decision", label: d.type.split(".")[1].replace("_", " "), option: d.option,
-                 detail: `${d.stage.toLowerCase()} by ${d.actor} · ${d.at.slice(0, 10)}` });
+    // Live decisions (captured by the gateway and the Zendesk webhook) keep the live tab's look: the AI's
+    // proposal and the rep's final decision.
+    const liveNode = d.id.startsWith("live|") && d.type === "support.complaint_resolution";
+    const opt = (d.option ?? "").replaceAll("_", " ");
+    nodes.push(liveNode
+      ? { id: d.id, kind: d.stage === "PROPOSAL" ? "proposal" : "final", option: d.option,
+          label: d.stage === "PROPOSAL" ? `AI: ${opt}` : opt.replace(/^./, (c) => c.toUpperCase()),
+          detail: d.stage === "PROPOSAL" ? `AI proposal by ${d.actor} (live, via the MCP gateway) · ${d.at.slice(0, 10)}`
+            : `final by ${d.actor} (live, via the Zendesk webhook) · ${d.at.slice(0, 10)}` }
+      : { id: d.id, kind: "decision", label: d.type.split(".")[1].replace("_", " "), option: d.option,
+          detail: `${d.stage.toLowerCase()} by ${d.actor} · ${d.at.slice(0, 10)}` });
     rels.push({ id: `${d.id}->${r.customer}`, from: d.id, to: r.customer, type: "ABOUT" });
     for (const e of d.about) rels.push({ id: `${d.id}->${e}`, from: d.id, to: e, type: "ABOUT" });
     for (const o of d.outcomes) {
@@ -73,13 +82,16 @@ export async function customerGraph(email: string) {
       rels.push({ id: `${d.id}->${o.id}`, from: d.id, to: o.id, type: "LED_TO" });
     }
   }
-  // A human decision that overrode the AI's proposal (e.g. captured live by the gateway + Zendesk webhook).
+  // A final decision and the AI proposal it followed: APPROVED, or OVERRIDES when the rep chose differently.
   const ids = r.decisions.map((d) => d.id);
   if (ids.length) {
-    const overrides = await query<{ from: string; to: string }>(
-      `MATCH (a:Decision)-[:OVERRIDES]->(b:Decision) WHERE a.decision_id IN $ids AND b.decision_id IN $ids
-       RETURN a.decision_id AS from, b.decision_id AS to`, { ids });
-    for (const o of overrides) rels.push({ id: `${o.from}~overrides`, from: o.from, to: o.to, type: "OVERRIDES" });
+    const follows = await query<{ from: string; to: string; overrides: boolean }>(
+      `MATCH (a:Decision {stage: 'FINAL'})-[:PRECEDED_BY]->(b:Decision {stage: 'PROPOSAL'})
+       WHERE a.decision_id IN $ids AND b.decision_id IN $ids
+       RETURN a.decision_id AS from, b.decision_id AS to, EXISTS { (a)-[:OVERRIDES]->(b) } AS overrides`, { ids });
+    for (const f of follows) {
+      rels.push({ id: `${f.from}~follows`, from: f.from, to: f.to, type: f.overrides ? "OVERRIDES" : "APPROVED" });
+    }
   }
   await addUsage(r.customer, nodes, rels);
   await addPolicyGap(email, nodes, rels);

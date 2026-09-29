@@ -12,7 +12,8 @@ import { MACRO_OPTION } from "@/lib/nativeAdapter";
 
 // The Zendesk macro for each option (the rep's action, sent through the Zendesk webhook).
 const MACRO_FOR = Object.fromEntries(Object.entries(MACRO_OPTION).map(([title, option]) => [option, title]));
-type Recorded = { decisions: { id: string; type: string; stage: string }[]; overrides: number };
+type Recorded = { decisions: { id: string; type: string; stage: string }[]; overrides: number;
+                  ticket_decisions?: { id: string; stage: string }[] };
 
 const GraphView = dynamic(() => import("@/components/GraphView"), { ssr: false });
 const GraphTable = dynamic(() => import("@/components/GraphTable"), { ssr: false });
@@ -383,10 +384,22 @@ export default function StreamlyLive() {
                              actor: { id: "zd_live_rep", name: REP.name, group: REP.team, role: "agent" } }),
     }).catch(() => null);
     if (res?.ok) {
-      setRecorded(await res.json());
-      // Show what the graph now holds: the recorded proposal and final decision, read back from Neo4j.
+      const rec = await res.json() as Recorded;
+      setRecorded(rec);
+      // Show what the graph now holds, read back from Neo4j: the recorded AI proposal and the rep's decision
+      // (linked APPROVED or OVERRIDES). The drawn complaint and its precedent stay, now pointing at the
+      // recorded proposal instead of the one drawn in the browser.
       const g = await fetch(`/api/graph/customer?email=${encodeURIComponent(current.email)}`);
-      if (g.ok) { setBase(await g.json()); setLive({ nodes: [], rels: [] }); }
+      if (g.ok) {
+        const recordedProposal = rec.ticket_decisions?.find((d) => d.stage === "PROPOSAL")?.id;
+        const caseId = `case:${TICKET}`;
+        setBase(await g.json());
+        setLive((l) => ({
+          nodes: l.nodes.filter((n) => n.kind === "case" || n.kind === "precedent"),
+          rels: [...l.rels.filter((r) => r.type === "SIMILAR_TO"),
+                 ...(recordedProposal ? [{ id: `${caseId}->recorded`, from: caseId, to: recordedProposal, type: "PROPOSED" }] : [])],
+        }));
+      }
       return;
     }
     const finalId = `final:${TICKET}`;
