@@ -2,14 +2,11 @@
 // distinct values, plus the event contract and the schema registry, and proposes a mapping with a
 // one-line reason per field. Structured output, so the result is schema-checked; a person reviews
 // it and the deterministic validator checks it before anything runs.
-import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
-import { AGENT_MODEL } from "./agent";
 import { DATA_FIELDS, ENTITY_REFS } from "./contract";
 import type { Registry } from "./detector";
 import { FileMappingSchema, profile, type FileMapping, type ParsedFile } from "./mapping";
-
-const client = new Anthropic();
+import { aiSettings, anthropicClient } from "./settings";
 
 // Meaning of each canonical event type and its data fields: the contract, stated once.
 const EVENT_TYPES = `
@@ -64,8 +61,9 @@ Rules:
 
 export async function proposeMapping(file: ParsedFile, registry: Registry): Promise<FileMapping> {
   const p = profile(file);
+  const [{ mappingModel }, client] = await Promise.all([aiSettings(), anthropicClient()]);
   const response = await client.messages.parse({
-    model: AGENT_MODEL,
+    model: mappingModel,
     max_tokens: 16000,
     thinking: { type: "adaptive" },
     output_config: { effort: "medium", format: zodOutputFormat(FileMappingSchema) },

@@ -3,6 +3,7 @@
 // from the deployment's environment and is never sent back to the browser. Infrastructure secrets (Neo4j,
 // Anthropic, the access code) stay in the environment and are only reported as set or not.
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
+import Anthropic from "@anthropic-ai/sdk";
 import { query, SCENARIO } from "./neo4j";
 
 export type DatabricksSettings = { host: string; warehouse: string; schema: string; token: string };
@@ -111,3 +112,75 @@ export async function candidateDatabricks(v: { host: string; warehouse: string; 
 }
 
 export const settingsKeySet = () => Boolean(key());
+
+// ------------------------------------------------------------------ AI (models and the tenant's own key)
+// Models the agent's request shape works with (adaptive thinking, effort, refusal fallbacks "default").
+// Claude Haiku 4.5 is left out: it doesn't take adaptive thinking.
+export const AI_MODELS = ["claude-opus-5", "claude-opus-5-5", "claude-sonnet-5-5", "claude-fable-5-1"] as const;
+const DEFAULT_MODEL = process.env.AGENT_MODEL ?? "claude-opus-5";
+
+type SavedAi = { agent_model: string | null; mapping_model: string | null; key_enc: string | null; updated_at: string };
+
+async function savedAi(): Promise<SavedAi | null> {
+  const [r] = await query<SavedAi>(
+    `MATCH (t:TenantConfig {tenant: $tenant, kind: 'ai'})
+     RETURN t.agent_model AS agent_model, t.mapping_model AS mapping_model, t.key_enc AS key_enc,
+            toString(t.updated_at) AS updated_at`, { tenant: SCENARIO });
+  return r ?? null;
+}
+
+// The models and key in use: saved in Settings first, else the environment (AGENT_MODEL, ANTHROPIC_API_KEY).
+export async function aiSettings() {
+  const s = await savedAi();
+  const key = s?.key_enc ? decrypt(s.key_enc) : null;
+  return {
+    agentModel: s?.agent_model ?? DEFAULT_MODEL,
+    mappingModel: s?.mapping_model ?? DEFAULT_MODEL,
+    apiKey: key ?? undefined,   // undefined: the SDK reads ANTHROPIC_API_KEY
+    keySource: key ? "settings" as const : process.env.ANTHROPIC_API_KEY?.trim() ? "env" as const : null,
+    keyUnreadable: Boolean(s?.key_enc && !key),
+    updatedAt: s?.updated_at,
+  };
+}
+
+export async function anthropicClient() {
+  const { apiKey } = await aiSettings();
+  return new Anthropic(apiKey ? { apiKey } : undefined);
+}
+
+export async function aiStatus() {
+  const a = await aiSettings();
+  return { agentModel: a.agentModel, mappingModel: a.mappingModel, models: AI_MODELS, keySource: a.keySource,
+           keyUnreadable: a.keyUnreadable, updatedAt: a.updatedAt };
+}
+
+const Model = (m: string) => {
+  if (!(AI_MODELS as readonly string[]).includes(m)) throw new Error(`Model must be one of ${AI_MODELS.join(", ")}`);
+  return m;
+};
+
+// Save models and, optionally, the tenant's own Anthropic key (blank keeps it; clearKey drops it).
+export async function saveAi(v: { agentModel: string; mappingModel: string; apiKey?: string; clearKey?: boolean }) {
+  const key = v.apiKey?.trim();
+  const keyEnc = v.clearKey ? null : key ? encrypt(key) : (await savedAi())?.key_enc ?? null;
+  await query(
+    `MERGE (t:TenantConfig {tenant: $tenant, kind: 'ai'})
+     SET t.agent_model = $agent, t.mapping_model = $mapping, t.key_enc = $keyEnc, t.updated_at = datetime()`,
+    { tenant: SCENARIO, agent: Model(v.agentModel), mapping: Model(v.mappingModel), keyEnc });
+}
+
+export async function clearAi() {
+  await query(`MATCH (t:TenantConfig {tenant: $tenant, kind: 'ai'}) DELETE t`, { tenant: SCENARIO });
+}
+
+// "Test": one small request shaped like the agent's (adaptive thinking, effort), with the form's model and key.
+export async function testAi(v: { model: string; apiKey?: string }) {
+  const key = v.apiKey?.trim() || (await aiSettings()).apiKey;
+  const client = new Anthropic(key ? { apiKey: key } : undefined);
+  const r = await client.messages.create({
+    model: Model(v.model), max_tokens: 1024, thinking: { type: "adaptive" }, output_config: { effort: "low" },
+    messages: [{ role: "user", content: "Reply with the single word: ready" }],
+  });
+  return `${r.model} answered (${r.stop_reason}) with ${key === undefined ? "the environment's" : v.apiKey?.trim() ? "the entered" : "the saved"} key`;
+}
+

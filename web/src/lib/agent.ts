@@ -6,9 +6,8 @@ import type { Context } from "./features";
 import { checkFraudPatterns } from "./fraud";
 import { appAuth, jsonResult, withMcp } from "./mcpClient";
 import { checkBeforeAct } from "./precedent";
+import { aiSettings, anthropicClient } from "./settings";
 
-const client = new Anthropic();
-export const AGENT_MODEL = process.env.AGENT_MODEL ?? "claude-opus-5";
 export const AGENT_VERSION = "v2";
 
 export type AgentEvent =
@@ -210,9 +209,11 @@ export async function* runSupportAgent(input: ChatInput): AsyncGenerator<AgentEv
     content: `New ${input.channel} ticket ${input.ticket_id} from ${input.customer_email}:\n\n${input.message}`,
   }];
 
+  // The tenant's model and key (Settings), else the environment's.
+  const [{ agentModel }, client] = await Promise.all([aiSettings(), anthropicClient()]);
   for (let turn = 0; turn < 8; turn++) {
     const stream = client.beta.messages.stream({
-      model: AGENT_MODEL,
+      model: agentModel,
       max_tokens: 16000,
       thinking: { type: "adaptive", display: "summarized" },
       output_config: { effort: (process.env.AGENT_EFFORT as "low" | "medium" | "high") ?? "medium" },

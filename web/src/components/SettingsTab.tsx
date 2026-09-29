@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 type Status = {
   tenant: string;
   neo4j: { configured: boolean; uri: string; database: string };
-  anthropic: { configured: boolean; model: string };
+  ai: { agentModel: string; mappingModel: string; models: string[]; keySource: "settings" | "env" | null; keyUnreadable: boolean; updatedAt?: string };
   databricks: { source: "settings" | "env" | null; host?: string; warehouse?: string; schema?: string; token: string; updated_at?: string };
   settingsKey: boolean;
   accessCode: boolean;
@@ -42,6 +42,8 @@ export default function SettingsTab() {
   const [status, setStatus] = useState<Status | null>(null);
   const [tests, setTests] = useState<Record<string, TestResult | "running">>({});
   const [form, setForm] = useState({ host: "", warehouse: "", schema: "", token: "" });
+  const [ai, setAi] = useState({ agentModel: "", mappingModel: "", apiKey: "" });
+  const [aiError, setAiError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
@@ -49,6 +51,7 @@ export default function SettingsTab() {
   const apply = (s: Status) => {
     setStatus(s);
     setForm({ host: s.databricks.host ?? "", warehouse: s.databricks.warehouse ?? "", schema: s.databricks.schema ?? "", token: "" });
+    setAi({ agentModel: s.ai.agentModel, mappingModel: s.ai.mappingModel, apiKey: "" });
   };
   const load = async () => apply(await (await fetch("/api/settings")).json());
   // Mounted when the tab opens, so it reads fresh status each time.
@@ -56,8 +59,9 @@ export default function SettingsTab() {
 
   async function test(name: "neo4j" | "anthropic" | "databricks", withForm = false) {
     setTests((t) => ({ ...t, [name]: "running" }));
+    const given = !withForm ? {} : name === "databricks" ? { databricks: form } : { ai: { model: ai.agentModel, apiKey: ai.apiKey } };
     const res = await fetch("/api/settings", { method: "POST", headers: { "content-type": "application/json" },
-                                               body: JSON.stringify({ test: name, ...(withForm ? { databricks: form } : {}) }) });
+                                               body: JSON.stringify({ test: name, ...given }) });
     const r: TestResult = await res.json().catch(() => ({ ok: false, error: res.statusText, ms: 0 }));
     setTests((t) => ({ ...t, [name]: r }));
   }
@@ -68,6 +72,15 @@ export default function SettingsTab() {
                                                           body: JSON.stringify(form) });
     const data = await res.json();
     if (res.ok) await load(); else setError(data.error ?? res.statusText);
+    setSaving(false);
+  }
+
+  async function saveAiSettings(body: Record<string, unknown>, method = "PUT") {
+    setSaving(true); setAiError(null);
+    const res = await fetch("/api/settings/ai", { method, headers: { "content-type": "application/json" },
+                                                  body: method === "PUT" ? JSON.stringify(body) : undefined });
+    const data = await res.json();
+    if (res.ok) await load(); else setAiError(data.error ?? res.statusText);
     setSaving(false);
   }
 
@@ -97,8 +110,9 @@ export default function SettingsTab() {
           </div>
           <Result r={tests.neo4j} />
           <div className="flex items-start justify-between gap-3">
-            <div><p className="flex items-center gap-2 font-medium"><Dot on={status.anthropic.configured} /> Agent model</p>
-              <p className="text-xs text-zinc-500">{status.anthropic.model} · Anthropic key {status.anthropic.configured ? "set" : "missing"}</p></div>
+            <div><p className="flex items-center gap-2 font-medium"><Dot on={status.ai.keySource !== null} /> Claude (Anthropic)</p>
+              <p className="text-xs text-zinc-500">agent {status.ai.agentModel} · mapping {status.ai.mappingModel} · key {
+                status.ai.keySource === "settings" ? "from Settings" : status.ai.keySource === "env" ? "from .env" : "missing"}</p></div>
             <button className={button} onClick={() => test("anthropic")}>Test</button>
           </div>
           <Result r={tests.anthropic} />
@@ -110,8 +124,8 @@ export default function SettingsTab() {
           <Result r={tests.databricks} />
           <div className="flex items-center gap-2 text-zinc-500"><Dot on={false} /> Snowflake, BigQuery: not available yet</div>
           <p className="text-xs text-zinc-500">
-            Neo4j, the Anthropic key and the access code ({status.accessCode ? "set" : "not set"}) are set in the deployment&apos;s
-            environment, not here.</p>
+            Neo4j and the access code ({status.accessCode ? "set" : "not set"}) are set in the deployment&apos;s environment, not here:
+            settings are stored in Neo4j, so the app needs Neo4j before it can read them.</p>
         </Section>
 
         <Section title="Endpoints for your systems">
@@ -165,6 +179,36 @@ export default function SettingsTab() {
           {error && <p className="text-xs text-red-400">{error}</p>}
           {d.source === "settings" && d.updated_at && <p className="text-xs text-zinc-500">Saved {d.updated_at.slice(0, 16).replace("T", " ")} UTC.</p>}
           {d.source === "env" && <p className="text-xs text-zinc-500">Currently from .env (DATABRICKS_*). Saving here takes precedence.</p>}
+        </Section>
+
+        <Section title="AI (Claude)">
+          <p className="text-xs text-zinc-500">
+            The support agent answers tickets; the mapping agent proposes how uploaded files and tables map to events.
+            A key entered here is this tenant&apos;s own (usage billed to it); leave it empty to use the deployment&apos;s key.</p>
+          <label className="block text-xs text-zinc-400">Support agent model
+            <select className={input} value={ai.agentModel} onChange={(e) => setAi({ ...ai, agentModel: e.target.value })}>
+              {status.ai.models.map((m) => <option key={m} value={m}>{m}</option>)}
+            </select></label>
+          <label className="block text-xs text-zinc-400">Mapping agent model
+            <select className={input} value={ai.mappingModel} onChange={(e) => setAi({ ...ai, mappingModel: e.target.value })}>
+              {status.ai.models.map((m) => <option key={m} value={m}>{m}</option>)}
+            </select></label>
+          <label className="block text-xs text-zinc-400">Anthropic API key (optional)
+            <input className={input} type="password" autoComplete="off" value={ai.apiKey}
+                   placeholder={status.ai.keySource === "settings" ? "saved · leave blank to keep it" : "sk-ant-… (empty: use the deployment's key)"}
+                   onChange={(e) => setAi({ ...ai, apiKey: e.target.value })} /></label>
+          {status.ai.keyUnreadable && <p className="text-xs text-amber-300">The saved key can&apos;t be read (SETTINGS_KEY changed): enter it again.</p>}
+          <div className="flex flex-wrap gap-2">
+            <button className={button} onClick={() => test("anthropic", true)}>Test support agent model</button>
+            <button className="rounded bg-violet-600 px-3 py-0.5 text-xs font-semibold text-white disabled:opacity-40"
+                    onClick={() => saveAiSettings(ai)} disabled={saving || (!!ai.apiKey.trim() && !status.settingsKey)}>{saving ? "Saving…" : "Save"}</button>
+            {status.ai.keySource === "settings" && (
+              <button className={button} onClick={() => saveAiSettings({ ...ai, apiKey: "", clearKey: true })}>Use the deployment&apos;s key</button>)}
+            {status.ai.updatedAt && <button className={button} onClick={() => saveAiSettings({}, "DELETE")}>Reset to environment</button>}
+          </div>
+          <Result r={tests.anthropic} />
+          {aiError && <p className="text-xs text-red-400">{aiError}</p>}
+          {status.ai.updatedAt && <p className="text-xs text-zinc-500">Saved {status.ai.updatedAt.slice(0, 16).replace("T", " ")} UTC.</p>}
         </Section>
       </div>
     </div>

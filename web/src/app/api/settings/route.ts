@@ -1,9 +1,7 @@
-import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
-import { AGENT_MODEL } from "@/lib/agent";
 import { listTables } from "@/lib/databricks";
 import { query, SCENARIO } from "@/lib/neo4j";
-import { candidateDatabricks, databricksStatus, settingsKeySet } from "@/lib/settings";
+import { aiStatus, candidateDatabricks, databricksStatus, settingsKeySet, testAi } from "@/lib/settings";
 import { listUploads } from "@/lib/uploads";
 
 export const maxDuration = 120;
@@ -16,7 +14,7 @@ export async function GET(request: Request) {
     tenant: SCENARIO,
     neo4j: { configured: env("NEO4J_URI") && env("NEO4J_PASSWORD"), uri: process.env.NEO4J_URI ?? "",
              database: process.env.NEO4J_DATABASE ?? "neo4j" },
-    anthropic: { configured: env("ANTHROPIC_API_KEY"), model: AGENT_MODEL },
+    ai: await aiStatus(),
     databricks: await databricksStatus(),
     settingsKey: settingsKeySet(),
     accessCode: env("DEMO_ACCESS_CODE"),
@@ -28,9 +26,10 @@ export async function GET(request: Request) {
 const Test = z.object({
   test: z.enum(["neo4j", "anthropic", "databricks"]),
   databricks: z.object({ host: z.string(), warehouse: z.string(), schema: z.string(), token: z.string().optional() }).optional(),
+  ai: z.object({ model: z.string(), apiKey: z.string().optional() }).optional(),
 });
 
-// POST {test}: a real round trip to one service; Databricks with the form's values (saved or not).
+// POST {test}: a real round trip to one service; Databricks and AI with the form's values (saved or not).
 export async function POST(request: Request) {
   const body = Test.safeParse(await request.json());
   if (!body.success) return Response.json({ error: body.error.message }, { status: 400 });
@@ -41,8 +40,7 @@ export async function POST(request: Request) {
       const [r] = await query<{ n: number }>("MATCH (e:Event) WHERE e.scenario_id = $s RETURN count(e) AS n", { s: SCENARIO });
       detail = `${r.n.toLocaleString()} events in ${SCENARIO}`;
     } else if (body.data.test === "anthropic") {
-      await new Anthropic().messages.create({ model: AGENT_MODEL, max_tokens: 1, messages: [{ role: "user", content: "ping" }] });
-      detail = `${AGENT_MODEL} answered`;
+      detail = await testAi(body.data.ai ?? { model: (await aiStatus()).agentModel });
     } else {
       const cfg = body.data.databricks ? await candidateDatabricks(body.data.databricks) : undefined;
       const tables = await listTables(cfg);

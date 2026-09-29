@@ -1,7 +1,7 @@
 // "Connect a source" (demo spec §16.2): uploaded files + an approved mapping -> contract events ->
 // the TypeScript detector -> Neo4j under scenario upload:<name>, removable like the Events-tab sets.
 import { createHash } from "node:crypto";
-import { AGENT_MODEL } from "./agent";
+import { aiSettings } from "./settings";
 import { Detector, REGISTRY_CYPHER, registryFrom, rowsDict, type Registry } from "./detector";
 import { parseFile, type FileMapping, type ParsedFile } from "./mapping";
 import { IS_DEMO, query, SCENARIO } from "./neo4j";
@@ -172,7 +172,7 @@ export async function run(files: UploadedFile[], mappings: FileMapping[], name: 
   const mappingJson = JSON.stringify(mappings);
   await query(PROVENANCE, {
     mappingId: createHash("sha256").update(mappingJson).digest("hex").slice(0, 16), mappingJson,
-    files: files.map((f) => f.name), proposedBy: `Claude mapping agent (${AGENT_MODEL}), reviewed and approved in the app`,
+    files: files.map((f) => f.name), proposedBy: `Claude mapping agent (${(await aiSettings()).mappingModel}), reviewed and approved in the app`,
     batchId, scenario, name, loadedAt, records: report.events.length,
     new: t ? t.new : report.events.length, changed: t?.changed ?? 0, unchanged: t?.unchanged ?? 0, removed: t?.removed ?? 0,
     editedFiles,

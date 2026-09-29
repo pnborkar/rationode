@@ -271,6 +271,7 @@ export default function StreamlyLive() {
   const [graphMode, setGraphMode] = useState<"graph" | "table">("graph");
   const [expanded, setExpanded] = useState(false);
   const [thinkingExpanded, setThinkingExpanded] = useState(false);
+  const [agentModel, setAgentModel] = useState("");   // from Settings (or the environment)
 
   // Customers from sets loaded, and batches uploaded, on the Events tab join the dropdown.
   const caseKeyRef = useRef(caseKey);
@@ -290,6 +291,9 @@ export default function StreamlyLive() {
       reset();
     }
   };
+  useEffect(() => {
+    fetch("/api/settings/ai").then((r) => r.json()).then((a) => setAgentModel(a.agentModel)).catch(() => {});
+  }, [tab]);
   useEffect(() => {
     let alive = true;
     fetch("/api/stories").then((r) => r.json()).then((sets: SetInfo[]) => { if (alive) setStoryCases(toCases(sets)); });
@@ -652,7 +656,7 @@ export default function StreamlyLive() {
 
         <Panel title="Agent's thinking" className="col-start-2 row-span-3 row-start-1" badge={
           <span className="flex items-center gap-2 text-xs text-zinc-500">
-            claude-opus-5 · prompt v2 · graph {graphOn ? "on" : "off"}
+            {agentModel} · prompt v2 · graph {graphOn ? "on" : "off"}
             <button onClick={() => setThinkingExpanded(true)} title="Expand"
                     className="rounded-md border border-zinc-700 px-2 py-0.5 text-zinc-300 hover:bg-zinc-800">⤢ Expand</button>
           </span>}>
@@ -710,7 +714,7 @@ export default function StreamlyLive() {
         <div className="fixed inset-0 z-50 flex flex-col bg-zinc-950/95 p-4 backdrop-blur">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-300">
-              Agent&apos;s thinking <span className="font-normal normal-case text-zinc-500">· {current.name} · claude-opus-5 · graph {graphOn ? "on" : "off"}</span></h2>
+              Agent&apos;s thinking <span className="font-normal normal-case text-zinc-500">· {current.name} · {agentModel} · graph {graphOn ? "on" : "off"}</span></h2>
             <button onClick={() => setThinkingExpanded(false)} title="Close (Esc)"
                     className="rounded-md border border-zinc-700 px-2 py-0.5 text-xs text-zinc-300 hover:bg-zinc-800">✕ Close</button>
           </div>
