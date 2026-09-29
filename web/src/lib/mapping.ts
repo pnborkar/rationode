@@ -196,6 +196,7 @@ export function mapFile(f: ParsedFile, m: FileMapping) {
     const e: ContractEvent = {
       event_id: "", source: m.source, source_type: rec.when?.equals ?? rec.event_type, event_type: rec.event_type,
       occurred_at: "", received_at: null, entity_refs: {}, actor: null, data: {}, raw: row,
+      source_ref: { file: f.name, row: i + 1 },   // data row, counting from 1 after the header
     };
     const actor: Partial<Actor> = {};
     for (const fm of rec.fields) {

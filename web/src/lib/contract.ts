@@ -38,6 +38,7 @@ export type ContractEvent = {
   actor?: Actor | null;
   data: Record<string, unknown>;   // type-specific normalized fields (see DATA_FIELDS)
   raw: Record<string, unknown>;    // the original record
+  source_ref?: { file: string; row: number } | null;   // where the record came from (uploads: file + data row)
 };
 
 // Normalized data fields per canonical type: what the detector reads. Required ones must be present.

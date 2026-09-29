@@ -120,8 +120,9 @@ export default function ConnectSource({ active, onClose, onChanged }: { active: 
 
   async function runAll() {
     setBusy("run"); setError(null);
+    const edited_files = files.filter((f) => proposals[f.name]?.edited).map((f) => f.name);
     const res = await fetch("/api/upload/run", { method: "POST", headers: { "content-type": "application/json" },
-                                                 body: JSON.stringify({ name, files, mappings }) });
+                                                 body: JSON.stringify({ name, files, mappings, edited_files }) });
     const data = await res.json();
     if (res.ok) {
       setResult(data); setView("result"); onChanged();

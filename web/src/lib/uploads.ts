@@ -1,5 +1,7 @@
 // "Connect a source" (demo spec §16.2): uploaded files + an approved mapping -> contract events ->
 // the TypeScript detector -> Neo4j under scenario upload:<name>, removable like the Events-tab sets.
+import { createHash } from "node:crypto";
+import { AGENT_MODEL } from "./agent";
 import { Detector, REGISTRY_CYPHER, registryFrom, rowsDict, type Registry } from "./detector";
 import { parseFile, type FileMapping, type ParsedFile } from "./mapping";
 import { query } from "./neo4j";
@@ -44,21 +46,35 @@ async function alreadyLoaded(eventIds: string[], scenario: string) {
   );
 }
 
+// What a batch holds now: source ID -> the stored raw row and the load that brought that version.
+async function storedEvents(scenario: string) {
+  return new Map((await query<{ id: string; payload: string; batch: string | null; file: string | null; row: number | null }>(
+    `MATCH (e:Event {scenario_id: $scenario})
+     RETURN e.event_id AS id, e.payload_json AS payload, e.batch_id AS batch, e.source_file AS file, e.source_row AS row`,
+    { scenario },
+  )).map((r) => [r.id.slice(scenario.length + 1), r]));
+}
+
+const where = (e: { source_ref?: { file: string; row: number } | null }) =>
+  e.source_ref ? `${e.source_ref.file} row ${e.source_ref.row}` : "";
+
 // Compare the files' records with what a batch already holds (same source IDs; same raw row = unchanged).
 async function diffAgainst(scenario: string, events: Validation["events"]) {
-  const stored = new Map((await query<{ id: string; payload: string }>(
-    `MATCH (e:Event {scenario_id: $scenario}) RETURN e.event_id AS id, e.payload_json AS payload`, { scenario },
-  )).map((r) => [r.id.slice(scenario.length + 1), r.payload]));
+  const stored = await storedEvents(scenario);
   let fresh = 0, changed = 0, unchanged = 0;
+  const examples: string[] = [];
   for (const e of events) {
     const before = stored.get(e.event_id);
-    if (before === undefined) fresh++;
-    else if (before === JSON.stringify(e.raw)) unchanged++;
-    else changed++;
+    if (before === undefined) { fresh++; if (examples.length < 5) examples.push(`${where(e)} (new)`); }
+    else if (before.payload === JSON.stringify(e.raw)) unchanged++;
+    else { changed++; if (examples.length < 5) examples.push(`${where(e)} (changed)`); }
   }
   const incoming = new Set(events.map((e) => e.event_id));
-  const removed = [...stored.keys()].filter((id) => !incoming.has(id)).length;
-  return { scenario, new: fresh, changed, unchanged, removed };
+  const gone = [...stored.entries()].filter(([id]) => !incoming.has(id));
+  for (const [, r] of gone.slice(0, Math.max(0, 5 - examples.length))) {
+    examples.push(r.file ? `${r.file} row ${r.row} (removed)` : "a record (removed)");
+  }
+  return { scenario, new: fresh, changed, unchanged, removed: gone.length, examples };
 }
 
 // Re-uploading is not an error: records already in a batch update that batch (re-detected over the whole
@@ -94,7 +110,8 @@ async function validateAll(files: UploadedFile[], mappings: FileMapping[], name:
     report.checks.unshift(nothing
       ? { level: "ok", message: `Nothing new: all ${t.unchanged} records are already loaded in ${scenario}.` }
       : { level: "ok", message: `Already loaded as ${scenario}: approving updates it with ${t.new} new and ${t.changed} ` +
-          `changed records` + (t.removed ? `; ${t.removed} records not in these files will be removed` : "") + "." });
+          `changed records` + (t.removed ? `; ${t.removed} records not in these files will be removed` : "") + ".",
+          examples: t.examples });
   }
   return report;
 }
@@ -105,8 +122,27 @@ export async function check(files: UploadedFile[], mappings: FileMapping[], name
   return report;
 }
 
+// Provenance for a load (demo spec §17.3): one UploadBatch per load, the approved Mapping it used (by content),
+// and on each event its file, data row, and the load that brought this version of the record.
+const PROVENANCE = `
+  MERGE (m:Mapping {mapping_id: $mappingId})
+  ON CREATE SET m.mapping_json = $mappingJson, m.files = $files, m.proposed_by = $proposedBy,
+                m.first_approved_at = datetime($loadedAt)
+  CREATE (b:UploadBatch {batch_id: $batchId, scenario_id: $scenario, name: $name, loaded_at: datetime($loadedAt),
+                         files: $files, records: toInteger($records), new: toInteger($new), changed: toInteger($changed),
+                         unchanged: toInteger($unchanged), removed: toInteger($removed), edited_files: $editedFiles})
+  MERGE (b)-[:USED_MAPPING]->(m)
+  WITH b
+  OPTIONAL MATCH (p:UploadBatch {scenario_id: $scenario}) WHERE p <> b AND NOT EXISTS { (:UploadBatch)-[:SUPERSEDES]->(p) }
+  FOREACH (x IN CASE WHEN p IS NULL THEN [] ELSE [p] END | MERGE (b)-[:SUPERSEDES]->(x))`;
+
+export async function removeBatches(scenario: string) {
+  await query(`MATCH (b:UploadBatch {scenario_id: $scenario}) DETACH DELETE b`, { scenario });
+  await query(`MATCH (m:Mapping) WHERE NOT EXISTS { (:UploadBatch)-[:USED_MAPPING]->(m) } DELETE m`);
+}
+
 // Validate again server-side (never trust the client's copy), then write and place in the trees.
-export async function run(files: UploadedFile[], mappings: FileMapping[], name: string) {
+export async function run(files: UploadedFile[], mappings: FileMapping[], name: string, editedFiles: string[] = []) {
   const registry = await loadRegistry();
   const report = await validateAll(files, mappings, name, registry);
   if (!report.ok) return { ok: false as const, error: "The mapping has validation errors", report: { ...report, events: undefined } };
@@ -115,13 +151,29 @@ export async function run(files: UploadedFile[], mappings: FileMapping[], name: 
     return { ok: false as const, error: `Nothing new: all records are already loaded in ${t.scenario}.` };
   }
   const scenario = t?.scenario ?? scenarioFor(name);
+  const loadedAt = new Date().toISOString(), batchId = `${scenario}@${loadedAt}`;
+  const previous = await storedEvents(scenario);
   const touched = await touchedPoints(scenario);
   if (touched.length || (await query(`MATCH (e:Event {scenario_id: $scenario}) RETURN e LIMIT 1`, { scenario })).length) {
     await removeScenario(scenario);        // re-running a batch replaces it
     await recomputePoints(touched);
   }
   const rows = rowsDict(new Detector(registry, scenario).run(report.events));
+  const byId = new Map(report.events.map((e) => [e.event_id, e]));
+  rows.events = rows.events.map((r) => {
+    const id = String(r.event_id).slice(scenario.length + 1), e = byId.get(id), old = previous.get(id);
+    return { ...r, source_file: e?.source_ref?.file ?? null, source_row: e?.source_ref?.row ?? null,
+             batch_id: old && old.payload === r.payload_json && old.batch ? old.batch : batchId };   // unchanged keeps its load
+  });
   await writeRows(rows);
+  const mappingJson = JSON.stringify(mappings);
+  await query(PROVENANCE, {
+    mappingId: createHash("sha256").update(mappingJson).digest("hex").slice(0, 16), mappingJson,
+    files: files.map((f) => f.name), proposedBy: `Claude mapping agent (${AGENT_MODEL}), reviewed and approved in the app`,
+    batchId, scenario, name, loadedAt, records: report.events.length,
+    new: t ? t.new : report.events.length, changed: t?.changed ?? 0, unchanged: t?.unchanged ?? 0, removed: t?.removed ?? 0,
+    editedFiles,
+  });
   const branches = await placeScenario(scenario);
   const customers = rows.entities.filter((e) => e.label === "Customer" && e.source_system === "stripe")
     .map((e) => (e.props as { email: string; name: string | null }))
@@ -145,6 +197,7 @@ export async function removeUpload(scenario: string) {
   if (!scenario.startsWith("upload:")) throw new Error("not an upload scenario");
   const touched = await touchedPoints(scenario);
   const removed = await removeScenario(scenario);
+  await removeBatches(scenario);
   await recomputePoints(touched);
   return { removed, branchesRestored: touched.length };
 }

@@ -12,7 +12,8 @@ const Q = {
         e.payload_json = r.payload_json, e.payload_ref = 'inline:payload_json',
         e.charge_id = r.charge_id, e.ticket_id = r.ticket_id, e.dispute_id = r.dispute_id,
         e.stripe_customer_id = r.stripe_customer_id, e.email = r.email, e.scenario_id = r.scenario_id,
-        e.canonical_type = r.canonical_type, e.data_json = r.data_json`,
+        e.canonical_type = r.canonical_type, e.data_json = r.data_json,
+        e.source_file = r.source_file, e.source_row = r.source_row, e.batch_id = r.batch_id`,
   entities: (label: string) => `UNWIND $rows AS r
     MERGE (e:Entity {entity_id: r.entity_id})
     SET e:${label}, e.source_system = r.source_system, e.source_key = r.source_key, e.scenario_id = r.scenario_id

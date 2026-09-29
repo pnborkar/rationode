@@ -59,7 +59,7 @@ export type Validation = {
   };
   events: ContractEvent[];
   // Set by the upload layer when these records are already loaded: the batch they update and what differs.
-  target?: { scenario: string; new: number; changed: number; unchanged: number; removed: number };
+  target?: { scenario: string; new: number; changed: number; unchanged: number; removed: number; examples: string[] };
 };
 
 const counted = <T,>(items: T[], key: (x: T) => string) => {

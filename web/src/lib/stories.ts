@@ -8,6 +8,7 @@ import set6 from "../data/stories/set-6.json";
 import { query } from "./neo4j";
 import { placeScenario, recomputePoints, touchedPoints, type BranchChange } from "./storyTrees";
 import { removeScenario, writeRows, type Rows } from "./storyWriter";
+import { removeBatches } from "./uploads";
 
 type RawEvent = { event_id: string; source_system: string; event_type: string; occurred_at: string;
                   payload: Record<string, unknown> };
@@ -71,6 +72,7 @@ export async function resetAll() {
   for (const sc of scenarios) {
     (await touchedPoints(sc)).forEach((p) => touched.add(p));
     removed += await removeScenario(sc);
+    if (sc.startsWith("upload:")) await removeBatches(sc);
   }
   await recomputePoints([...touched]);
   return { removed, scenarios, branchesRestored: touched.size };

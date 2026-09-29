@@ -1,4 +1,4 @@
-import { query, SCENARIO } from "./neo4j";
+import { query } from "./neo4j";
 
 // why(decision_id): the decision, the chain it sits in, what it led to, where it falls in the
 // learned trees, and the most similar decisions (GDS kNN).
@@ -23,13 +23,13 @@ export async function why(decisionId: string) {
   const chain = await query(
     `MATCH (d:Decision {decision_id: $id})
      MATCH (c:Customer:Entity {source_system: 'stripe'})<-[:ABOUT]-(d)
-     MATCH (x:Decision)-[:ABOUT]->(c) WHERE x.scenario_id = $scenario OR x.scenario_id STARTS WITH 'story:'
+     MATCH (x:Decision)-[:ABOUT]->(c) WHERE x.scenario_id = d.scenario_id
      MATCH (x)-[:MADE_BY]->(a:Actor)
      OPTIONAL MATCH (x)-[k:CONSIDERED]->(o:Option) WHERE k.status IN ['CHOSEN', 'PROPOSED']
      RETURN x.decision_id AS decision_id, x.decision_type AS decision_type, x.stage AS stage,
             x.decided_at AS decided_at, a.name AS actor, collect(o.option_key) AS options
      ORDER BY decided_at`,
-    { id: decisionId, scenario: SCENARIO },
+    { id: decisionId },
   );
 
   const branches = await query(
@@ -50,5 +50,17 @@ export async function why(decisionId: string) {
     { id: decisionId },
   );
 
-  return { ...d, case_chain: chain, tree_branches: branches, similar_decisions: similar };
+  // Where the decision's evidence came from: source records, and for uploads the file, row, load, and mapping.
+  const evidence = await query(
+    `MATCH (:Decision {decision_id: $id})-[:EVIDENCED_BY]->(e:Event)
+     OPTIONAL MATCH (b:UploadBatch {batch_id: e.batch_id})-[:USED_MAPPING]->(m:Mapping)
+     RETURN e.source_system AS source, e.event_type AS record_type, toString(e.occurred_at) AS occurred_at,
+            e.source_file AS file, e.source_row AS row, toString(b.loaded_at) AS loaded_at, b.name AS batch,
+            m.mapping_id AS mapping_id, m.proposed_by AS mapping_by,
+            e.source_file IN coalesce(b.edited_files, []) AS mapping_edited_by_reviewer
+     ORDER BY occurred_at`,
+    { id: decisionId },
+  );
+
+  return { ...d, case_chain: chain, tree_branches: branches, similar_decisions: similar, evidence };
 }
