@@ -1,0 +1,31 @@
+Event ID,Type,id,Created (UTC),Amount,Currency,Customer ID,Customer Email,Customer Name,Charge ID,Dispute Reason,Status,Plan (metadata),Zendesk Ticket (metadata),Initiated By (metadata)
+evt_ELHzByf8nUDv4n,charge,ch_dA195D5KVz9fq0,2026-03-08 16:32:00,15.00,usd,cus_LGlI7Zjsrrz6y8,ivan.cohen90011@example.com,Ivan Cohen,,,succeeded,monthly_15,,
+evt_4CHObbqnFmfA94,charge,ch_MOuYel7MVVoB8b,2026-03-08 23:36:00,15.00,usd,cus_2wqjbJ1vbQHvAz,alex.muller90013@example.com,Alex Muller,,,succeeded,monthly_15,,
+evt_aqCMdLSaFOvjf3,charge,ch_3kepenv9a5Bcy6,2026-03-10 05:42:00,49.00,usd,cus_zJYY7juW7If6J7,hana.silva90002@example.com,Hana Silva,,,succeeded,monthly_49,,
+evt_FmZoxutXEJwZn3,charge,ch_CsmPRwMCEoWfdD,2026-03-18 16:19:00,49.00,usd,cus_4nFrYdHZqf86yy,theo.tanaka90009@example.com,Theo Tanaka,,,succeeded,monthly_49,,
+evt_45aCRW6VqR66eN,charge,ch_IwtW0m2CogBrjX,2026-03-23 15:12:00,300.00,usd,cus_9n18PfQUA04Xk7,elena.chen90006@example.com,Elena Chen,,,succeeded,annual_300,,
+evt_b4B5MjeFsb0rwo,charge,ch_FyBYSZivSqrUrX,2026-03-31 07:58:00,49.00,usd,cus_XEvEzMNBztF1qt,ravi.larsen90003@example.com,Ravi Larsen,,,succeeded,monthly_49,,
+evt_0pI021HBCyl8GI,charge,ch_2yesc9SIyYkl9P,2026-04-01 18:21:00,15.00,usd,cus_pi0irbbUG0J28o,elena.ibrahim90005@example.com,Elena Ibrahim,,,succeeded,monthly_15,,
+evt_xp5MhkTvVWUzzD,charge,ch_wXfPXGBZ3NOBS1,2026-04-03 18:19:00,15.00,usd,cus_hGm5Jn8azMhBhr,mei.haddad90015@example.com,Mei Haddad,,,succeeded,monthly_15,,
+evt_m0SpL5AKjIE4Id,charge,ch_QVfjto3gZ4bxFk,2026-04-05 13:17:00,180.00,usd,cus_RAABjOWy0b0SC5,taylor.kim90004@example.com,Taylor Kim,,,succeeded,annual_180,,
+evt_eY1NlTtQ84U88k,dispute_opened,dp_bAfhr2F1xU96Yu,2026-04-06 04:21:33,15.00,usd,,,,ch_dA195D5KVz9fq0,subscription_canceled,needs_response,,,
+evt_ZPKrnZEDMuSvts,charge,ch_o2MhfptRocnDQf,2026-04-11 15:33:00,180.00,usd,cus_sh6zzUDrb0vTNa,casey.costa90007@example.com,Casey Costa,,,succeeded,annual_180,,
+evt_hkjIunwUUtK560,charge,ch_avYQhICOATKhKP,2026-04-12 20:29:00,180.00,usd,cus_myk2JQimXIJIzP,taylor.garcia90001@example.com,Taylor Garcia,,,succeeded,annual_180,,
+evt_oC3jlzsqikCldo,charge,ch_j9l8HN5gufo6I0,2026-04-13 14:51:00,49.00,usd,cus_HOvy1Udxruvqgl,hana.silva90016@example.com,Hana Silva,,,succeeded,monthly_49,,
+evt_h7CaFdn2UUTlaZ,refund,re_VDoIRWnN0echyL,2026-04-14 22:10:35,90.00,usd,,,,ch_o2MhfptRocnDQf,,succeeded,,600007,zd_b04
+evt_x1SCluHxTkGUH3,dispute_opened,dp_BVWFGmF8xtk6zL,2026-04-15 01:52:38,15.00,usd,,,,ch_MOuYel7MVVoB8b,unrecognized,needs_response,,,
+evt_L5quJNRXsYXpqS,charge,ch_JSJwYrNl7NkIwH,2026-04-18 08:16:00,25.00,usd,cus_ji0HiMzb4i3udZ,quinn.larsen90008@example.com,Quinn Larsen,,,succeeded,monthly_25,,
+evt_16FwFJaVDo8G0c,charge,ch_5jTMoH5jMmlmm3,2026-04-18 16:42:00,25.00,usd,cus_9fS2OW4orKGgdt,lucas.costa90012@example.com,Lucas Costa,,,succeeded,monthly_25,,
+evt_z4TTma0d6pA7im,charge,ch_vBSQIWxhIL8odC,2026-04-19 14:39:00,25.00,usd,cus_IQDNdNQmsttutl,taylor.chen90010@example.com,Taylor Chen,,,succeeded,monthly_25,,
+evt_saBTFB3XaWl3qN,charge,ch_1lIfMgUyFfGBED,2026-04-20 04:51:00,15.00,usd,cus_GAVsAEOSVSKhPD,sofia.smith90014@example.com,Sofia Smith,,,succeeded,monthly_15,,
+evt_M9MIzHUkGX760K,dispute_opened,dp_XH9k9TFm6qxebf,2026-04-25 08:25:46,49.00,usd,,,,ch_CsmPRwMCEoWfdD,fraudulent,needs_response,,,
+evt_8SqA9YcksAwnk5,dispute_opened,dp_Cq2p41yWxdFqeT,2026-04-28 02:36:42,25.00,usd,,,,ch_5jTMoH5jMmlmm3,subscription_canceled,needs_response,,,
+evt_Nr0enmYTlFYysJ,refund,re_CMmplnk7vIWeAQ,2026-04-30 01:55:39,300.00,usd,,,,ch_IwtW0m2CogBrjX,,succeeded,,600006,zd_a10
+evt_alQROKYL6hwoRW,refund,re_7491g4NNGSgVPS,2026-05-02 16:52:48,25.00,usd,,,,ch_vBSQIWxhIL8odC,,succeeded,,600009,zd_b02
+evt_vBXZ9csPmJmpB0,refund,re_zSy1a95uyhIm4V,2026-05-04 02:31:00,25.00,usd,,,,ch_JSJwYrNl7NkIwH,,succeeded,,600008,streamly-support-agent
+evt_gElg143OCZHjaV,dispute_opened,dp_sya9Kyx9kmTjgy,2026-05-21 00:03:52,15.00,usd,,,,ch_1lIfMgUyFfGBED,fraudulent,needs_response,,,
+evt_YMJiuju8blQKMZ,dispute_closed,dp_BVWFGmF8xtk6zL,2026-06-08 05:32:11,15.00,usd,,,,ch_MOuYel7MVVoB8b,unrecognized,won,,,
+evt_CsRtpXa5Ehtru9,dispute_closed,dp_XH9k9TFm6qxebf,2026-06-12 08:33:31,49.00,usd,,,,ch_CsmPRwMCEoWfdD,fraudulent,lost,,,
+evt_gjU9fUGviUJZNT,dispute_closed,dp_bAfhr2F1xU96Yu,2026-06-14 01:13:57,15.00,usd,,,,ch_dA195D5KVz9fq0,subscription_canceled,lost,,,
+evt_8FRQfVXY3XFvGE,dispute_closed,dp_Cq2p41yWxdFqeT,2026-07-06 19:00:01,25.00,usd,,,,ch_5jTMoH5jMmlmm3,subscription_canceled,lost,,,
+evt_mU3y60pTzgCjpi,dispute_closed,dp_sya9Kyx9kmTjgy,2026-07-14 01:37:59,15.00,usd,,,,ch_1lIfMgUyFfGBED,fraudulent,lost,,,

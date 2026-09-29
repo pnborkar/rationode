@@ -1,0 +1,26 @@
+Ticket ID,Audit ID,Event Type,Timestamp (UTC),Requester Email,Requester Name,Subject,Tags,Channel,Stripe Charge ID,Macro Title,Updater ID,Updater Name,Group,Status From,Status To
+600005,zdevt_r3zH23xp0vOa6L,Create,2026-04-09 13:36:55,elena.ibrahim90005@example.com,Elena Ibrahim,The price went up again and it's too expensive for us now,too_expensive,chat,ch_2yesc9SIyYkl9P,,,,,,
+600005,zdevt_j88pmBvrIoQ9uh,Macro applied,2026-04-09 17:19:40,,,,,,,Voucher: 20% credit,zd_b05,Morgan Smith,Team B,,
+600005,zdevt_Wf02zD3CPHjNFs,Status change,2026-04-09 17:22:40,,,,,,,,zd_b05,,,open,solved
+600002,zdevt_3BsHq5Qn7Nkfi2,Create,2026-04-09 21:10:54,hana.silva90002@example.com,Hana Silva,The price went up again and it's too expensive for us now,too_expensive,email,ch_3kepenv9a5Bcy6,,,,,,
+600002,zdevt_nN3Pxof0VUrDka,Macro applied,2026-04-10 04:06:26,,,,,,,Deny refund,zd_a03,Avery Cohen,Team A,,
+600002,zdevt_yqgFPjMErI4HY1,Status change,2026-04-10 04:09:26,,,,,,,,zd_a03,,,open,solved
+600007,zdevt_fgILqNEOOehHxQ,Create,2026-04-14 16:17:58,casey.costa90007@example.com,Casey Costa,The amount charged doesn't match my plan,billing_error,chat,ch_o2MhfptRocnDQf,,,,,,
+600007,zdevt_n9vJd0VBRntxS3,Macro applied,2026-04-14 22:09:35,,,,,,,Refund: partial (50%),zd_b04,Omar Tanaka,Team B,,
+600007,zdevt_DtL1zly9inVE6u,Status change,2026-04-14 22:12:35,,,,,,,,zd_b04,,,open,solved
+600001,zdevt_NHzSCTVP2aztBO,Create,2026-04-20 23:08:44,taylor.garcia90001@example.com,Taylor Garcia,The price went up again and it's too expensive for us now,too_expensive,chat,ch_avYQhICOATKhKP,,,,,,
+600001,zdevt_Y83iUcp5aTsRs7,Status change,2026-04-21 23:45:08,,,,,,,,streamly-support-agent,,,open,solved
+600003,zdevt_rKSEuq4E4vf9BK,Create,2026-04-28 10:51:01,ravi.larsen90003@example.com,Ravi Larsen,The price went up again and it's too expensive for us now,too_expensive,chat,ch_FyBYSZivSqrUrX,,,,,,
+600003,zdevt_QtcVl6yu3oQdOX,Macro applied,2026-04-28 17:02:56,,,,,,,Voucher: 20% credit,zd_a13,Wei Cohen,Team A,,
+600003,zdevt_yKvtemyuNEbASU,Status change,2026-04-28 17:05:56,,,,,,,,zd_a13,,,open,solved
+600006,zdevt_1Zj1ro3NXV2wXb,Create,2026-04-29 23:31:40,elena.chen90006@example.com,Elena Chen,I can't justify paying this much anymore,too_expensive,chat,ch_IwtW0m2CogBrjX,,,,,,
+600006,zdevt_bBG1iKdQ1E2xF2,Macro applied,2026-04-30 01:54:39,,,,,,,Refund: full,zd_a10,Omar Ibrahim,Team A,,
+600006,zdevt_Idpgb4NmhyNSc9,Status change,2026-04-30 01:57:39,,,,,,,,zd_a10,,,open,solved
+600009,zdevt_1bW8xUYHdd3tMh,Create,2026-05-02 13:46:58,taylor.chen90010@example.com,Taylor Chen,I was charged twice this month,billing_error,email,ch_vBSQIWxhIL8odC,,,,,,
+600009,zdevt_uxOTk2wYFtfEmO,Macro applied,2026-05-02 16:51:48,,,,,,,Refund: full,zd_b02,Mei Muller,Team B,,
+600009,zdevt_XMjzfLEz5aIqlG,Status change,2026-05-02 16:54:48,,,,,,,,zd_b02,,,open,solved
+600008,zdevt_iTd4VOPvVii4zP,Create,2026-05-03 02:08:17,quinn.larsen90008@example.com,Quinn Larsen,I was charged twice this month,billing_error,chat,ch_JSJwYrNl7NkIwH,,,,,,
+600008,zdevt_hWpKepQlcRuICQ,Status change,2026-05-04 02:33:00,,,,,,,,streamly-support-agent,,,open,solved
+600004,zdevt_3vG2lozr8w8VGh,Create,2026-05-10 16:46:11,taylor.kim90004@example.com,Taylor Kim,I can't justify paying this much anymore,too_expensive,chat,ch_QVfjto3gZ4bxFk,,,,,,
+600004,zdevt_OuWdzA2680l4Cu,Macro applied,2026-05-10 18:05:38,,,,,,,Pause subscription,zd_a05,Leah Mensah,Team A,,
+600004,zdevt_DTQ0wu6Xw8VqRi,Status change,2026-05-10 18:08:38,,,,,,,,zd_a05,,,open,solved

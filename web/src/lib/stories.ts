@@ -60,10 +60,10 @@ export async function removeSet(n: number) {
   return { removed, branchesRestored: touched.length };
 }
 
-// Remove every loaded set and the live tab's decisions; the history is never touched.
+// Remove every loaded set, uploaded batch, and the live tab's decisions; the history is never touched.
 export async function resetAll() {
   const scenarios = (await query<{ s: string }>(
-    `MATCH (d:Event) WHERE d.scenario_id STARTS WITH 'story:' OR d.scenario_id = 'live'
+    `MATCH (d:Event) WHERE d.scenario_id STARTS WITH 'story:' OR d.scenario_id STARTS WITH 'upload:' OR d.scenario_id = 'live'
      RETURN DISTINCT d.scenario_id AS s`)).map((r) => r.s);
   for (const extra of ["live"]) if (!scenarios.includes(extra)) scenarios.push(extra);
   let removed = 0;

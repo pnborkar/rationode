@@ -1,0 +1,17 @@
+screen_id,screened_at,charge_reference,email,amount,plan,renewal,risk_score,ip_country_match,card_age_days,outcome,rule
+scr_KJXtFuNxW7r3GP,2026-03-08T16:31:58Z,ch_dA195D5KVz9fq0,ivan.cohen90011@example.com,15.0,monthly_15,Y,14,Y,904,APPROVE,R-APPROVE-LE75
+scr_rbnRUgnfiU2z7c,2026-03-08T23:35:58Z,ch_MOuYel7MVVoB8b,alex.muller90013@example.com,15.0,monthly_15,Y,19,Y,1127,APPROVE,R-APPROVE-LE75
+scr_Dufw6LhIMXzxgD,2026-03-10T05:41:58Z,ch_3kepenv9a5Bcy6,hana.silva90002@example.com,49.0,monthly_49,Y,26,Y,585,APPROVE,R-APPROVE-LE75
+scr_47zgxEFAeVVAlU,2026-03-18T16:18:58Z,ch_CsmPRwMCEoWfdD,theo.tanaka90009@example.com,49.0,monthly_49,Y,17,Y,0,APPROVE,R-APPROVE-LE75
+scr_OR2bG1b8pcJUpq,2026-03-23T15:11:58Z,ch_IwtW0m2CogBrjX,elena.chen90006@example.com,300.0,annual_300,Y,20,Y,1806,APPROVE,R-APPROVE-LE75
+scr_QdXIdTcbt36Uy2,2026-03-31T07:57:58Z,ch_FyBYSZivSqrUrX,ravi.larsen90003@example.com,49.0,monthly_49,Y,39,Y,341,APPROVE,R-APPROVE-LE75
+scr_t9UQHv101SNpi4,2026-04-01T18:20:58Z,ch_2yesc9SIyYkl9P,elena.ibrahim90005@example.com,15.0,monthly_15,Y,27,Y,1058,APPROVE,R-APPROVE-LE75
+scr_1rp7BRDyG42GQw,2026-04-03T18:18:58Z,ch_wXfPXGBZ3NOBS1,mei.haddad90015@example.com,15.0,monthly_15,Y,19,Y,1604,APPROVE,R-APPROVE-LE75
+scr_qJtikwvEdH9ljk,2026-04-05T13:16:58Z,ch_QVfjto3gZ4bxFk,taylor.kim90004@example.com,180.0,annual_180,Y,18,Y,1405,APPROVE,R-APPROVE-LE75
+scr_48xts4xaRLrGYE,2026-04-11T15:32:58Z,ch_o2MhfptRocnDQf,casey.costa90007@example.com,180.0,annual_180,Y,21,Y,697,APPROVE,R-APPROVE-LE75
+scr_fz2f5K2fKzNHhp,2026-04-12T20:28:58Z,ch_avYQhICOATKhKP,taylor.garcia90001@example.com,180.0,annual_180,Y,21,Y,295,APPROVE,R-APPROVE-LE75
+scr_91j3PDW08hDRen,2026-04-13T14:50:58Z,ch_j9l8HN5gufo6I0,hana.silva90016@example.com,49.0,monthly_49,Y,29,Y,1755,APPROVE,R-APPROVE-LE75
+scr_AqUaoP5ILq7wwF,2026-04-18T08:15:58Z,ch_JSJwYrNl7NkIwH,quinn.larsen90008@example.com,25.0,monthly_25,Y,31,Y,57,APPROVE,R-APPROVE-LE75
+scr_v456n5Gk9XdaRi,2026-04-18T16:41:58Z,ch_5jTMoH5jMmlmm3,lucas.costa90012@example.com,25.0,monthly_25,Y,20,Y,1239,APPROVE,R-APPROVE-LE75
+scr_RsWonZb8IOw9Rc,2026-04-19T14:38:58Z,ch_vBSQIWxhIL8odC,taylor.chen90010@example.com,25.0,monthly_25,Y,49,Y,557,APPROVE,R-APPROVE-LE75
+scr_C9qDA6y0CUhb8z,2026-04-20T04:50:58Z,ch_1lIfMgUyFfGBED,sofia.smith90014@example.com,15.0,monthly_15,N,66,Y,6,APPROVE,R-APPROVE-LE75

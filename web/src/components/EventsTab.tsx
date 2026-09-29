@@ -4,6 +4,7 @@
 // and see the story emerge, its journey in the graph, and the tree branches it updates.
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
+import ConnectSource from "./ConnectSource";
 import type { ViewNode, ViewRel } from "./GraphView";
 
 const GraphView = dynamic(() => import("./GraphView"), { ssr: false });
@@ -49,13 +50,27 @@ export default function EventsTab({ active, onChanged }: { active: boolean; onCh
   const [history, setHistory] = useState<StreamEvent[]>([]);   // earlier phase's events for the current set
   const [graph, setGraph] = useState<{ nodes: ViewNode[]; rels: ViewRel[] }>({ nodes: [], rels: [] });
   const [mode, setMode] = useState<"graph" | "table">("graph");
+  const [connect, setConnect] = useState(false);
+  const [uploads, setUploads] = useState<{ scenario: string; events: number; decisions: number; customers: number }[]>([]);
 
-  const refresh = () => fetch("/api/stories").then((r) => r.json()).then(setSets);
+  const refresh = () => Promise.all([
+    fetch("/api/stories").then((r) => r.json()).then(setSets),
+    fetch("/api/upload").then((r) => r.json()).then(setUploads),
+  ]);
   useEffect(() => {
     let alive = true;
     fetch("/api/stories").then((r) => r.json()).then((s) => { if (alive) setSets(s); });
+    fetch("/api/upload").then((r) => r.json()).then((u) => { if (alive) setUploads(u); });
     return () => { alive = false; };
   }, []);
+
+  async function removeUpload(scenario: string) {
+    setBusy(`remove-${scenario}`);
+    await fetch(`/api/upload?scenario=${encodeURIComponent(scenario)}`, { method: "DELETE" });
+    await refresh();
+    onChanged();
+    setBusy(null);
+  }
 
   // Reveal streamed events one at a time.
   useEffect(() => {
@@ -148,15 +163,35 @@ export default function EventsTab({ active, onChanged }: { active: boolean; onCh
               </div>
             </div>
           ))}
+          <div className={`rounded-lg border p-3 ${connect ? "border-emerald-700 bg-emerald-950/30" : "border-zinc-800 bg-zinc-950"}`}>
+            <p className="font-semibold">Connect a source</p>
+            <p className="mt-1 text-xs text-zinc-500">Upload exports; Claude maps them onto the event contract and you see the mapping.</p>
+            <button onClick={() => setConnect(!connect)} disabled={streaming}
+                    className="mt-2 rounded-md bg-emerald-600 px-3 py-1 text-xs font-semibold text-white disabled:opacity-40">
+              {connect ? "Back to events" : "Open"}</button>
+            {uploads.map((u) => (
+              <div key={u.scenario} className="mt-2 flex items-center justify-between gap-2 text-xs">
+                <span className="truncate font-mono text-zinc-300" title={`${u.events} events · ${u.decisions} decisions`}>
+                  {u.scenario} <span className="text-zinc-500">· {u.customers} customers</span></span>
+                <button onClick={() => removeUpload(u.scenario)} disabled={!!busy}
+                        className="rounded-md bg-zinc-800 px-2 py-0.5 disabled:opacity-40">
+                  {busy === `remove-${u.scenario}` ? "…" : "Remove"}</button>
+              </div>
+            ))}
+          </div>
           <button onClick={resetAll} disabled={!!busy || streaming}
                   className="w-full rounded-md border border-zinc-700 py-1.5 text-xs text-zinc-300 disabled:opacity-40">
-            {busy === "reset" ? "Resetting…" : "Reset all (removes loaded sets and live decisions; history untouched)"}
+            {busy === "reset" ? "Resetting…" : "Reset all (removes loaded sets, uploads, and live decisions; history untouched)"}
           </button>
         </div>
       </section>
 
+      <div className={connect ? "col-span-2 flex min-h-0" : "hidden"}>
+        <ConnectSource active={active && connect} onClose={() => setConnect(false)} onChanged={() => { refresh(); onChanged(); }} />
+      </div>
+
       {/* Incoming events */}
-      <section className="flex min-h-0 flex-col rounded-xl border border-zinc-800 bg-zinc-900/60">
+      <section className={`${connect ? "hidden" : "flex"} min-h-0 flex-col rounded-xl border border-zinc-800 bg-zinc-900/60`}>
         <header className="flex items-center justify-between rounded-t-xl border-b border-zinc-800 bg-zinc-800/70 px-4 py-2">
           <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Incoming events</h2>
           {result && <span className="text-xs text-zinc-500">Set {result.set} · {result.phase}</span>}
@@ -197,7 +232,7 @@ export default function EventsTab({ active, onChanged }: { active: boolean; onCh
       </section>
 
       {/* Story, journey, trees */}
-      <section className="flex min-h-0 flex-col gap-3">
+      <section className={`${connect ? "hidden" : "flex"} min-h-0 flex-col gap-3`}>
         <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
           {result && !streaming ? (
             <>
@@ -220,7 +255,7 @@ export default function EventsTab({ active, onChanged }: { active: boolean; onCh
             </span>
           </header>
           <div className="min-h-0 flex-1">
-            {active && graph.nodes.length > 0 && !streaming &&
+            {active && !connect && graph.nodes.length > 0 && !streaming &&
               (mode === "graph" ? <GraphView nodes={graph.nodes} rels={graph.rels} /> : <GraphTable nodes={graph.nodes} rels={graph.rels} />)}
           </div>
         </div>
