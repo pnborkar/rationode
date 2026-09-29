@@ -13,6 +13,8 @@ import type { ViewNode, ViewRel } from "./GraphView";
 const GraphView = dynamic(() => import("./GraphView"), { ssr: false });
 
 const SAMPLE_DIR = "/samples/streamly-spring";
+const TENANT = process.env.NEXT_PUBLIC_RATIONODE_TENANT ?? "history";
+const DEMO = TENANT === "history";
 const SAMPLE_FILES = ["zendesk_ticket_events.csv", "stripe_activity.csv", "support_agent_tool_calls.jsonl",
                       "fraudguard_screening.csv", "subscriptions.csv", "app_usage_weekly.csv"];
 
@@ -54,6 +56,10 @@ export default function ConnectSource({ active, onClose, onChanged }: { active: 
   const [result, setResult] = useState<RunResult | null>(null);
   const [graph, setGraph] = useState<{ email: string; nodes: ViewNode[]; rels: ViewRel[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [dbx, setDbx] = useState<{ configured: boolean; schema?: string } | null>(null);
+  useEffect(() => {
+    fetch("/api/databricks?check=1").then((r) => r.json()).then(setDbx).catch(() => setDbx({ configured: false }));
+  }, []);
 
   const parsed = useMemo(() => {
     const out: Record<string, ParsedFile | string> = {};
@@ -78,6 +84,25 @@ export default function ConnectSource({ active, onClose, onChanged }: { active: 
     const next = await Promise.all(SAMPLE_FILES.map(async (n) => ({ name: n, content: await (await fetch(`${SAMPLE_DIR}/${n}`)).text() })));
     setName("streamly-spring");
     reset(next);
+    setBusy(null);
+  }
+
+  // Databricks: every table in the configured schema, read through the SQL API, each treated as one source.
+  async function useDatabricks() {
+    setBusy("files"); setError(null);
+    try {
+      const listing = await (await fetch("/api/databricks")).json();
+      if (listing.error) throw new Error(listing.error);
+      const tables = (listing.tables as { table: string }[]).map((t) => t.table);
+      const res = await fetch("/api/databricks", { method: "POST", headers: { "content-type": "application/json" },
+                                                   body: JSON.stringify({ tables }) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? res.statusText);
+      setName(DEMO ? "databricks" : TENANT);
+      reset((data as { name: string; content: string }[]).map((t) => ({ name: t.name, content: t.content })));
+    } catch (e) {
+      setError(`Databricks: ${(e as Error).message}`);
+    }
     setBusy(null);
   }
 
@@ -165,6 +190,11 @@ export default function ConnectSource({ active, onClose, onChanged }: { active: 
       <div className="flex flex-wrap items-center gap-2 border-b border-zinc-800 px-4 py-2 text-xs">
         <button onClick={useSamples} disabled={!!busy} className="rounded-md bg-zinc-700 px-3 py-1 font-semibold disabled:opacity-40">
           {busy === "files" ? "Loading…" : "Use sample exports (6 files)"}</button>
+        {dbx?.configured && (
+          <button onClick={useDatabricks} disabled={!!busy} className="rounded-md bg-orange-700 px-3 py-1 font-semibold text-white disabled:opacity-40"
+                  title={`Read every table in ${dbx.schema} through the Databricks SQL API`}>
+            {busy === "files" ? "Reading…" : `Load tables from Databricks (${dbx.schema})`}</button>
+        )}
         <label className="cursor-pointer rounded-md border border-zinc-700 px-3 py-1">
           Upload files…
           <input type="file" multiple accept=".csv,.jsonl,.ndjson" className="hidden" onChange={(e) => pickFiles(e.target.files)} />
@@ -195,6 +225,8 @@ export default function ConnectSource({ active, onClose, onChanged }: { active: 
             a deterministic validator checks it and dry-runs the detector, and only then is anything written.</p>
           <p className="mt-2 text-xs text-zinc-500">The sample exports are simulated Streamly data (16 new customers, spring 2026).
             Everything shown after mapping is computed live from the files.</p>
+          {!DEMO && <p className="mt-2 text-xs text-amber-300">Tenant <span className="font-mono">{TENANT}</span>: what you load here
+            becomes this tenant&apos;s history (then build its trees with the pipeline).</p>}
         </div>
       ) : (
         <div className="grid min-h-0 flex-1 grid-cols-[230px_1fr]">

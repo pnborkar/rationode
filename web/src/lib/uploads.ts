@@ -11,7 +11,7 @@ import { validate, type Validation } from "./validator";
 
 export type UploadedFile = { name: string; content: string };
 
-export const MAX_FILE_BYTES = 2_000_000;
+export const MAX_FILE_BYTES = 30_000_000;   // tables from Databricks can be larger than uploads
 
 export async function loadRegistry(): Promise<Registry> {
   return registryFrom(await query(REGISTRY_CYPHER));
@@ -27,7 +27,7 @@ export function scenarioFor(name: string): string {
 
 export function parseAll(files: UploadedFile[]): ParsedFile[] {
   return files.map((f) => {
-    if (f.content.length > MAX_FILE_BYTES) throw new Error(`${f.name} is larger than 2 MB`);
+    if (f.content.length > MAX_FILE_BYTES) throw new Error(`${f.name} is larger than 30 MB`);
     return parseFile(f.name, f.content);
   });
 }

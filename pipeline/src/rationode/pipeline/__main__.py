@@ -2,6 +2,7 @@
 
     uv run python -m rationode.pipeline ingest history_events.jsonl [--scenario history]
     uv run python -m rationode.pipeline reset --scenario history
+    uv run python -m rationode.pipeline remove-tenant dbx
     uv run python -m rationode.pipeline stats
     uv run python -m rationode.pipeline dana
 """
@@ -16,7 +17,8 @@ from rationode.pipeline.detect import Detector
 from rationode.pipeline.write import load_registry, write
 
 GENERATED = REPO_ROOT / "data" / "generated"
-SCENARIO_LABELS = ["DecisionPoint", "DecisionTree", "Event", "Decision", "Context", "Entity", "Outcome", "Actor"]
+SCENARIO_LABELS = ["DecisionPoint", "DecisionTree", "Event", "Decision", "Context", "Entity", "Outcome", "Actor",
+                   "UploadBatch"]
 
 
 def ingest(path: str, scenario: str) -> None:
@@ -52,6 +54,18 @@ def reset(scenario: str) -> None:
                            "WHERE e.key = e.decision_type + '.' + o.option_key "
                            "DETACH DELETE e, c, o")
             print(f"  proposed schema elements deleted {result.consume().counters.nodes_deleted}")
+
+
+def remove_tenant(tenant: str) -> None:
+    """A tenant other than the demo (demo spec §21): its history, trees, loads and live data."""
+    if tenant == "history" or tenant.startswith(("story:", "upload:")) or tenant == "live":
+        raise SystemExit("refusing: that is the demo's data, not a tenant")
+    for scenario in (tenant, f"{tenant}:live"):
+        print(f"{scenario}:")
+        reset(scenario)
+    with driver() as d:
+        d.execute_query("MATCH (m:Mapping) WHERE NOT EXISTS { (:UploadBatch)-[:USED_MAPPING]->(m) } DELETE m",
+                        database_=database())
 
 
 def stats() -> None:
@@ -99,6 +113,8 @@ def main() -> None:
     p.add_argument("--scenario", default="history")
     p = sub.add_parser("reset")
     p.add_argument("--scenario", required=True)
+    p = sub.add_parser("remove-tenant")
+    p.add_argument("tenant")
     sub.add_parser("stats")
     sub.add_parser("dana")
     args = parser.parse_args()
@@ -106,6 +122,8 @@ def main() -> None:
         ingest(args.file, args.scenario)
     elif args.cmd == "reset":
         reset(args.scenario)
+    elif args.cmd == "remove-tenant":
+        remove_tenant(args.tenant)
     elif args.cmd == "stats":
         stats()
     else:
