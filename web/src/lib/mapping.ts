@@ -104,12 +104,15 @@ export function profile(f: ParsedFile, samples = 8) {
       distinct[col] = [...counts].map(([value, count]) => ({ value, count })).sort((a, b) => b.count - a.count);
     }
   }
-  // Samples: the first row of each value of the most "type-like" column, then fill from the top.
-  const typeCol = Object.entries(distinct).sort((a, b) => a[1].length - b[1].length).find(([, v]) => v.length > 1)?.[0];
+  // Samples: a row for every value of every "type-like" column (fewest values first), so each record
+  // kind is seen even when a true/false column has fewer values than the type column; then fill from
+  // the top. Lakehouse tables have many such columns, so coverage may go past `samples`.
   const picked: Record_[] = [];
-  if (typeCol) for (const { value } of distinct[typeCol]) {
-    const r = f.rows.find((x) => String(x[typeCol]) === value);
-    if (r && picked.length < samples) picked.push(r);
+  const typeCols = Object.entries(distinct).filter(([, v]) => v.length > 1).sort((a, b) => a[1].length - b[1].length);
+  for (const [col, values] of typeCols) for (const { value } of values) {
+    if (picked.some((x) => String(x[col]) === value)) continue;
+    const r = f.rows.find((x) => String(x[col]) === value);
+    if (r && picked.length < samples * 2) picked.push(r);
   }
   for (const r of f.rows) if (picked.length < samples && !picked.includes(r)) picked.push(r);
   return { file: f.name, format: f.format, rows: f.rows.length, columns: f.columns, distinct, samples: picked };
