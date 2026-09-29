@@ -225,16 +225,19 @@ const toUploadCases = (rows: UploadedCase[]): LiveCase[] => rows.map((u, i) => (
     : undefined,
 }));
 
-// A tenant's customers grouped by their case (hundreds of customers, a handful of questions), largest
-// group first: the dropdown lists the questions, the chat box the customers who asked the one chosen.
-// Names repeat, so a repeated name within a group shows the email's name part too.
-function byQuestion(cases: LiveCase[]): [string, (LiveCase & { sameName: boolean })[]][] {
+// Uploaded customers (demo or tenant) grouped by batch and case: hundreds of customers, a handful of questions.
+// The dropdown lists the questions per batch, largest first; the chat box lists the customers who asked the one
+// chosen. Names repeat, so a repeated name within a group shows the email's name part too.
+type Group = { key: string; scenario: string; question: string; cases: (LiveCase & { sameName: boolean })[] };
+const groupKey = (c: LiveCase) => `${c.scenario ?? ""}\u0000${c.question ?? ""}`;
+function byQuestion(cases: LiveCase[]): Group[] {
   const groups = new Map<string, LiveCase[]>();
-  for (const c of cases) groups.set(c.question ?? "", [...(groups.get(c.question ?? "") ?? []), c]);
-  return [...groups].sort((a, b) => b[1].length - a[1].length).map(([q, cs]) => {
+  for (const c of cases) groups.set(groupKey(c), [...(groups.get(groupKey(c)) ?? []), c]);
+  return [...groups].sort((a, b) => b[1].length - a[1].length).map(([key, cs]) => {
     const count = new Map<string, number>();
     cs.forEach((c) => count.set(c.name, (count.get(c.name) ?? 0) + 1));
-    return [q, [...cs].sort((a, b) => a.name.localeCompare(b.name)).map((c) => ({ ...c, sameName: count.get(c.name)! > 1 }))];
+    return { key, scenario: cs[0].scenario ?? "", question: cs[0].question ?? "",
+             cases: [...cs].sort((a, b) => a.name.localeCompare(b.name)).map((c) => ({ ...c, sameName: count.get(c.name)! > 1 })) };
   });
 }
 const capital = (s: string) => s.replace(/^./, (x) => x.toUpperCase());
@@ -245,15 +248,17 @@ export default function StreamlyLive() {
   const [uploadCases, setUploadCases] = useState<LiveCase[]>([]);
   const cases = [...PREPARED, ...storyCases, ...uploadCases];
   const [caseKey, setCaseKey] = useState((PREPARED[0] ?? EMPTY).key);
-  // Another tenant: the question chosen in the dropdown; caseKey "pick" until a customer who asked it is picked.
+  // Uploaded customers: the question group chosen in the dropdown (batch + question); caseKey "pick" until a
+  // customer who asked it is picked.
   const [question, setQuestion] = useState("");
   const [customerFilter, setCustomerFilter] = useState("");
-  const groups = DEMO ? [] : byQuestion(uploadCases);
-  const asked = groups.find(([q]) => q === question)?.[1] ?? [];
+  const groups = byQuestion(uploadCases);
+  const asked = groups.find((g) => g.key === question)?.cases ?? [];
   const current = cases.find((c) => c.key === caseKey)
     ?? (caseKey === "pick" ? { ...EMPTY, key: "pick", name: "", blurb: `${asked.length} customers asked this. Pick one to answer.` }
       : PREPARED[0] ?? cases[0] ?? EMPTY);
   const TICKET = current.ticket_id;
+  const isUpload = caseKey === "pick" || uploadCases.some((c) => c.key === caseKey);
   const [graphOn, setGraphOn] = useState(true);
   const [message, setMessage] = useState((PREPARED[0] ?? EMPTY).message);
   const [chat, setChat] = useState<{ from: "sam" | "agent"; text: string }[]>([]);
@@ -303,7 +308,7 @@ export default function StreamlyLive() {
       setUploadCases(u);
       // Another tenant has no prepared customers: start on its most-asked question.
       const [first] = byQuestion(u);
-      if (!DEMO && first && caseKeyRef.current === "none") { setQuestion(first[0]); setCaseKey("pick"); setMessage(""); }
+      if (!DEMO && first && caseKeyRef.current === "none") { setQuestion(first.key); setCaseKey("pick"); setMessage(""); }
     });
     return () => { alive = false; };
   }, []);
@@ -579,24 +584,18 @@ export default function StreamlyLive() {
 
       <div className={tab === "live" ? "grid min-h-0 flex-1 grid-cols-2 grid-rows-6 gap-3" : "hidden"}>
         <Panel title="Streamly help chat" className="col-start-1 row-span-4 row-start-1" badge={
-          DEMO ? (
-          <select value={caseKey} onChange={(e) => pickCase(e.target.value)} disabled={running}
-                  className="rounded-md border border-zinc-700 bg-zinc-950 px-2 py-0.5 text-xs text-zinc-200">
+          <select value={isUpload ? `q:${question}` : caseKey} disabled={running}
+                  onChange={(e) => (e.target.value.startsWith("q:") ? pickQuestion(e.target.value.slice(2)) : pickCase(e.target.value))}
+                  className="max-w-[26rem] rounded-md border border-zinc-700 bg-zinc-950 px-2 py-0.5 text-xs text-zinc-200">
             {current.key === "none" && <option value="none">No customers yet</option>}
             {[...PREPARED, ...storyCases].map((c) => <option key={c.key} value={c.key}>{c.name}{c.setNumber ? ` (Set ${c.setNumber})` : ""}</option>)}
-            {[...new Set(uploadCases.map((c) => c.scenario))].map((sc) => (
+            {[...new Set(groups.map((g) => g.scenario))].map((sc) => (
               <optgroup key={sc} label={`Uploaded · ${sc}`}>
-                {uploadCases.filter((c) => c.scenario === sc).map((c) => <option key={c.key} value={c.key}>{c.name}</option>)}
+                {groups.filter((g) => g.scenario === sc).map((g) => (
+                  <option key={g.key} value={`q:${g.key}`}>{capital(g.question)} ({g.cases.length})</option>))}
               </optgroup>
             ))}
-          </select>
-          ) : (
-          <select value={question} onChange={(e) => pickQuestion(e.target.value)} disabled={running}
-                  className="max-w-[26rem] rounded-md border border-zinc-700 bg-zinc-950 px-2 py-0.5 text-xs text-zinc-200">
-            {!groups.length && <option value="">No customers yet</option>}
-            {groups.map(([q, cs]) => <option key={q} value={q}>{capital(q)} ({cs.length})</option>)}
-          </select>
-          )}>
+          </select>}>
           <div className="flex h-full flex-col">
             <div className="mb-3 flex items-start gap-2 rounded-md bg-zinc-950/60 px-3 py-2 text-xs text-zinc-400">
               <div className="flex-1">
@@ -615,7 +614,7 @@ export default function StreamlyLive() {
                   Clear {current.name.split(" ")[0]}&apos;s live decisions ({liveOfCustomer.decisions})</button>
               )}
             </div>
-            {!DEMO && !running && chat.length === 0 && asked.length > 0 && (
+            {isUpload && !running && chat.length === 0 && asked.length > 0 && (
               <div className="mb-3 flex min-h-0 flex-1 flex-col rounded-md border border-zinc-800">
                 <input value={customerFilter} onChange={(e) => setCustomerFilter(e.target.value)}
                        placeholder={`Filter ${asked.length} customers by name or email`}
@@ -634,7 +633,7 @@ export default function StreamlyLive() {
                 </ul>
               </div>
             )}
-            <div className={`space-y-3 ${!DEMO && chat.length === 0 ? "" : "flex-1"}`}>
+            <div className={`space-y-3 ${isUpload && chat.length === 0 ? "" : "flex-1"}`}>
               {chat.map((m, i) => (
                 <div key={i} className={`max-w-[85%] rounded-2xl px-4 py-2 text-sm ${
                   m.from === "sam" ? "ml-auto bg-violet-600 text-white" : "bg-zinc-800"}`}>
