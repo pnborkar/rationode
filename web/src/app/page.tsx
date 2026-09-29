@@ -225,17 +225,18 @@ const toUploadCases = (rows: UploadedCase[]): LiveCase[] => rows.map((u, i) => (
 }));
 
 // A tenant's customers grouped by their case (hundreds of customers, a handful of questions), largest
-// group first; names repeat, so a repeated name within a group shows the email's name part too.
+// group first: the dropdown lists the questions, the chat box the customers who asked the one chosen.
+// Names repeat, so a repeated name within a group shows the email's name part too.
 function byQuestion(cases: LiveCase[]): [string, (LiveCase & { sameName: boolean })[]][] {
   const groups = new Map<string, LiveCase[]>();
   for (const c of cases) groups.set(c.question ?? "", [...(groups.get(c.question ?? "") ?? []), c]);
   return [...groups].sort((a, b) => b[1].length - a[1].length).map(([q, cs]) => {
     const count = new Map<string, number>();
     cs.forEach((c) => count.set(c.name, (count.get(c.name) ?? 0) + 1));
-    return [q.replace(/^./, (x) => x.toUpperCase()),
-            [...cs].sort((a, b) => a.name.localeCompare(b.name)).map((c) => ({ ...c, sameName: count.get(c.name)! > 1 }))];
+    return [q, [...cs].sort((a, b) => a.name.localeCompare(b.name)).map((c) => ({ ...c, sameName: count.get(c.name)! > 1 }))];
   });
 }
+const capital = (s: string) => s.replace(/^./, (x) => x.toUpperCase());
 
 export default function StreamlyLive() {
   const [tab, setTab] = useState<"live" | "events">("live");
@@ -243,7 +244,14 @@ export default function StreamlyLive() {
   const [uploadCases, setUploadCases] = useState<LiveCase[]>([]);
   const cases = [...PREPARED, ...storyCases, ...uploadCases];
   const [caseKey, setCaseKey] = useState((PREPARED[0] ?? EMPTY).key);
-  const current = cases.find((c) => c.key === caseKey) ?? PREPARED[0] ?? cases[0] ?? EMPTY;
+  // Another tenant: the question chosen in the dropdown; caseKey "pick" until a customer who asked it is picked.
+  const [question, setQuestion] = useState("");
+  const [customerFilter, setCustomerFilter] = useState("");
+  const groups = DEMO ? [] : byQuestion(uploadCases);
+  const asked = groups.find(([q]) => q === question)?.[1] ?? [];
+  const current = cases.find((c) => c.key === caseKey)
+    ?? (caseKey === "pick" ? { ...EMPTY, key: "pick", name: "", blurb: `${asked.length} customers asked this. Pick one to answer.` }
+      : PREPARED[0] ?? cases[0] ?? EMPTY);
   const TICKET = current.ticket_id;
   const [graphOn, setGraphOn] = useState(true);
   const [message, setMessage] = useState((PREPARED[0] ?? EMPTY).message);
@@ -273,7 +281,7 @@ export default function StreamlyLive() {
     setStoryCases(s);
     setUploadCases(u);
     // The selected customer's set or batch was removed: start over on the first live case.
-    if (![...PREPARED, ...s, ...u].some((c) => c.key === caseKeyRef.current)) {
+    if (caseKeyRef.current !== "pick" && ![...PREPARED, ...s, ...u].some((c) => c.key === caseKeyRef.current)) {
       const first = PREPARED[0] ?? u[0] ?? EMPTY;
       setCaseKey(first.key);
       setMessage(first.message);
@@ -288,8 +296,9 @@ export default function StreamlyLive() {
       if (!alive) return;
       const u = toUploadCases(rows);
       setUploadCases(u);
-      // Another tenant has no prepared customers: start on its first customer with a case.
-      if (!DEMO && u[0] && caseKeyRef.current === "none") { setCaseKey(u[0].key); setMessage(u[0].message); }
+      // Another tenant has no prepared customers: start on its most-asked question.
+      const [first] = byQuestion(u);
+      if (!DEMO && first && caseKeyRef.current === "none") { setQuestion(first[0]); setCaseKey("pick"); setMessage(""); }
     });
     return () => { alive = false; };
   }, []);
@@ -347,6 +356,15 @@ export default function StreamlyLive() {
     const next = cases.find((c) => c.key === key) ?? PREPARED[0] ?? cases[0] ?? EMPTY;
     setCaseKey(key);
     setMessage(next.message);
+    setBase({ nodes: [], rels: [] });
+    reset();
+  }
+
+  function pickQuestion(q: string) {
+    setQuestion(q);
+    setCustomerFilter("");
+    setCaseKey("pick");
+    setMessage("");
     setBase({ nodes: [], rels: [] });
     reset();
   }
@@ -491,7 +509,8 @@ export default function StreamlyLive() {
                   via {s.via}{s.ms != null ? ` · ${s.ms} ms` : ""}{s.via === "Rationode gateway" ? " · recorded for the decision graph" : ""}</p>}
               </div>
             ))}
-            {!steps.length && !running && <p className="text-sm text-zinc-500">Send {current.name.split(" ")[0]}&apos;s message to start.</p>}
+            {!steps.length && !running && <p className="text-sm text-zinc-500">
+              {current.key === "pick" ? "Pick a customer in the help chat to start." : <>Send {current.name.split(" ")[0]}&apos;s message to start.</>}</p>}
           </div>
   );
 
@@ -551,22 +570,26 @@ export default function StreamlyLive() {
         <EventsTab active={tab === "events"} onChanged={refreshStories} />
       </div>
 
-      <div className={tab === "live" ? "grid min-h-0 flex-1 grid-cols-2 grid-rows-2 gap-3" : "hidden"}>
-        <Panel title="Streamly help chat" badge={
+      <div className={tab === "live" ? "grid min-h-0 flex-1 grid-cols-2 grid-rows-6 gap-3" : "hidden"}>
+        <Panel title="Streamly help chat" className="col-start-1 row-span-4 row-start-1" badge={
+          DEMO ? (
           <select value={caseKey} onChange={(e) => pickCase(e.target.value)} disabled={running}
                   className="rounded-md border border-zinc-700 bg-zinc-950 px-2 py-0.5 text-xs text-zinc-200">
             {current.key === "none" && <option value="none">No customers yet</option>}
             {[...PREPARED, ...storyCases].map((c) => <option key={c.key} value={c.key}>{c.name}{c.setNumber ? ` (Set ${c.setNumber})` : ""}</option>)}
-            {DEMO ? [...new Set(uploadCases.map((c) => c.scenario))].map((sc) => (
+            {[...new Set(uploadCases.map((c) => c.scenario))].map((sc) => (
               <optgroup key={sc} label={`Uploaded · ${sc}`}>
                 {uploadCases.filter((c) => c.scenario === sc).map((c) => <option key={c.key} value={c.key}>{c.name}</option>)}
               </optgroup>
-            )) : byQuestion(uploadCases).map(([q, cs]) => (
-              <optgroup key={q} label={`${q} (${cs.length})`}>
-                {cs.map((c) => <option key={c.key} value={c.key}>{c.name}{c.sameName ? ` (${c.email.split("@")[0]})` : ""}</option>)}
-              </optgroup>
             ))}
-          </select>}>
+          </select>
+          ) : (
+          <select value={question} onChange={(e) => pickQuestion(e.target.value)} disabled={running}
+                  className="max-w-[26rem] rounded-md border border-zinc-700 bg-zinc-950 px-2 py-0.5 text-xs text-zinc-200">
+            {!groups.length && <option value="">No customers yet</option>}
+            {groups.map(([q, cs]) => <option key={q} value={q}>{capital(q)} ({cs.length})</option>)}
+          </select>
+          )}>
           <div className="flex h-full flex-col">
             <div className="mb-3 flex items-start gap-2 rounded-md bg-zinc-950/60 px-3 py-2 text-xs text-zinc-400">
               <div className="flex-1">
@@ -585,7 +608,26 @@ export default function StreamlyLive() {
                   Clear {current.name.split(" ")[0]}&apos;s live decisions ({liveOfCustomer.decisions})</button>
               )}
             </div>
-            <div className="flex-1 space-y-3">
+            {!DEMO && !running && chat.length === 0 && asked.length > 0 && (
+              <div className="mb-3 flex min-h-0 flex-1 flex-col rounded-md border border-zinc-800">
+                <input value={customerFilter} onChange={(e) => setCustomerFilter(e.target.value)}
+                       placeholder={`Filter ${asked.length} customers by name or email`}
+                       className="border-b border-zinc-800 bg-transparent px-3 py-1.5 text-xs outline-none" />
+                <ul className="min-h-0 flex-1 overflow-y-auto py-1 text-sm">
+                  {asked.filter((c) => `${c.name} ${c.email}`.toLowerCase().includes(customerFilter.trim().toLowerCase())).map((c) => (
+                    <li key={c.key}>
+                      <button onClick={() => pickCase(c.key)}
+                              className={`flex w-full items-baseline justify-between gap-3 px-3 py-1 text-left hover:bg-zinc-800 ${
+                                c.key === caseKey ? "bg-violet-600/20 text-violet-200" : ""}`}>
+                        <span>{c.name}</span>
+                        <span className="text-xs text-zinc-500">{c.email}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            <div className={`space-y-3 ${!DEMO && chat.length === 0 ? "" : "flex-1"}`}>
               {chat.map((m, i) => (
                 <div key={i} className={`max-w-[85%] rounded-2xl px-4 py-2 text-sm ${
                   m.from === "sam" ? "ml-auto bg-violet-600 text-white" : "bg-zinc-800"}`}>
@@ -599,13 +641,13 @@ export default function StreamlyLive() {
             <div className="mt-3 flex gap-2">
               <textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={2}
                         className="flex-1 resize-none rounded-lg border border-zinc-700 bg-zinc-950 p-2 text-sm" />
-              <button onClick={send} disabled={running || current.key === "none"}
+              <button onClick={send} disabled={running || current.key === "none" || current.key === "pick"}
                       className="rounded-lg bg-violet-600 px-4 text-sm font-semibold text-white disabled:opacity-50">Send</button>
             </div>
           </div>
         </Panel>
 
-        <Panel title="Agent's thinking" badge={
+        <Panel title="Agent's thinking" className="col-start-2 row-span-3 row-start-1" badge={
           <span className="flex items-center gap-2 text-xs text-zinc-500">
             claude-opus-5 · prompt v2 · graph {graphOn ? "on" : "off"}
             <button onClick={() => setThinkingExpanded(true)} title="Expand"
@@ -614,7 +656,7 @@ export default function StreamlyLive() {
           {!thinkingExpanded && thinkingBody}
         </Panel>
 
-        <Panel title="Support rep console" badge={<span className="text-xs text-zinc-500">{REP.name} · {REP.team}</span>}>
+        <Panel title="Support rep console" className="col-start-1 row-span-2 row-start-5" badge={<span className="text-xs text-zinc-500">{REP.name} · {REP.team}</span>}>
           {!proposal ? (
             <p className="text-sm text-zinc-500">Waiting for the AI&apos;s proposal on ticket #{TICKET}…</p>
           ) : (
@@ -656,7 +698,7 @@ export default function StreamlyLive() {
           )}
         </Panel>
 
-        <Panel title="Decision graph · live from Neo4j" className="overflow-hidden" badge={graphControls}>
+        <Panel title="Decision graph · live from Neo4j" className="col-start-2 row-span-3 row-start-4 overflow-hidden" badge={graphControls}>
           <div className="-m-4 h-[calc(100%+2rem)]">{!expanded && graphBody}</div>
         </Panel>
       </div>
