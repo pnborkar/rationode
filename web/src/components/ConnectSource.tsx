@@ -144,6 +144,8 @@ export default function ConnectSource({ active, onClose, onChanged }: { active: 
   }
 
   const step = result ? 4 : report ? 3 : allMapped ? 2 : files.length ? 1 : 0;
+  const t = report?.target;
+  const nothingNew = !!t && t.new === 0 && t.changed === 0 && t.removed === 0;
 
   return (
     <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/60">
@@ -176,9 +178,10 @@ export default function ConnectSource({ active, onClose, onChanged }: { active: 
           <button onClick={validateAll} disabled={!allMapped || !!busy}
                   className="rounded-md bg-amber-600 px-3 py-1 font-semibold text-white disabled:opacity-40">
             {busy === "validate" ? "Checking…" : "Validate + dry run"}</button>
-          <button onClick={runAll} disabled={!report?.ok || !!busy}
+          <button onClick={runAll} disabled={!report?.ok || nothingNew || !!busy}
                   className="rounded-md bg-emerald-600 px-3 py-1 font-semibold text-white disabled:opacity-40">
-            {busy === "run" ? "Loading…" : "Approve + load into Neo4j"}</button>
+            {busy === "run" ? "Loading…" : nothingNew ? "Nothing new to load"
+              : report?.target ? `Approve + update ${report.target.scenario}` : "Approve + load into Neo4j"}</button>
         </span>
       </div>
       {error && <p className="border-b border-red-900 bg-red-950/50 px-4 py-1.5 text-xs text-red-300">{error}</p>}
@@ -389,7 +392,13 @@ function ValidationView({ report }: { report: ReportView }) {
   return (
     <div className="space-y-4">
       <p className={`rounded-md px-3 py-2 text-sm ${report.ok ? "bg-emerald-950 text-emerald-200" : "bg-red-950 text-red-200"}`}>
-        {report.ok ? "All checks passed. Nothing has been written yet: approve to load." : "Fix the errors below (edit the mapping or re-map) before loading."}
+        {!report.ok ? "Fix the errors below (edit the mapping or re-map) before loading."
+          : report.target && !report.target.new && !report.target.changed && !report.target.removed
+            ? `Nothing new: these files are already loaded as ${report.target.scenario}. Nothing to write.`
+          : report.target ? `All checks passed. These files update ${report.target.scenario}: ${report.target.new} new, ` +
+              `${report.target.changed} changed${report.target.removed ? `, ${report.target.removed} removed` : ""} ` +
+              `(${report.target.unchanged} unchanged). Nothing has been written yet: approve to update.`
+          : "All checks passed. Nothing has been written yet: approve to load."}
       </p>
       <div className="grid grid-cols-2 gap-3">
         <div className="rounded-lg border border-zinc-800 p-3">

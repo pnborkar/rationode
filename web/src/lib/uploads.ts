@@ -44,16 +44,57 @@ async function alreadyLoaded(eventIds: string[], scenario: string) {
   );
 }
 
+// Compare the files' records with what a batch already holds (same source IDs; same raw row = unchanged).
+async function diffAgainst(scenario: string, events: Validation["events"]) {
+  const stored = new Map((await query<{ id: string; payload: string }>(
+    `MATCH (e:Event {scenario_id: $scenario}) RETURN e.event_id AS id, e.payload_json AS payload`, { scenario },
+  )).map((r) => [r.id.slice(scenario.length + 1), r.payload]));
+  let fresh = 0, changed = 0, unchanged = 0;
+  for (const e of events) {
+    const before = stored.get(e.event_id);
+    if (before === undefined) fresh++;
+    else if (before === JSON.stringify(e.raw)) unchanged++;
+    else changed++;
+  }
+  const incoming = new Set(events.map((e) => e.event_id));
+  const removed = [...stored.keys()].filter((id) => !incoming.has(id)).length;
+  return { scenario, new: fresh, changed, unchanged, removed };
+}
+
+// Re-uploading is not an error: records already in a batch update that batch (re-detected over the whole
+// files, so only what changed changes); identical files load nothing. Records that belong to the history
+// or an Events-tab set can't be loaded as an upload.
 async function validateAll(files: UploadedFile[], mappings: FileMapping[], name: string, registry: Registry) {
-  const scenario = scenarioFor(name);
-  const report = validate(parseAll(files), mappings, registry, scenario);
-  const overlap = await alreadyLoaded(report.events.map((e) => e.event_id).filter(Boolean), scenario);
-  for (const o of overlap) {
-    report.checks.unshift({ level: "error", message: `${o.n} of ${report.events.length} records are already loaded as ` +
-      `${o.scenario}. Loading them again would duplicate those customers and decisions: ` +
-      (o.scenario.startsWith("upload:") ? `use the batch name "${o.scenario.slice(7)}" to replace it, or remove it first.`
-        : "these records are already in the graph.") });
+  const parsed = parseAll(files);
+  let scenario = scenarioFor(name);
+  let report = validate(parsed, mappings, registry, scenario);
+  const ids = report.events.map((e) => e.event_id).filter(Boolean);
+  const overlap = await alreadyLoaded(ids, scenario);
+  const batches = overlap.filter((o) => o.scenario.startsWith("upload:"));
+  for (const o of overlap.filter((x) => !x.scenario.startsWith("upload:"))) {
+    report.checks.unshift({ level: "error", message: `${o.n} of ${report.events.length} records are already in the graph ` +
+      `as ${o.scenario}; they can't be loaded again as an upload.` });
     report.ok = false;
+  }
+  if (batches.length > 1) {
+    report.checks.unshift({ level: "error", message: `These records are spread across batches ` +
+      `${batches.map((b) => b.scenario).join(" and ")}; remove the ones you don't want first.` });
+    report.ok = false;
+    return report;
+  }
+  if (batches.length === 1 && batches[0].scenario !== scenario) {
+    scenario = batches[0].scenario;                    // update the batch that holds them
+    report = { ...validate(parsed, mappings, registry, scenario), checks: report.checks, ok: report.ok };
+  }
+  const exists = (await query(`MATCH (e:Event {scenario_id: $scenario}) RETURN e LIMIT 1`, { scenario })).length > 0;
+  if (exists) {
+    const t = await diffAgainst(scenario, report.events);
+    report.target = t;
+    const nothing = t.new === 0 && t.changed === 0 && t.removed === 0;
+    report.checks.unshift(nothing
+      ? { level: "ok", message: `Nothing new: all ${t.unchanged} records are already loaded in ${scenario}.` }
+      : { level: "ok", message: `Already loaded as ${scenario}: approving updates it with ${t.new} new and ${t.changed} ` +
+          `changed records` + (t.removed ? `; ${t.removed} records not in these files will be removed` : "") + "." });
   }
   return report;
 }
@@ -66,10 +107,14 @@ export async function check(files: UploadedFile[], mappings: FileMapping[], name
 
 // Validate again server-side (never trust the client's copy), then write and place in the trees.
 export async function run(files: UploadedFile[], mappings: FileMapping[], name: string) {
-  const scenario = scenarioFor(name);
   const registry = await loadRegistry();
   const report = await validateAll(files, mappings, name, registry);
   if (!report.ok) return { ok: false as const, error: "The mapping has validation errors", report: { ...report, events: undefined } };
+  const t = report.target;
+  if (t && t.new === 0 && t.changed === 0 && t.removed === 0) {
+    return { ok: false as const, error: `Nothing new: all records are already loaded in ${t.scenario}.` };
+  }
+  const scenario = t?.scenario ?? scenarioFor(name);
   const touched = await touchedPoints(scenario);
   if (touched.length || (await query(`MATCH (e:Event {scenario_id: $scenario}) RETURN e LIMIT 1`, { scenario })).length) {
     await removeScenario(scenario);        // re-running a batch replaces it
