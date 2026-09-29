@@ -241,7 +241,7 @@ export default function ConnectSource({ active, onClose, onChanged }: { active: 
         {dbx?.configured && (
           <button onClick={useDatabricks} disabled={!!busy} className="rounded-md bg-orange-700 px-3 py-1 font-semibold text-white disabled:opacity-40"
                   title={`Read every table in ${dbx.schema} through the Databricks SQL API`}>
-            {busy === "files" ? "Reading…" : `Load from Databricks · ${dbx.schema}`}</button>
+            {busy === "files" ? "Reading…" : "Load from Databricks"}</button>
         )}
         {dbx?.configured && pending?.batch && (
           <button onClick={checkChanges} disabled={!!busy || !changedTables}
@@ -278,6 +278,8 @@ export default function ConnectSource({ active, onClose, onChanged }: { active: 
             fraud screening, subscriptions, usage. No pre-labelled decisions and no custom connector.</p>
           <p className="mt-2">Claude proposes how each file maps onto the event contract, with a reason per field. You review it,
             a deterministic validator checks it and dry-runs the detector, and only then is anything written.</p>
+          {dbx?.configured && <p className="mt-2 text-xs text-zinc-400">Load from Databricks reads every table in{" "}
+            <b className="font-mono text-zinc-100">{dbx.schema}</b> (catalog.schema, set in Settings).</p>}
           <p className="mt-2 text-xs text-zinc-500">The sample exports are simulated Streamly data (16 new customers, spring 2026).
             Everything shown after mapping is computed live from the files.</p>
           {!DEMO && <p className="mt-2 text-xs text-amber-300">Tenant <span className="font-mono">{TENANT}</span>: what you load here
