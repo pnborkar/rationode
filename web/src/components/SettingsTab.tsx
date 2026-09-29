@@ -3,6 +3,7 @@
 // customer points their agent and Zendesk at, and the tenant's Databricks connection (saved in Neo4j, token
 // encrypted). Secrets are never shown: only whether they're set.
 import { useEffect, useState } from "react";
+import DeleteScenario from "./DeleteScenario";
 
 type Status = {
   tenant: string;
@@ -47,6 +48,7 @@ export default function SettingsTab() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+
 
   const apply = (s: Status) => {
     setStatus(s);
@@ -145,6 +147,7 @@ export default function SettingsTab() {
               <p key={l.scenario}><span className="font-medium">{l.scenario}</span>
                 <span className="text-zinc-500"> · {l.events.toLocaleString()} events · {l.decisions.toLocaleString()} decisions · {l.customers.toLocaleString()} customers</span></p>
             ))}
+          <DeleteScenario onDeleted={load} />
         </Section>
       </div>
 

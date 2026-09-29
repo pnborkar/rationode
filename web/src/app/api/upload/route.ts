@@ -4,9 +4,12 @@ export async function GET() {
   return Response.json(await listUploads());
 }
 
-// DELETE /api/upload?scenario=upload:<name>
+// DELETE /api/upload?scenario=: the demo's upload:<name>, or a tenant's own loaded history (removeUpload decides).
 export async function DELETE(request: Request) {
   const scenario = new URL(request.url).searchParams.get("scenario") ?? "";
-  if (!scenario.startsWith("upload:")) return Response.json({ error: "scenario must be upload:<name>" }, { status: 400 });
-  return Response.json(await removeUpload(scenario));
+  try {
+    return Response.json(await removeUpload(scenario));
+  } catch (err) {
+    return Response.json({ error: (err as Error).message }, { status: 400 });
+  }
 }

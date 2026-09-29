@@ -202,12 +202,36 @@ export async function listUploads() {
 }
 
 export async function removeUpload(scenario: string) {
-  if (!scenario.startsWith("upload:") && (IS_DEMO || scenario !== SCENARIO)) throw new Error("not an upload scenario");
+  // The demo removes its upload batches; a tenant only its own loaded history (never another app's data).
+  if (IS_DEMO ? !scenario.startsWith("upload:") : scenario !== SCENARIO) throw new Error("not an upload scenario of this app");
+  if (!IS_DEMO) return removeTenantData();   // a tenant's loaded history: with its trees, analytics and batches
   const touched = await touchedPoints(scenario);
   const removed = await removeScenario(scenario);
   await removeBatches(scenario);
   await recomputePoints(touched);
   return { removed, branchesRestored: touched.length };
+}
+
+// Settings → "Remove all of this tenant's data" (demo spec §22): its history, trees and points, analytics
+// links, load batches and live data, as the pipeline's remove-tenant does, but its saved settings (connections,
+// AI) stay so it can be loaded again. Never the demo.
+const TENANT_LABELS = ["DecisionPoint", "DecisionTree", "Event", "Decision", "Context", "Entity", "Outcome", "Actor", "UploadBatch"];
+
+export async function removeTenantData() {
+  if (IS_DEMO) throw new Error("refusing: this is the demo, not a tenant");
+  const removed: Record<string, number> = {};
+  for (const scenario of [SCENARIO, `${SCENARIO}:live`]) {
+    for (const label of TENANT_LABELS) {
+      for (let n = -1; n !== 0;) {   // in chunks until none are left
+        const [r] = await query<{ n: number }>(
+          `MATCH (x:${label} {scenario_id: $scenario}) WITH x LIMIT 10000 DETACH DELETE x RETURN count(*) AS n`, { scenario });
+        n = r?.n ?? 0;
+        if (n) removed[label] = (removed[label] ?? 0) + n;
+      }
+    }
+  }
+  await query(`MATCH (m:Mapping) WHERE NOT EXISTS { (:UploadBatch)-[:USED_MAPPING]->(m) } DELETE m`);
+  return { tenant: SCENARIO, removed };
 }
 
 // Uploaded customers with a case (a support ticket or a card dispute), for the live tab's dropdown.

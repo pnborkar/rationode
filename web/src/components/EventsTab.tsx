@@ -5,6 +5,7 @@
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import ConnectSource from "./ConnectSource";
+import DeleteScenario from "./DeleteScenario";
 import type { ViewNode, ViewRel } from "./GraphView";
 
 const GraphView = dynamic(() => import("./GraphView"), { ssr: false });
@@ -233,6 +234,7 @@ export default function EventsTab({ active, onChanged }: { active: boolean; onCh
                   className="w-full rounded-md border border-zinc-700 py-1.5 text-xs text-zinc-300 disabled:opacity-40">
             {busy === "reset" ? "Resetting…" : "Reset all (removes loaded sets, uploads, and live decisions; history untouched)"}
           </button>
+          <DeleteScenario refreshKey={uploads.length + sets.filter((x) => x.loaded).length} onDeleted={() => { refresh(); onChanged(); }} />
         </div>
       </section>
 
