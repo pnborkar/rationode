@@ -84,4 +84,38 @@ html.light {
   --color-green-800: oklch(92.5% 0.084 155.995);
   --color-green-300: oklch(52.7% 0.154 150.069);
   --color-green-700: oklch(87.1% 0.15 154.449);
+  --color-teal-50: oklch(27.7% 0.046 192.524);
+  --color-teal-950: oklch(98.4% 0.014 180.72);
+  --color-teal-100: oklch(38.6% 0.063 188.416);
+  --color-teal-900: oklch(95.3% 0.051 180.801);
+  --color-teal-200: oklch(43.7% 0.078 188.216);
+  --color-teal-800: oklch(91% 0.096 180.426);
+  --color-teal-300: oklch(51.1% 0.096 186.391);
+  --color-teal-700: oklch(85.5% 0.138 181.071);
+  --color-orange-50: oklch(26.6% 0.079 36.259);
+  --color-orange-950: oklch(98% 0.016 73.684);
+  --color-orange-100: oklch(40.8% 0.123 38.172);
+  --color-orange-900: oklch(95.4% 0.038 75.164);
+  --color-orange-200: oklch(47% 0.157 37.304);
+  --color-orange-800: oklch(90.1% 0.076 70.697);
+  --color-orange-300: oklch(55.3% 0.195 38.402);
+  --color-orange-700: oklch(83.7% 0.128 66.29);
+  --color-rose-50: oklch(27.1% 0.105 12.094);
+  --color-rose-950: oklch(96.9% 0.015 12.422);
+  --color-rose-100: oklch(41% 0.159 10.272);
+  --color-rose-900: oklch(94.1% 0.03 12.58);
+  --color-rose-200: oklch(45.5% 0.188 13.697);
+  --color-rose-800: oklch(89.2% 0.058 10.001);
+  --color-rose-300: oklch(51.4% 0.222 16.935);
+  --color-rose-700: oklch(81% 0.117 11.638);
+  /* Mid accents (-400: status text, labels, bars) are too pale on white: use the -600 shade. */
+  --color-sky-400: oklch(58.8% 0.158 241.966);
+  --color-emerald-400: oklch(59.6% 0.145 163.225);
+  --color-red-400: oklch(57.7% 0.245 27.325);
+  --color-amber-400: oklch(66.6% 0.179 58.318);
+  --color-violet-400: oklch(54.1% 0.281 293.009);
+  --color-green-400: oklch(62.7% 0.194 149.214);
+  --color-teal-400: oklch(60% 0.118 184.704);
+  --color-orange-400: oklch(64.6% 0.222 41.116);
+  --color-rose-400: oklch(58.6% 0.253 17.585);
 }

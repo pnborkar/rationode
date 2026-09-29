@@ -40,7 +40,7 @@ export default function DeleteScenario({ onDeleted, refreshKey = 0 }: { onDelete
           <input value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder={`type ${picked} to confirm`}
                  className="min-w-0 flex-1 rounded border border-zinc-700 bg-zinc-950 px-2 py-1" />
           <button onClick={remove} disabled={busy || !picked || confirm !== picked}
-                  className="rounded bg-red-700 px-3 py-1 font-semibold text-white disabled:opacity-40">{busy ? "Deleting…" : "Delete"}</button>
+                  className="rounded bg-red-600 px-3 py-1 font-semibold text-white disabled:opacity-40">{busy ? "Deleting…" : "Delete"}</button>
         </div>
       </>}
       {message && <p className={message.startsWith("✓") ? "text-emerald-400" : "text-red-400"}>{message}</p>}

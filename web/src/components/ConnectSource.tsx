@@ -227,7 +227,7 @@ export default function ConnectSource({ active, onClose, onChanged }: { active: 
         <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Connect a source</h2>
         <ol className="flex items-center gap-1 text-[11px]">
           {["Files", "Mapping (Claude)", "Validate + dry run", "Load into Neo4j"].map((s, i) => (
-            <li key={s} className={`rounded-full px-2 py-0.5 ${step > i ? "bg-sky-700 text-white" : step === i ? "bg-zinc-700 text-zinc-100" : "text-zinc-500"}`}>
+            <li key={s} className={`rounded-full px-2 py-0.5 ${step > i ? "bg-sky-600 text-white" : step === i ? "bg-zinc-700 text-zinc-100" : "text-zinc-500"}`}>
               {i + 1}. {s}</li>
           ))}
         </ol>
@@ -239,7 +239,7 @@ export default function ConnectSource({ active, onClose, onChanged }: { active: 
         <button onClick={useSamples} disabled={!!busy} className="rounded-md bg-zinc-700 px-3 py-1 font-semibold disabled:opacity-40">
           {busy === "files" ? "Loading…" : "Use sample exports (6 files)"}</button>
         {dbx?.configured && (
-          <button onClick={useDatabricks} disabled={!!busy} className="rounded-md bg-orange-700 px-3 py-1 font-semibold text-white disabled:opacity-40"
+          <button onClick={useDatabricks} disabled={!!busy} className="rounded-md bg-orange-600 px-3 py-1 font-semibold text-white disabled:opacity-40"
                   title={`Read every table in ${dbx.schema} through the Databricks SQL API`}>
             {busy === "files" ? "Reading…" : "Load from Databricks"}</button>
         )}
