@@ -3,8 +3,11 @@ import { ingestLive, liveCustomerSummary, liveEvents, liveSummary, removeLiveCus
 // GET /api/live: counts; ?events=1: the captured events and what each became; ?email=: one customer's live tickets.
 export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
-  const email = params.get("email");
-  if (email) return Response.json(await liveCustomerSummary(email));
+  // ?email= with no customer selected (a tenant with no customers yet) is still a customer query.
+  if (params.has("email")) {
+    const email = params.get("email")!.trim();
+    return Response.json(email ? await liveCustomerSummary(email) : { tickets: [], decisions: 0 });
+  }
   return Response.json(params.has("events") ? await liveEvents() : await liveSummary());
 }
 
