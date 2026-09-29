@@ -217,6 +217,11 @@ class Detector:
 
         screen_dec = complaint_final = proposal = None
         ticket = ticket_entity = None
+        # A charge can have more than one ticket (e.g. a customer writes in again): proposals and final
+        # decisions are tracked per ticket; complaint_final is the latest, for outcomes on the charge.
+        tickets: dict[str, tuple[Ev, str]] = {}
+        proposals: dict[str, dict] = {}
+        finals: dict[str, str] = {}
         sessions: dict[str, Ev] = {}
         dispute_ev = response_dec = evidence_dec = contested = None
 
@@ -240,6 +245,7 @@ class Detector:
                 ticket_entity = self.entity("Ticket", "zendesk", f"ticket:{e.ticket_id}",
                                             category=e.data["category"], channel=e.data["channel"],
                                             subject=e.data["subject"])
+                tickets[e.ticket_id] = (ticket, ticket_entity)
                 zd_user = self.entity("Customer", "zendesk", f"user:{e.email}", email=e.email, name=e.data["name"])
                 self.rows.same_as.append({"from": zd_user, "to": customer, "confidence": 0.98, "method": "EMAIL"})
 
@@ -248,22 +254,27 @@ class Detector:
 
             elif k == "mcp_gateway:propose_resolution":
                 info = sessions.get(e.session_id)
-                if not (info and ticket):
+                tk = tickets.get(e.ticket_id) or ((ticket, ticket_entity) if ticket else None)
+                if not (info and tk):
                     self.rows.review.append({"event_id": e.event_id, "reason": "proposal without customer lookup or ticket"})
                     continue
+                p_ticket, p_ticket_entity = tk
                 res, args = info.data["result"], e.data["args"]
-                ctx = self.complaint_context(res, ticket, args)
+                ctx = self.complaint_context(res, p_ticket, args)
                 actor = self.agent_actor(e)
                 proposal = {"id": None, "option": args["option"], "amount": args["amount_usd"], "ctx": ctx,
-                            "evidence": [ticket, info, e], "actor": actor}
+                            "evidence": [p_ticket, info, e], "actor": actor, "ticket_entity": p_ticket_entity}
                 proposal["id"] = self.decision(
                     e, "support.complaint_resolution", "PROPOSAL", actor=actor, role="PROPOSER",
                     chosen=[(args["option"], args["amount_usd"])], proposed_status=True, context=ctx,
                     summary=self.complaint_summary(ctx, f"AI {e.data['agent_version']} proposed {args['option']}"),
-                    about=[ticket_entity, charge, customer], evidence=proposal["evidence"])
+                    about=[p_ticket_entity, charge, customer], evidence=proposal["evidence"])
                 self.rows.preceded_by.append({"from": proposal["id"], "to": screen_dec})
+                proposals[e.ticket_id] = proposal
 
-            elif k in ("zendesk:macro.applied", "zendesk:ticket.updated") and proposal and not complaint_final:
+            elif k in ("zendesk:macro.applied", "zendesk:ticket.updated") and e.ticket_id in proposals \
+                    and e.ticket_id not in finals:
+                proposal = proposals[e.ticket_id]
                 human = k == "zendesk:macro.applied"
                 if not human and e.data["actor_id"] != "streamly-support-agent":
                     continue
@@ -282,7 +293,8 @@ class Detector:
                     summary=self.complaint_summary(
                         proposal["ctx"], (f"{e.data['group']} rep chose {option}" if human else f"AI executed {option}")
                         + (f", overriding AI proposal {proposal['option']}" if overridden else "")),
-                    about=[ticket_entity, charge, customer], evidence=[e])
+                    about=[proposal["ticket_entity"], charge, customer], evidence=[e])
+                finals[e.ticket_id] = complaint_final
                 self.rows.preceded_by.append({"from": complaint_final, "to": proposal["id"]})
                 if overridden:
                     self.rows.overrides.append({"from": complaint_final, "to": proposal["id"], "detected_at": e.at})
@@ -290,8 +302,9 @@ class Detector:
 
             elif k == "stripe:refund.created":
                 out = self.outcome(e, "refund_cost", e.data["amount"])
-                self.led_to(complaint_final, out, "refund_cost", "EXPLICIT_REF", 1.0)
-                for row in self.chosen_rows.get(complaint_final, []):   # record the executed amount
+                final = finals.get(e.ticket_id, complaint_final)   # the ticket the refund names, else the latest
+                self.led_to(final, out, "refund_cost", "EXPLICIT_REF", 1.0)
+                for row in self.chosen_rows.get(final, []):   # record the executed amount
                     row["amount_usd"] = e.data["amount"]
 
             elif k == "stripe:charge.dispute.created":

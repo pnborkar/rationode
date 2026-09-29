@@ -61,7 +61,7 @@ function fmt0(x: number): string {
 
 const ms = (iso: string) => Date.parse(iso);
 
-type Proposal = { id: string; option: string; amount: number | null; ctx: Data; actor: string };
+type Proposal = { id: string; option: string; amount: number | null; ctx: Data; actor: string; ticketEntity: string };
 
 export class Detector {
   private reg: Registry;
@@ -261,6 +261,11 @@ export class Detector {
     let screenDec: string | null = null, complaintFinal: string | null = null;
     let proposal: Proposal | null = null;
     let ticket: ContractEvent | null = null, ticketEntity: string | null = null;
+    // A charge can have more than one ticket (e.g. a customer writes in again): proposals and final decisions
+    // are tracked per ticket; complaintFinal is the latest, for outcomes on the charge.
+    const tickets = new Map<string, [ContractEvent, string]>();
+    const proposals = new Map<string, Proposal>();
+    const finals = new Map<string, string>();
     const sessions = new Map<string, ContractEvent>();
     let disputeEv: ContractEvent | null = null, responseDec: string | null = null, evidenceDec: string | null = null;
     let contested = false;
@@ -283,6 +288,7 @@ export class Detector {
           ticket = e;
           ticketEntity = this.entity("Ticket", "zendesk", `ticket:${x.ticket_id}`,
                                      { category: d.category, channel: d.channel, subject: d.subject ?? null });
+          tickets.set(x.ticket_id!, [ticket, ticketEntity]);
           const zdUser = this.entity("Customer", "zendesk", `user:${x.customer_email}`, { email: x.customer_email, name: d.name ?? null });
           this.rows.same_as.push({ from: zdUser, to: customer, confidence: 0.98, method: "EMAIL" });
           break;
@@ -293,25 +299,29 @@ export class Detector {
           break;
         case "agent.proposal": {
           const info = sessions.get(x.session_id!);
-          if (!(info && ticket)) {
+          const tk = (x.ticket_id ? tickets.get(x.ticket_id) : undefined) ?? (ticket ? [ticket, ticketEntity!] as [ContractEvent, string] : undefined);
+          if (!(info && tk)) {
             this.rows.review.push({ event_id: e.event_id, reason: "proposal without customer lookup or ticket" });
             break;
           }
-          const ctx = complaintContext(info.data, ticket.data, d);
+          const [pTicket, pTicketEntity] = tk;
+          const ctx = complaintContext(info.data, pTicket.data, d);
           const actor = this.actor(e.actor!);
           const amount = (d.amount_usd ?? null) as number | null;
           const id = this.decision(e, "support.complaint_resolution", "PROPOSAL", {
             actor, role: "PROPOSER", chosen: [[d.option, amount]], proposedStatus: true, context: ctx,
             summary: complaintSummary(ctx, `AI ${e.actor!.version} proposed ${d.option}`),
-            about: [ticketEntity!, charge, customer], evidence: [ticket, info, e],
+            about: [pTicketEntity, charge, customer], evidence: [pTicket, info, e],
           });
-          proposal = { id, option: d.option, amount, ctx, actor };
+          proposal = { id, option: d.option, amount, ctx, actor, ticketEntity: pTicketEntity };
+          proposals.set(x.ticket_id!, proposal);
           this.rows.preceded_by.push({ from: id, to: screenDec });
           break;
         }
         case "rep.decision":
         case "ticket.closed": {
-          if (!proposal || complaintFinal) break;
+          const proposal = x.ticket_id ? proposals.get(x.ticket_id) : undefined;
+          if (!proposal || finals.has(x.ticket_id!)) break;
           const human = e.event_type === "rep.decision";
           if (!human && e.actor?.kind !== "AI_AGENT") break;
           const option: string = human ? d.option : proposal.option;
@@ -324,8 +334,9 @@ export class Detector {
             summary: complaintSummary(proposal.ctx,
               (human ? `${e.actor!.team} rep chose ${option}` : `AI executed ${option}`)
               + (overridden ? `, overriding AI proposal ${proposal.option}` : "")),
-            about: [ticketEntity!, charge, customer], evidence: [e],
+            about: [proposal.ticketEntity, charge, customer], evidence: [e],
           });
+          finals.set(x.ticket_id!, complaintFinal);
           this.rows.preceded_by.push({ from: complaintFinal, to: proposal.id });
           if (overridden) this.rows.overrides.push({ from: complaintFinal, to: proposal.id, detected_at: e.occurred_at });
           byCus.push([e.occurred_at, complaintFinal, "complaint"]);
@@ -333,8 +344,9 @@ export class Detector {
         }
         case "refund.created": {
           const out = this.outcome(e, "refund_cost", d.amount);
-          this.ledTo(complaintFinal, out, "refund_cost", "EXPLICIT_REF", 1.0);
-          for (const row of (complaintFinal && this.chosenRows.get(complaintFinal)) || []) row.amount_usd = d.amount;   // executed amount
+          const final = (x.ticket_id && finals.get(x.ticket_id)) || complaintFinal;   // the ticket the refund names, else the latest
+          this.ledTo(final, out, "refund_cost", "EXPLICIT_REF", 1.0);
+          for (const row of (final && this.chosenRows.get(final)) || []) row.amount_usd = d.amount;   // executed amount
           break;
         }
         case "dispute.created": {

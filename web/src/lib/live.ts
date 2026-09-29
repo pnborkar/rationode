@@ -92,6 +92,37 @@ export async function removeLiveTicket(ticketId: string) {
   await query(`MATCH (t:Entity {scenario_id: $live, source_key: $key}) DETACH DELETE t`, { live: LIVE, key: `ticket:${ticketId}` });
 }
 
+// What the gateway and webhooks captured, event by event, with what each became (for the Events tab).
+export async function liveEvents() {
+  const rows = await query<{ event_id: string; source_system: string; event_type: string; occurred_at: string;
+                             payload: string; ticket: string | null; email: string | null;
+                             became: { type: string; stage: string; option: string | null; overrides: boolean }[] }>(
+    `MATCH (e:Event {scenario_id: $live})
+     WITH e, split(e.event_id, '|')[1] AS raw
+     // The decisions made by this event (their IDs derive from it), e.g. a proposal from a propose call.
+     OPTIONAL MATCH (d:Decision {decision_id: $live + '|dec:' + raw})
+     OPTIONAL MATCH (d)-[k:CONSIDERED]->(o:Option) WHERE k.status IN ['CHOSEN', 'PROPOSED']
+     WITH e, raw, d, head(collect(o.option_key)) AS option
+     WITH e, raw, collect(CASE WHEN d IS NULL THEN null ELSE
+            {type: d.decision_type, stage: d.stage, option: option, overrides: EXISTS { (d)-[:OVERRIDES]->() }} END) AS became
+     RETURN raw AS event_id, e.source_system AS source_system, e.event_type AS event_type,
+            toString(e.occurred_at) AS occurred_at, e.payload_json AS payload, e.ticket_id AS ticket, e.email AS email, became
+     ORDER BY occurred_at DESC`,
+    { live: LIVE },
+  );
+  // The customer of the latest ticket, for the journey graph.
+  const latest = rows.find((r) => r.email)?.email ?? null;
+  return {
+    customer_email: latest,
+    events: rows.map((r) => ({
+      event_id: r.event_id, source_system: r.source_system, event_type: r.event_type, occurred_at: r.occurred_at,
+      payload: JSON.parse(r.payload), ticket: r.ticket,
+      became: r.became.map((b) => `Decision · ${b.type} ${b.stage.toLowerCase()}${b.option ? ` (${b.option})` : ""}` +
+                                   (b.overrides ? " · OVERRIDES the AI proposal" : "")),
+    })),
+  };
+}
+
 export async function liveSummary() {
   const [r] = await query<{ decisions: number; proposals: number; finals: number; overrides: number; tickets: number }>(
     `OPTIONAL MATCH (d:Decision {scenario_id: $live})

@@ -107,6 +107,22 @@ export default function EventsTab({ active, onChanged }: { active: boolean; onCh
     setBusy(null);
   }
 
+  // What the MCP gateway and the Zendesk webhook captured, shown like a set's events.
+  async function showLive() {
+    setBusy("live");
+    setConnect(false);
+    const data = await (await fetch("/api/live?events=1")).json() as { customer_email: string | null; events: StreamEvent[] };
+    setHistory([]);
+    setResult({ set: 0, phase: "live", events: data.events, branches: [],
+                story: { title: "Captured live", point: "The agent's tool calls came through Rationode's MCP gateway and the rep's " +
+                         "decisions through the Zendesk webhook; the detector turned them into the decisions shown.",
+                         customer: { name: "", email: data.customer_email ?? "", plan: "", tenure_months: 0 } } });
+    setShown(data.events.length);
+    if (data.customer_email) await loadGraph(data.customer_email);
+    await refresh();
+    setBusy(null);
+  }
+
   async function remove(n: number) {
     setBusy(`remove-${n}`);
     await fetch(`/api/stories/${n}`, { method: "DELETE" });
@@ -162,6 +178,11 @@ export default function EventsTab({ active, onChanged }: { active: boolean; onCh
             <p className="mt-1 text-xs">{live && live.decisions
               ? <>{live.proposals} AI proposal(s), {live.finals} rep decision(s), {live.overrides} override(s) across {live.tickets} ticket(s)</>
               : <span className="text-zinc-500">Nothing captured yet: run a case on the Streamly live tab.</span>}</p>
+            {live && live.decisions > 0 && (
+              <button onClick={showLive} disabled={!!busy || streaming}
+                      className="mt-2 rounded-md bg-sky-600 px-3 py-1 text-xs font-semibold text-white disabled:opacity-40">
+                {busy === "live" ? "Loading…" : "Show live events"}</button>
+            )}
           </div>
           <div className="rounded-lg border border-zinc-800">
             <button onClick={() => setSetsOpen(!setsOpen)} className="flex w-full items-center justify-between px-3 py-2 text-left">
@@ -217,7 +238,7 @@ export default function EventsTab({ active, onChanged }: { active: boolean; onCh
       <section className={`${connect ? "hidden" : "flex"} min-h-0 flex-col rounded-xl border border-zinc-800 bg-zinc-900/60`}>
         <header className="flex items-center justify-between rounded-t-xl border-b border-zinc-800 bg-zinc-800/70 px-4 py-2">
           <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Incoming events</h2>
-          {result && <span className="text-xs text-zinc-500">Set {result.set} · {result.phase}</span>}
+          {result && <span className="text-xs text-zinc-500">{result.set ? `Set ${result.set} · ${result.phase}` : "Live · newest first"}</span>}
         </header>
         <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-4">
           {!result && <p className="text-sm text-zinc-500">Load a set to see its events arrive.</p>}
@@ -259,10 +280,11 @@ export default function EventsTab({ active, onChanged }: { active: boolean; onCh
         <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
           {result && !streaming ? (
             <>
-              <p className="text-xs uppercase tracking-wider text-sky-400">The story in Set {result.set}</p>
-              <p className="text-lg font-semibold">{result.story.customer.name}: {result.story.title}</p>
+              <p className="text-xs uppercase tracking-wider text-sky-400">{result.set ? `The story in Set ${result.set}` : "Live · MCP gateway"}</p>
+              <p className="text-lg font-semibold">{result.set ? `${result.story.customer.name}: ${result.story.title}` : result.story.title}</p>
               <p className="text-sm text-zinc-400">{result.story.point}</p>
-              <p className="mt-1 text-xs text-zinc-500">Now selectable on the Streamly live tab.</p>
+              <p className="mt-1 text-xs text-zinc-500">{result.set ? "Now selectable on the Streamly live tab."
+                : `Journey below: ${result.story.customer.email} (latest ticket).`}</p>
             </>
           ) : <p className="text-sm text-zinc-500">{streaming ? "Reading the events…" : "The story appears once a set is loaded."}</p>}
         </div>
@@ -302,7 +324,8 @@ export default function EventsTab({ active, onChanged }: { active: boolean; onCh
               </div>
             ))}
             {result && !streaming && result.branches.length === 0 && (
-              <p className="text-zinc-500">No tree branches changed: new options stay out of trees until approved.</p>
+              <p className="text-zinc-500">{result.set ? "No tree branches changed: new options stay out of trees until approved."
+                : "Live decisions join the trees once their outcomes arrive (without outcomes they would skew the rates)."}</p>
             )}
           </div>
         </div>
