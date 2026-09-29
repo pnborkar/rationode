@@ -154,7 +154,7 @@ export default function SettingsTab() {
       <div className="space-y-3">
         <Section title="Databricks connection">
           <p className="text-xs text-zinc-500">
-            Rationode reads the schema&apos;s tables through a SQL warehouse (Connect a source → Load tables from Databricks).
+            Rationode reads the schema&apos;s tables through a SQL warehouse (Connect a source → Load from Databricks).
             Use a token that can only read this schema, ideally a service principal&apos;s.</p>
           {!status.settingsKey && (
             <p className="rounded bg-amber-500/10 px-2 py-1 text-xs text-amber-300">

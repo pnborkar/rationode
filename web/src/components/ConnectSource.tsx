@@ -241,7 +241,7 @@ export default function ConnectSource({ active, onClose, onChanged }: { active: 
         {dbx?.configured && (
           <button onClick={useDatabricks} disabled={!!busy} className="rounded-md bg-orange-700 px-3 py-1 font-semibold text-white disabled:opacity-40"
                   title={`Read every table in ${dbx.schema} through the Databricks SQL API`}>
-            {busy === "files" ? "Reading…" : `Load tables from Databricks (${dbx.schema})`}</button>
+            {busy === "files" ? "Reading…" : `Load from Databricks · ${dbx.schema}`}</button>
         )}
         {dbx?.configured && pending?.batch && (
           <button onClick={checkChanges} disabled={!!busy || !changedTables}
