@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { databricksConfig, listTables, readTable } from "@/lib/databricks";
+import { databricksConfig, listTables } from "@/lib/databricks";
+import { tablePreview } from "@/lib/sources";
 
 export const maxDuration = 120;
 
@@ -17,12 +18,13 @@ export async function GET(request: Request) {
 
 const Body = z.object({ tables: z.array(z.string().regex(/^[A-Za-z0-9_]+$/)).min(1) });
 
-// POST {tables}: read them (rows as JSON lines) for Connect a source.
+// POST {tables}: for Connect a source, each table's current version, row count and a preview; the rows stay
+// on the server (propose, validate and approve read them by reference, §21.2).
 export async function POST(request: Request) {
   const body = Body.safeParse(await request.json());
   if (!body.success) return Response.json({ error: body.error.message }, { status: 400 });
   try {
-    return Response.json(await Promise.all(body.data.tables.map(readTable)));
+    return Response.json(await Promise.all(body.data.tables.map(tablePreview)));
   } catch (err) {
     return Response.json({ error: (err as Error).message }, { status: 502 });
   }

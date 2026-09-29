@@ -138,11 +138,15 @@ export async function removeScenario(scenario: string): Promise<number> {
   if (scenario === "history") throw new Error("refusing to delete the history scenario");
   let removed = 0;
   for (const label of ["Event", "Decision", "Context", "Entity", "Outcome", "Actor"]) {
-    const [r] = await query<{ n: number }>(
-      `MATCH (n:${label} {scenario_id: $scenario}) WITH n LIMIT 10000 DETACH DELETE n RETURN count(*) AS n`,
-      { scenario },
-    );
-    removed += r?.n ?? 0;
+    // In chunks of 10,000 until none are left (a tenant's history holds far more than one chunk).
+    for (let n = -1; n !== 0;) {
+      const [r] = await query<{ n: number }>(
+        `MATCH (n:${label} {scenario_id: $scenario}) WITH n LIMIT 10000 DETACH DELETE n RETURN count(*) AS n`,
+        { scenario },
+      );
+      n = r?.n ?? 0;
+      removed += n;
+    }
   }
   return removed;
 }

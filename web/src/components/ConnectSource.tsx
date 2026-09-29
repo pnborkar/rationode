@@ -18,6 +18,11 @@ const DEMO = TENANT === "history";
 const SAMPLE_FILES = ["zendesk_ticket_events.csv", "stripe_activity.csv", "support_agent_tool_calls.jsonl",
                       "fraudguard_screening.csv", "subscriptions.csv", "app_usage_weekly.csv"];
 
+// A source: an uploaded file (with its contents) or a Databricks table (a reference: the server reads it,
+// the browser only gets a preview, demo spec §21.2).
+type Src = { name: string; content?: string; table?: { version: number; rows: number; preview: ParsedFile } };
+type Range = { table: string; from: number; to: number };
+type ChangeCount = Range & { inserted: number; updated: number; deleted: number };
 type Proposal = { status: "mapping" | "done" | "error"; mapping?: FileMapping; seconds?: number; error?: string; edited?: boolean };
 type Stats = { support: number; dispute_rate: number | null; churn_rate: number | null; win_rate: number | null };
 type RunResult = { ok: boolean; error?: string; scenario: string; counts: Record<string, number>;
@@ -48,7 +53,7 @@ function CheckLine({ c }: { c: Check }) {
 
 export default function ConnectSource({ active, onClose, onChanged }: { active: boolean; onClose: () => void; onChanged: () => void }) {
   const [name, setName] = useState("streamly-spring");
-  const [files, setFiles] = useState<{ name: string; content: string }[]>([]);
+  const [files, setFiles] = useState<Src[]>([]);
   const [proposals, setProposals] = useState<Record<string, Proposal>>({});
   const [view, setView] = useState<string>("");            // a file name, "validate", or "result"
   const [report, setReport] = useState<ReportView | null>(null);
@@ -57,13 +62,22 @@ export default function ConnectSource({ active, onClose, onChanged }: { active: 
   const [graph, setGraph] = useState<{ email: string; nodes: ViewNode[]; rels: ViewRel[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dbx, setDbx] = useState<{ configured: boolean; schema?: string } | null>(null);
+  // The last Databricks load and the tables changed since (for "Load changes"); set while checking changes.
+  const [pending, setPending] = useState<{ batch: string | null; ranges?: Range[] } | null>(null);
+  const [incremental, setIncremental] = useState<{ ranges: Range[]; changes: ChangeCount[] } | null>(null);
+  const refreshPending = () => fetch("/api/databricks/changes").then((r) => r.json()).then(setPending).catch(() => setPending(null));
   useEffect(() => {
-    fetch("/api/databricks?check=1").then((r) => r.json()).then(setDbx).catch(() => setDbx({ configured: false }));
+    fetch("/api/databricks?check=1").then((r) => r.json()).then((d) => {
+      setDbx(d);
+      if (d.configured) fetch("/api/databricks/changes").then((r) => r.json()).then(setPending).catch(() => {});
+    }).catch(() => setDbx({ configured: false }));
   }, []);
 
   const parsed = useMemo(() => {
     const out: Record<string, ParsedFile | string> = {};
     for (const f of files) {
+      if (f.table) { out[f.name] = f.table.preview; continue; }
+      if (f.content === undefined) continue;
       try { out[f.name] = parseFile(f.name, f.content); } catch (e) { out[f.name] = (e as Error).message; }
     }
     return out;
@@ -74,8 +88,15 @@ export default function ConnectSource({ active, onClose, onChanged }: { active: 
   const mapping = view && proposals[view]?.mapping;
   const pf = parsed[view];
 
-  function reset(next: { name: string; content: string }[]) {
-    setFiles(next); setProposals({}); setReport(null); setResult(null); setGraph(null); setError(null);
+  const rowCount = (f: Src) => f.table?.rows ?? (typeof parsed[f.name] === "object" ? (parsed[f.name] as ParsedFile).rows.length : 0);
+  // What validate and approve send: uploaded files with contents, tables by reference at the version read.
+  const sources = () => ({
+    files: files.filter((f) => !f.table).map((f) => ({ name: f.name, content: f.content ?? "" })),
+    tables: files.filter((f) => f.table).map((f) => ({ table: f.name, version: f.table!.version })),
+  });
+
+  function reset(next: Src[]) {
+    setFiles(next); setProposals({}); setReport(null); setResult(null); setGraph(null); setError(null); setIncremental(null);
     setView(next[0]?.name ?? "");
   }
 
@@ -87,7 +108,8 @@ export default function ConnectSource({ active, onClose, onChanged }: { active: 
     setBusy(null);
   }
 
-  // Databricks: every table in the configured schema, read through the SQL API, each treated as one source.
+  // Databricks: every table in the configured schema, each one source. The server pins each table's current
+  // Delta version and sends a preview; propose, validate and approve read that version server-side.
   async function useDatabricks() {
     setBusy("files"); setError(null);
     try {
@@ -99,7 +121,8 @@ export default function ConnectSource({ active, onClose, onChanged }: { active: 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? res.statusText);
       setName(DEMO ? "databricks" : TENANT);
-      reset((data as { name: string; content: string }[]).map((t) => ({ name: t.name, content: t.content })));
+      reset((data as { name: string; version: number; rows: number; preview: ParsedFile }[])
+        .map((t) => ({ name: t.name, table: { version: t.version, rows: t.rows, preview: t.preview } })));
     } catch (e) {
       setError(`Databricks: ${(e as Error).message}`);
     }
@@ -117,7 +140,8 @@ export default function ConnectSource({ active, onClose, onChanged }: { active: 
     setProposals(Object.fromEntries(files.map((f) => [f.name, { status: "mapping" }])));
     await Promise.all(files.map(async (f) => {
       const res = await fetch("/api/upload/propose", { method: "POST", headers: { "content-type": "application/json" },
-                                                       body: JSON.stringify({ file: f }) });
+                                                       body: JSON.stringify(f.table ? { table: { table: f.name, version: f.table.version } }
+                                                                                      : { file: { name: f.name, content: f.content } }) });
       const data = await res.json();
       setProposals((p) => ({ ...p, [f.name]: res.ok ? { status: "done", mapping: data.mapping, seconds: data.seconds }
                                                     : { status: "error", error: data.error ?? res.statusText } }));
@@ -137,22 +161,45 @@ export default function ConnectSource({ active, onClose, onChanged }: { active: 
   async function validateAll() {
     setBusy("validate"); setError(null);
     const res = await fetch("/api/upload/validate", { method: "POST", headers: { "content-type": "application/json" },
-                                                      body: JSON.stringify({ name, files, mappings }) });
+                                                      body: JSON.stringify({ name, ...sources(), mappings }) });
     const data = await res.json();
     if (res.ok) { setReport(data); setView("validate"); } else setError(data.error ?? res.statusText);
     setBusy(null);
   }
 
+  // Changes since the last Databricks load: the server reads only the changed rows (Change Data Feed), merges
+  // them into the stored rows and validates; the report shows what approving would add, change or remove.
+  async function checkChanges() {
+    setBusy("changes"); setError(null);
+    const res = await fetch("/api/databricks/changes", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+    const data = await res.json();
+    setBusy(null);
+    if (!res.ok || data.error) { setError(data.error ?? res.statusText); return; }
+    if (data.nothing) { setError(null); await refreshPending(); return; }
+    setName(data.batch);
+    setFiles((data.changes as ChangeCount[]).map((c) => ({ name: c.table })));
+    setProposals(Object.fromEntries((data.mappings as FileMapping[]).map((m) => [m.file, { status: "done", mapping: m }])));
+    setResult(null); setGraph(null);
+    setIncremental({ ranges: data.ranges, changes: data.changes });
+    setReport(data.report); setView("validate");
+  }
+
   async function runAll() {
     setBusy("run"); setError(null);
     const edited_files = files.filter((f) => proposals[f.name]?.edited).map((f) => f.name);
-    const res = await fetch("/api/upload/run", { method: "POST", headers: { "content-type": "application/json" },
-                                                 body: JSON.stringify({ name, files, mappings, edited_files }) });
-    const data = await res.json();
-    if (res.ok) {
+    const res = incremental
+      ? await fetch("/api/databricks/changes", { method: "POST", headers: { "content-type": "application/json" },
+                                                 body: JSON.stringify({ apply: true, ranges: incremental.ranges }) })
+      : await fetch("/api/upload/run", { method: "POST", headers: { "content-type": "application/json" },
+                                         body: JSON.stringify({ name, ...sources(), mappings, edited_files }) });
+    const body = await res.json();
+    const data = incremental ? (body.result ?? body) : body;
+    if (res.ok && data.ok !== false) {
+      if (incremental) { setIncremental(null); refreshPending(); }
       setResult(data); setView("result"); onChanged();
       if (data.customers?.length) await showCustomer(data.customers[0].email);
     } else setError(data.error ?? res.statusText);
+    if (!incremental && data.ok) refreshPending();
     setBusy(null);
   }
 
@@ -170,6 +217,7 @@ export default function ConnectSource({ active, onClose, onChanged }: { active: 
   }
 
   const step = result ? 4 : report ? 3 : allMapped ? 2 : files.length ? 1 : 0;
+  const changedTables = pending?.ranges?.length ?? 0;
   const t = report?.target;
   const nothingNew = !!t && t.new === 0 && t.changed === 0 && t.removed === 0;
 
@@ -195,6 +243,13 @@ export default function ConnectSource({ active, onClose, onChanged }: { active: 
                   title={`Read every table in ${dbx.schema} through the Databricks SQL API`}>
             {busy === "files" ? "Reading…" : `Load tables from Databricks (${dbx.schema})`}</button>
         )}
+        {dbx?.configured && pending?.batch && (
+          <button onClick={checkChanges} disabled={!!busy || !changedTables}
+                  className="rounded-md border border-orange-700 px-3 py-1 font-semibold text-orange-300 disabled:opacity-40"
+                  title="Read only the rows changed in Databricks since the last load (Change Data Feed)">
+            {busy === "changes" ? "Reading changes…" : changedTables
+              ? `Load changes from Databricks (${changedTables} table${changedTables > 1 ? "s" : ""} changed)` : "Databricks: no changes since the last load"}</button>
+        )}
         <label className="cursor-pointer rounded-md border border-zinc-700 px-3 py-1">
           Upload files…
           <input type="file" multiple accept=".csv,.jsonl,.ndjson" className="hidden" onChange={(e) => pickFiles(e.target.files)} />
@@ -203,7 +258,7 @@ export default function ConnectSource({ active, onClose, onChanged }: { active: 
         <input value={name} onChange={(e) => { setName(e.target.value); setReport(null); }}
                className="w-40 rounded border border-zinc-700 bg-zinc-950 px-2 py-0.5 font-mono" />
         <span className="ml-auto flex gap-2">
-          <button onClick={proposeAll} disabled={!files.length || !!busy}
+          <button onClick={proposeAll} disabled={!files.length || !!busy || !!incremental}
                   className="rounded-md bg-sky-600 px-3 py-1 font-semibold text-white disabled:opacity-40">
             {busy === "propose" ? "Claude is mapping…" : allMapped ? "Re-map with Claude" : "Map with Claude"}</button>
           <button onClick={validateAll} disabled={!allMapped || !!busy}
@@ -211,7 +266,7 @@ export default function ConnectSource({ active, onClose, onChanged }: { active: 
             {busy === "validate" ? "Checking…" : "Validate + dry run"}</button>
           <button onClick={runAll} disabled={!report?.ok || nothingNew || !!busy}
                   className="rounded-md bg-emerald-600 px-3 py-1 font-semibold text-white disabled:opacity-40">
-            {busy === "run" ? "Loading…" : nothingNew ? "Nothing new to load"
+            {busy === "run" ? "Loading…" : nothingNew ? "Nothing new to load" : incremental ? `Approve changes to ${report?.target?.scenario ?? name}`
               : report?.target ? `Approve + update ${report.target.scenario}` : "Approve + load into Neo4j"}</button>
         </span>
       </div>
@@ -239,7 +294,9 @@ export default function ConnectSource({ active, onClose, onChanged }: { active: 
                         className={`w-full rounded-md px-2 py-1.5 text-left ${view === f.name ? "bg-zinc-800" : "hover:bg-zinc-800/50"}`}>
                   <span className="block truncate font-mono">{f.name}</span>
                   <span className="text-[10px] text-zinc-500">
-                    {typeof x === "string" ? "unreadable" : `${x.rows.length} rows`}
+                    {incremental ? (() => { const c = incremental.changes.find((y) => y.table === f.name);
+                      return c ? `v${c.from}–${c.to}: +${c.inserted} · ~${c.updated} · −${c.deleted}` : "unchanged"; })()
+                      : x === undefined ? "" : typeof x === "string" ? "unreadable" : `${rowCount(f).toLocaleString()} rows${f.table ? ` · v${f.table.version}` : ""}`}
                     {" · "}{!p ? "not mapped" : p.status === "mapping" ? "Claude is mapping…" : p.status === "error" ? "mapping failed"
                       : `${p.mapping!.records.length} record types${p.edited ? " · edited" : ""}`}
                   </span>
@@ -263,6 +320,12 @@ export default function ConnectSource({ active, onClose, onChanged }: { active: 
 
           {/* Detail */}
           <div className="min-h-0 overflow-y-auto p-4">
+            {view === "validate" && report && incremental && (
+              <p className="mb-3 rounded-md bg-orange-950/60 px-3 py-2 text-xs text-orange-200">
+                Changes since the last load, read from Databricks&apos; Change Data Feed:{" "}
+                {incremental.changes.map((c) => `${c.table} (v${c.from}–${c.to}: ${c.inserted} new, ${c.updated} changed, ${c.deleted} deleted)`).join("; ")}.
+                Merged into the rows already loaded and re-detected over the full history with the last approved mapping.</p>
+            )}
             {view === "validate" && report && <ValidationView report={report} />}
             {view === "result" && result && (
               <ResultView result={result} graph={graph} active={active} onCustomer={showCustomer} onRemove={removeBatch} busy={busy} />
@@ -270,6 +333,7 @@ export default function ConnectSource({ active, onClose, onChanged }: { active: 
             {view !== "validate" && view !== "result" && pf && (typeof pf === "string"
               ? <p className="text-sm text-red-400">Could not read {view}: {pf}</p>
               : mapping ? <MappingView file={pf} mapping={mapping} proposal={proposals[view]}
+                                       total={files.find((f) => f.name === view)?.table?.rows}
                                        onEdit={(r, i, c) => editField(view, r, i, c)} />
               : <FilePreview file={pf} status={proposals[view]} />)}
           </div>
@@ -283,7 +347,7 @@ export default function ConnectSource({ active, onClose, onChanged }: { active: 
 function FilePreview({ file, status }: { file: ParsedFile; status?: Proposal }) {
   return (
     <div>
-      <p className="font-mono text-sm">{file.name} <span className="text-xs text-zinc-500">· {file.format} · {file.rows.length} rows · {file.columns.length} columns</span></p>
+      <p className="font-mono text-sm">{file.name} <span className="text-xs text-zinc-500">· {file.format} · {file.columns.length} columns · showing {Math.min(8, file.rows.length)} example rows</span></p>
       {status?.status === "error" && <p className="mt-1 text-xs text-red-400">{status.error}</p>}
       <p className="mt-1 text-xs text-zinc-500">{status?.status === "mapping" ? "Claude is reading the columns and sample rows…" : "Not mapped yet."}</p>
       <div className="mt-3 overflow-x-auto">
@@ -301,8 +365,8 @@ function FilePreview({ file, status }: { file: ParsedFile; status?: Proposal }) 
 const fmt = (v: unknown) => (v === null || v === undefined ? "" : typeof v === "object" ? JSON.stringify(v) : String(v));
 
 // ------------------------------------------------------------------ the mapping
-function MappingView({ file, mapping, proposal, onEdit }: {
-  file: ParsedFile; mapping: FileMapping; proposal: Proposal;
+function MappingView({ file, mapping, proposal, total, onEdit }: {
+  file: ParsedFile; mapping: FileMapping; proposal: Proposal; total?: number;   // total: a table's rows (file holds a preview)
   onEdit: (record: number, field: number, change: Partial<FieldMap>) => void;
 }) {
   const { events, problems } = useMemo(() => mapFile(file, mapping), [file, mapping]);
@@ -311,10 +375,11 @@ function MappingView({ file, mapping, proposal, onEdit }: {
   return (
     <div className="space-y-4">
       <div>
-        <p className="font-mono text-sm">{file.name} <span className="text-xs text-zinc-500">· {file.format} · {file.rows.length} rows ·
+        <p className="font-mono text-sm">{file.name} <span className="text-xs text-zinc-500">· {file.format} · {(total ?? file.rows.length).toLocaleString()} rows ·
           source <span className="text-zinc-300">{mapping.source}</span> · mapped by Claude in {proposal.seconds}s{proposal.edited ? " · edited by you" : ""}</span></p>
         <p className="mt-1 text-sm text-zinc-300">{mapping.reason}</p>
         <p className="mt-1 text-xs text-zinc-500">
+          {total !== undefined && <span>In the {file.rows.length} example rows (the table stays in Databricks; Validate checks all {total.toLocaleString()}): </span>}
           {events.length} rows → contract events{skipped ? ` · ${skipped} skipped on purpose` : ""}
           {unmatched ? <span className="text-amber-400"> · {unmatched} rows match no record type</span> : null}
           {problems.length ? <span className="text-red-400"> · {problems.length} values could not be converted</span> : null}

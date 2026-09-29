@@ -1,20 +1,28 @@
 import { z } from "zod";
 import { FileMappingSchema } from "@/lib/mapping";
+import { resolve } from "@/lib/sources";
 import { run } from "@/lib/uploads";
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 const Body = z.object({
   name: z.string().min(1),
-  files: z.array(z.object({ name: z.string(), content: z.string() })).min(1),
+  files: z.array(z.object({ name: z.string(), content: z.string() })).default([]),
+  tables: z.array(z.object({ table: z.string().regex(/^[A-Za-z0-9_]+$/), version: z.number().int().nonnegative() })).default([]),
   mappings: z.array(FileMappingSchema),
   edited_files: z.array(z.string()).default([]),   // files whose mapping the reviewer changed
-});
+}).refine((b) => b.files.length + b.tables.length > 0, "no files or tables");
 
-// Approve -> run: detector over the mapped events, written to Neo4j under upload:<name>.
+// Approve -> run: detector over the mapped events, written to Neo4j. Tables are read at the versions that
+// were validated, and those versions are kept on the batch for the next (incremental) load.
 export async function POST(request: Request) {
   const body = Body.safeParse(await request.json());
   if (!body.success) return Response.json({ error: body.error.message }, { status: 400 });
-  const result = await run(body.data.files, body.data.mappings, body.data.name, body.data.edited_files);
-  return Response.json(result, { status: result.ok ? 200 : 422 });
+  try {
+    const { files, tables, mappings, name, edited_files } = body.data;
+    const result = await run(await resolve(files, tables), mappings, name, edited_files, tables);
+    return Response.json(result, { status: result.ok ? 200 : 422 });
+  } catch (err) {
+    return Response.json({ ok: false, error: (err as Error).message }, { status: 422 });
+  }
 }

@@ -1,19 +1,24 @@
 import { z } from "zod";
 import { FileMappingSchema } from "@/lib/mapping";
+import { resolve } from "@/lib/sources";
 import { check } from "@/lib/uploads";
 
+export const maxDuration = 120;
+
+// Uploaded files come with their contents; Databricks tables as references the server reads itself (§21.2).
 const Body = z.object({
   name: z.string().min(1),
-  files: z.array(z.object({ name: z.string(), content: z.string() })).min(1),
+  files: z.array(z.object({ name: z.string(), content: z.string() })).default([]),
+  tables: z.array(z.object({ table: z.string().regex(/^[A-Za-z0-9_]+$/), version: z.number().int().nonnegative() })).default([]),
   mappings: z.array(FileMappingSchema),
-});
+}).refine((b) => b.files.length + b.tables.length > 0, "no files or tables");
 
 // Validator + dry run: nothing is written.
 export async function POST(request: Request) {
   const body = Body.safeParse(await request.json());
   if (!body.success) return Response.json({ error: body.error.message }, { status: 400 });
   try {
-    return Response.json(await check(body.data.files, body.data.mappings, body.data.name));
+    return Response.json(await check(await resolve(body.data.files, body.data.tables), body.data.mappings, body.data.name));
   } catch (err) {
     return Response.json({ error: (err as Error).message }, { status: 422 });
   }

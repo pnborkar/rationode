@@ -10,6 +10,7 @@ import { removeScenario, writeRows } from "./storyWriter";
 import { validate, type Validation } from "./validator";
 
 export type UploadedFile = { name: string; content: string };
+export type TableSource = { table: string; version: number };   // a Databricks table at one Delta version
 
 export const MAX_FILE_BYTES = 30_000_000;   // tables from Databricks can be larger than uploads
 
@@ -50,7 +51,7 @@ async function alreadyLoaded(eventIds: string[], scenario: string) {
 }
 
 // What a batch holds now: source ID -> the stored raw row and the load that brought that version.
-async function storedEvents(scenario: string) {
+export async function storedEvents(scenario: string) {
   return new Map((await query<{ id: string; payload: string; batch: string | null; file: string | null; row: number | null }>(
     `MATCH (e:Event {scenario_id: $scenario})
      RETURN e.event_id AS id, e.payload_json AS payload, e.batch_id AS batch, e.source_file AS file, e.source_row AS row`,
@@ -83,8 +84,7 @@ async function diffAgainst(scenario: string, events: Validation["events"]) {
 // Re-uploading is not an error: records already in a batch update that batch (re-detected over the whole
 // files, so only what changed changes); identical files load nothing. Records that belong to the history
 // or an Events-tab set can't be loaded as an upload.
-async function validateAll(files: UploadedFile[], mappings: FileMapping[], name: string, registry: Registry) {
-  const parsed = parseAll(files);
+async function validateAll(parsed: ParsedFile[], mappings: FileMapping[], name: string, registry: Registry) {
   let scenario = scenarioFor(name);
   let report = validate(parsed, mappings, registry, scenario);
   const ids = report.events.map((e) => e.event_id).filter(Boolean);
@@ -119,8 +119,8 @@ async function validateAll(files: UploadedFile[], mappings: FileMapping[], name:
   return report;
 }
 
-export async function check(files: UploadedFile[], mappings: FileMapping[], name: string) {
-  const report: Partial<Validation> = await validateAll(files, mappings, name, await loadRegistry());
+export async function check(parsed: ParsedFile[], mappings: FileMapping[], name: string) {
+  const report: Partial<Validation> = await validateAll(parsed, mappings, name, await loadRegistry());
   delete report.events;   // the client gets the report, not every mapped event
   return report;
 }
@@ -133,7 +133,8 @@ const PROVENANCE = `
                 m.first_approved_at = datetime($loadedAt)
   CREATE (b:UploadBatch {batch_id: $batchId, scenario_id: $scenario, name: $name, loaded_at: datetime($loadedAt),
                          files: $files, records: toInteger($records), new: toInteger($new), changed: toInteger($changed),
-                         unchanged: toInteger($unchanged), removed: toInteger($removed), edited_files: $editedFiles})
+                         unchanged: toInteger($unchanged), removed: toInteger($removed), edited_files: $editedFiles,
+                         sources_json: $sourcesJson})
   MERGE (b)-[:USED_MAPPING]->(m)
   WITH b
   OPTIONAL MATCH (p:UploadBatch {scenario_id: $scenario}) WHERE p <> b AND NOT EXISTS { (:UploadBatch)-[:SUPERSEDES]->(p) }
@@ -144,10 +145,12 @@ export async function removeBatches(scenario: string) {
   await query(`MATCH (m:Mapping) WHERE NOT EXISTS { (:UploadBatch)-[:USED_MAPPING]->(m) } DELETE m`);
 }
 
-// Validate again server-side (never trust the client's copy), then write and place in the trees.
-export async function run(files: UploadedFile[], mappings: FileMapping[], name: string, editedFiles: string[] = []) {
+// Validate again server-side (never trust the client's copy), then write and place in the trees. `sources`:
+// the Databricks tables and versions read, kept on the batch so the next load reads only what changed.
+export async function run(parsed: ParsedFile[], mappings: FileMapping[], name: string, editedFiles: string[] = [],
+                          sources: TableSource[] = []) {
   const registry = await loadRegistry();
-  const report = await validateAll(files, mappings, name, registry);
+  const report = await validateAll(parsed, mappings, name, registry);
   if (!report.ok) return { ok: false as const, error: "The mapping has validation errors", report: { ...report, events: undefined } };
   const t = report.target;
   if (t && t.new === 0 && t.changed === 0 && t.removed === 0) {
@@ -172,10 +175,10 @@ export async function run(files: UploadedFile[], mappings: FileMapping[], name: 
   const mappingJson = JSON.stringify(mappings);
   await query(PROVENANCE, {
     mappingId: createHash("sha256").update(mappingJson).digest("hex").slice(0, 16), mappingJson,
-    files: files.map((f) => f.name), proposedBy: `Claude mapping agent (${(await aiSettings()).mappingModel}), reviewed and approved in the app`,
+    files: parsed.map((f) => f.name), proposedBy: `Claude mapping agent (${(await aiSettings()).mappingModel}), reviewed and approved in the app`,
     batchId, scenario, name, loadedAt, records: report.events.length,
     new: t ? t.new : report.events.length, changed: t?.changed ?? 0, unchanged: t?.unchanged ?? 0, removed: t?.removed ?? 0,
-    editedFiles,
+    editedFiles, sourcesJson: sources.length ? JSON.stringify(sources) : null,
   });
   // A tenant's own history isn't placed into trees: its trees are built from it (pipeline, per tenant).
   const branches = scenario === SCENARIO && !IS_DEMO ? [] : await placeScenario(scenario);

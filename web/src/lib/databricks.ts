@@ -62,18 +62,46 @@ export async function listTables(given?: DatabricksSettings): Promise<{ table: s
   })));
 }
 
-// A table's rows as JSON lines, plus its current Delta version (for provenance and incremental reads).
-export async function readTable(table: string): Promise<{ name: string; content: string; rows: number; version: number | null }> {
-  const cfg = await config();
-  const fq = quoted(`${cfg.schema}.${table}`);
-  const { columns, rows } = await sql(`SELECT * FROM ${fq}`, cfg);
+// Rows as objects; nested STRUCT/ARRAY/MAP columns parsed so they flatten like JSONL.
+function decode(columns: Column[], rows: (string | null)[][]): Record<string, unknown>[] {
   const nested = new Set(columns.filter((c) => ["STRUCT", "ARRAY", "MAP"].includes(c.type_name)).map((c) => c.name));
-  const lines = rows.map((r) => JSON.stringify(Object.fromEntries(columns.map((c, i) => {
+  return rows.map((r) => Object.fromEntries(columns.map((c, i) => {
     const v = r[i];
     return [c.name, v != null && nested.has(c.name) ? JSON.parse(v) : v];
-  }))));
-  const history = await sql(`DESCRIBE HISTORY ${fq} LIMIT 1`, cfg).catch(() => null);
-  const vIdx = history?.columns.findIndex((c) => c.name === "version") ?? -1;
-  const version = history && vIdx >= 0 ? Number(history.rows[0]?.[vIdx]) : null;
-  return { name: table, content: lines.join("\n") + "\n", rows: rows.length, version };
+  })));
+}
+
+// A table's current Delta version.
+export async function tableVersion(table: string, given?: DatabricksSettings): Promise<number> {
+  const cfg = await config(given);
+  const h = await sql(`DESCRIBE HISTORY ${quoted(`${cfg.schema}.${table}`)} LIMIT 1`, cfg);
+  const i = h.columns.findIndex((c) => c.name === "version");
+  return Number(h.rows[0]?.[i]);
+}
+
+// A table's rows as JSON lines at one Delta version (the current one if not given), so every step of a
+// load (propose, validate, approve) reads the same snapshot.
+export async function readTable(table: string, version?: number): Promise<{ name: string; content: string; rows: number; version: number }> {
+  const cfg = await config();
+  const v = version ?? await tableVersion(table, cfg);
+  const { columns, rows } = await sql(`SELECT * FROM ${quoted(`${cfg.schema}.${table}`)} VERSION AS OF ${Math.trunc(v)}`, cfg);
+  const lines = decode(columns, rows).map((r) => JSON.stringify(r));
+  return { name: table, content: lines.join("\n") + "\n", rows: rows.length, version: v };
+}
+
+export type Change = { type: "insert" | "update_postimage" | "delete"; version: number; row: Record<string, unknown> };
+
+// What changed in a table between two Delta versions (Change Data Feed), oldest first; update pre-images
+// dropped. The row comes without the feed's own columns.
+export async function readChanges(table: string, from: number, to: number): Promise<Change[]> {
+  const cfg = await config();
+  const name = `${cfg.schema}.${table}`.replaceAll("'", "");
+  const { columns, rows } = await sql(
+    `SELECT * FROM table_changes('${name}', ${Math.trunc(from)}, ${Math.trunc(to)}) ` +
+    `WHERE _change_type <> 'update_preimage' ORDER BY _commit_version`, cfg);
+  return decode(columns, rows).map((r) => {
+    const row = { ...r };
+    for (const k of ["_change_type", "_commit_version", "_commit_timestamp"]) delete row[k];
+    return { type: r._change_type as Change["type"], version: Number(r._commit_version), row };
+  });
 }
