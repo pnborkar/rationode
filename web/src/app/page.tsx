@@ -238,6 +238,7 @@ export default function StreamlyLive() {
   const [live, setLive] = useState<{ nodes: ViewNode[]; rels: ViewRel[] }>({ nodes: [], rels: [] });
   const [graphMode, setGraphMode] = useState<"graph" | "table">("graph");
   const [expanded, setExpanded] = useState(false);
+  const [thinkingExpanded, setThinkingExpanded] = useState(false);
 
   // Customers from sets loaded, and batches uploaded, on the Events tab join the dropdown.
   const caseKeyRef = useRef(caseKey);
@@ -269,9 +270,9 @@ export default function StreamlyLive() {
     pickCase(LIVE_CASES[0].key);
   }
 
-  // Esc closes the expanded graph.
+  // Esc closes the expanded graph or thinking panel.
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setExpanded(false); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") { setExpanded(false); setThinkingExpanded(false); } };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
@@ -447,6 +448,23 @@ export default function StreamlyLive() {
       <span><i className="mr-1 inline-block h-2 w-2 rounded-full bg-red-500" />disputed</span>
     </span>
   );
+  const thinkingBody = (
+          <div className="space-y-3">
+            {thinking && <p className="text-sm italic text-zinc-400">“{thinking.trim()}”</p>}
+            {!graphOn && steps.length > 0 && (
+              <p className="text-xs text-zinc-500">Decision graph off: the agent has only its instructions.</p>
+            )}
+            {steps.map((s, i) => (
+              <div key={i}>
+                <StepCard step={s} />
+                {s.via && <p className="mt-0.5 text-right text-[10px] text-zinc-500">
+                  via {s.via}{s.ms != null ? ` · ${s.ms} ms` : ""}{s.via === "Rationode gateway" ? " · recorded for the decision graph" : ""}</p>}
+              </div>
+            ))}
+            {!steps.length && !running && <p className="text-sm text-zinc-500">Send {current.name.split(" ")[0]}&apos;s message to start.</p>}
+          </div>
+  );
+
   const graphControls = (
     <span className="flex items-center gap-3">
       {graphMode === "graph" && legend}
@@ -552,22 +570,13 @@ export default function StreamlyLive() {
           </div>
         </Panel>
 
-        <Panel title="Agent's thinking" badge={<span className="text-xs text-zinc-500">
-          claude-opus-5 · prompt v2 · graph {graphOn ? "on" : "off"}</span>}>
-          <div className="space-y-3">
-            {thinking && <p className="text-sm italic text-zinc-400">“{thinking.trim()}”</p>}
-            {!graphOn && steps.length > 0 && (
-              <p className="text-xs text-zinc-500">Decision graph off: the agent has only its instructions.</p>
-            )}
-            {steps.map((s, i) => (
-              <div key={i}>
-                <StepCard step={s} />
-                {s.via && <p className="mt-0.5 text-right text-[10px] text-zinc-500">
-                  via {s.via}{s.ms != null ? ` · ${s.ms} ms` : ""}{s.via === "Rationode gateway" ? " · recorded for the decision graph" : ""}</p>}
-              </div>
-            ))}
-            {!steps.length && !running && <p className="text-sm text-zinc-500">Send {current.name.split(" ")[0]}&apos;s message to start.</p>}
-          </div>
+        <Panel title="Agent's thinking" badge={
+          <span className="flex items-center gap-2 text-xs text-zinc-500">
+            claude-opus-5 · prompt v2 · graph {graphOn ? "on" : "off"}
+            <button onClick={() => setThinkingExpanded(true)} title="Expand"
+                    className="rounded-md border border-zinc-700 px-2 py-0.5 text-zinc-300 hover:bg-zinc-800">⤢ Expand</button>
+          </span>}>
+          {!thinkingExpanded && thinkingBody}
         </Panel>
 
         <Panel title="Support rep console" badge={<span className="text-xs text-zinc-500">{REP.name} · {REP.team}</span>}>
@@ -616,6 +625,20 @@ export default function StreamlyLive() {
           <div className="-m-4 h-[calc(100%+2rem)]">{!expanded && graphBody}</div>
         </Panel>
       </div>
+
+      {thinkingExpanded && tab === "live" && (
+        <div className="fixed inset-0 z-50 flex flex-col bg-zinc-950/95 p-4 backdrop-blur">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-300">
+              Agent&apos;s thinking <span className="font-normal normal-case text-zinc-500">· {current.name} · claude-opus-5 · graph {graphOn ? "on" : "off"}</span></h2>
+            <button onClick={() => setThinkingExpanded(false)} title="Close (Esc)"
+                    className="rounded-md border border-zinc-700 px-2 py-0.5 text-xs text-zinc-300 hover:bg-zinc-800">✕ Close</button>
+          </div>
+          <div className="mx-auto min-h-0 w-full max-w-4xl flex-1 overflow-y-auto rounded-xl border border-zinc-800 bg-zinc-900/60 p-6 text-base">
+            {thinkingBody}
+          </div>
+        </div>
+      )}
 
       {expanded && tab === "live" && (
         <div className="fixed inset-0 z-50 flex flex-col bg-zinc-950/95 p-4 backdrop-blur">
