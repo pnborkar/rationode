@@ -58,19 +58,33 @@ export async function ingestLive(raws: RawEvent[]) {
     ...raws,
   ];
   const events = all.map(toContract).filter((e): e is ContractEvent => !!e);
-  // The gateway knows which calls are one conversation (session): a lookup made while working a ticket
-  // belongs to that ticket even if its arguments didn't name it.
-  const ticketOfSession = new Map<string, string>();
+  // The gateway knows which calls are one conversation (session). A call that doesn't name its ticket (e.g. a
+  // customer lookup) belongs to the next call in the same session that does (the proposal it leads to), else
+  // the previous one. A session can work several tickets in turn, so "the session's ticket" isn't enough.
+  const bySession = new Map<string, ContractEvent[]>();
   for (const e of events) {
-    const { session_id, ticket_id } = e.entity_refs;
-    if (session_id && ticket_id) ticketOfSession.set(session_id, ticket_id);
+    const s = e.entity_refs.session_id;
+    if (s) bySession.set(s, [...(bySession.get(s) ?? []), e]);
   }
-  for (const e of events) {
-    const { session_id, ticket_id } = e.entity_refs;
-    if (session_id && !ticket_id && ticketOfSession.has(session_id)) e.entity_refs.ticket_id = ticketOfSession.get(session_id);
+  for (const list of bySession.values()) {
+    list.sort((a, b) => (a.occurred_at < b.occurred_at ? -1 : a.occurred_at > b.occurred_at ? 1 : 0));
+    list.forEach((e, i) => {
+      if (e.entity_refs.ticket_id) return;
+      const next = list.slice(i + 1).find((x) => x.entity_refs.ticket_id);
+      const prev = [...list.slice(0, i)].reverse().find((x) => x.entity_refs.ticket_id);
+      const t = next?.entity_refs.ticket_id ?? prev?.entity_refs.ticket_id;
+      if (t) e.entity_refs.ticket_id = t;
+    });
   }
   const rows = rowsDict(new Detector(await loadRegistry(), LIVE).run(events));
   await resolveEntities(rows);
+  // Live decisions a re-run no longer produces (e.g. after a correction) are removed, so none linger.
+  await query(
+    `MATCH (d:Decision {scenario_id: $live}) WHERE NOT d.decision_id IN $ids
+     OPTIONAL MATCH (d)-[:HAD_CONTEXT]->(c:Context)
+     DETACH DELETE d, c`,
+    { live: LIVE, ids: rows.decisions.map((d) => d.decision_id) },
+  );
   await writeRows(rows);
   return {
     events: rows.events.length,
