@@ -243,12 +243,13 @@ export default function ConnectSource({ active, onClose, onChanged }: { active: 
                   title={`Read every table in ${dbx.schema} through the Databricks SQL API`}>
             {busy === "files" ? "Reading…" : "Load from Databricks"}</button>
         )}
-        {dbx?.configured && pending?.batch && (
-          <button onClick={checkChanges} disabled={!!busy || !changedTables}
+        {/* Only when a table changed since the last Databricks load (Change Data Feed). */}
+        {dbx?.configured && pending?.batch && changedTables > 0 && (
+          <button onClick={checkChanges} disabled={!!busy}
                   className="rounded-md border border-orange-700 px-3 py-1 font-semibold text-orange-300 disabled:opacity-40"
                   title="Read only the rows changed in Databricks since the last load (Change Data Feed)">
-            {busy === "changes" ? "Reading changes…" : changedTables
-              ? `Load changes from Databricks (${changedTables} table${changedTables > 1 ? "s" : ""} changed)` : "Databricks: no changes since the last load"}</button>
+            {busy === "changes" ? "Reading changes…"
+              : `Load changes from Databricks (${changedTables} table${changedTables > 1 ? "s" : ""} changed)`}</button>
         )}
         <label className="cursor-pointer rounded-md border border-zinc-700 px-3 py-1">
           Upload files…
