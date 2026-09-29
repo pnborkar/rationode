@@ -545,7 +545,8 @@ export default function StreamlyLive() {
             {[...PREPARED, ...storyCases].map((c) => <option key={c.key} value={c.key}>{c.name}{c.setNumber ? ` (Set ${c.setNumber})` : ""}</option>)}
             {[...new Set(uploadCases.map((c) => c.scenario))].map((sc) => (
               <optgroup key={sc} label={`Uploaded · ${sc}`}>
-                {uploadCases.filter((c) => c.scenario === sc).map((c) => <option key={c.key} value={c.key}>{c.name}</option>)}
+                {uploadCases.filter((c) => c.scenario === sc).map((c) => (
+                  <option key={c.key} value={c.key}>{c.name}{DEMO ? "" : ` · ${c.message.slice(0, 48)}`}</option>))}
               </optgroup>
             ))}
           </select>}>
