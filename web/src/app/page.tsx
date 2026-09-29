@@ -181,10 +181,21 @@ const toCases = (sets: SetInfo[]): LiveCase[] => sets.filter((s) => s.loaded && 
     : undefined,
 }));
 
+// Customers from batches uploaded on the Events tab ("Connect a source") who have a case in the files.
+type UploadedCase = { scenario: string; email: string; name: string; message: string; via_bank: boolean; case_in_files: string };
+const toUploadCases = (rows: UploadedCase[]): LiveCase[] => rows.map((u, i) => ({
+  key: `up-${u.email}`, name: u.name, email: u.email, ticket_id: `52${String(i + 1).padStart(4, "0")}`,
+  blurb: `Uploaded (${u.scenario}). Their case in the files: ${u.case_in_files}.`, message: u.message, scenario: u.scenario,
+  note: u.via_bank
+    ? `${u.name.split(" ")[0]} went to their bank, not support. Sending this message here asks: what if they had contacted support first?`
+    : undefined,
+}));
+
 export default function StreamlyLive() {
   const [tab, setTab] = useState<"live" | "events">("live");
   const [storyCases, setStoryCases] = useState<LiveCase[]>([]);
-  const cases = [...LIVE_CASES, ...storyCases];
+  const [uploadCases, setUploadCases] = useState<LiveCase[]>([]);
+  const cases = [...LIVE_CASES, ...storyCases, ...uploadCases];
   const [caseKey, setCaseKey] = useState(LIVE_CASES[0].key);
   const current = cases.find((c) => c.key === caseKey) ?? LIVE_CASES[0];
   const TICKET = current.ticket_id;
@@ -202,12 +213,15 @@ export default function StreamlyLive() {
   const [graphMode, setGraphMode] = useState<"graph" | "table">("graph");
   const [expanded, setExpanded] = useState(false);
 
-  // Customers from sets loaded on the Events tab join the dropdown.
-  const refreshStories = () =>
-    fetch("/api/stories").then((r) => r.json()).then((sets: SetInfo[]) => setStoryCases(toCases(sets)));
+  // Customers from sets loaded, and batches uploaded, on the Events tab join the dropdown.
+  const refreshStories = () => Promise.all([
+    fetch("/api/stories").then((r) => r.json()).then((sets: SetInfo[]) => setStoryCases(toCases(sets))),
+    fetch("/api/upload/cases").then((r) => r.json()).then((rows: UploadedCase[]) => setUploadCases(toUploadCases(rows))),
+  ]);
   useEffect(() => {
     let alive = true;
     fetch("/api/stories").then((r) => r.json()).then((sets: SetInfo[]) => { if (alive) setStoryCases(toCases(sets)); });
+    fetch("/api/upload/cases").then((r) => r.json()).then((rows: UploadedCase[]) => { if (alive) setUploadCases(toUploadCases(rows)); });
     return () => { alive = false; };
   }, []);
 
@@ -393,7 +407,12 @@ export default function StreamlyLive() {
         <Panel title="Streamly help chat" badge={
           <select value={caseKey} onChange={(e) => pickCase(e.target.value)} disabled={running}
                   className="rounded-md border border-zinc-700 bg-zinc-950 px-2 py-0.5 text-xs text-zinc-200">
-            {cases.map((c) => <option key={c.key} value={c.key}>{c.name}{c.setNumber ? ` (Set ${c.setNumber})` : ""}</option>)}
+            {[...LIVE_CASES, ...storyCases].map((c) => <option key={c.key} value={c.key}>{c.name}{c.setNumber ? ` (Set ${c.setNumber})` : ""}</option>)}
+            {[...new Set(uploadCases.map((c) => c.scenario))].map((sc) => (
+              <optgroup key={sc} label={`Uploaded · ${sc}`}>
+                {uploadCases.filter((c) => c.scenario === sc).map((c) => <option key={c.key} value={c.key}>{c.name}</option>)}
+              </optgroup>
+            ))}
           </select>}>
           <div className="flex h-full flex-col">
             <div className="mb-3 flex items-start gap-2 rounded-md bg-zinc-950/60 px-3 py-2 text-xs text-zinc-400">

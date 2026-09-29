@@ -72,3 +72,38 @@ export async function removeUpload(scenario: string) {
   await recomputePoints(touched);
   return { removed, branchesRestored: touched.length };
 }
+
+// Uploaded customers with a case (a support ticket or a card dispute), for the live tab's dropdown.
+// Their message: the ticket's subject from the export, or, for customers who went straight to their
+// bank, a line in their words from the dispute category (as the Events-tab sets do).
+const BANK_MESSAGE: Record<string, (usd: string) => string> = {
+  subscription_canceled: (usd) => `I thought I canceled. Why was I charged ${usd} again?`,
+  not_recognized: (usd) => `I don't recognise a ${usd} charge from Streamly on my card.`,
+  unauthorized: (usd) => `I never signed up for Streamly. Why was I charged ${usd}?`,
+  duplicate_charge: (usd) => `I was charged ${usd} twice by Streamly.`,
+};
+
+export async function uploadedCases() {
+  const rows = await query<{ scenario: string; email: string; name: string; subject: string | null;
+                             dispute: string | null; amount: number | null }>(
+    `MATCH (c:Customer:Entity {source_system: 'stripe'}) WHERE c.scenario_id STARTS WITH 'upload:'
+     OPTIONAL MATCH (c)<-[:ABOUT]-(:Decision)-[:ABOUT]->(t:Ticket)
+     OPTIONAL MATCH (c)<-[:ABOUT]-(:Decision)-[:ABOUT]->(dp:Dispute)
+     OPTIONAL MATCH (c)<-[:ABOUT]-(:Decision)-[:ABOUT]->(ch:Charge)
+     WITH c, head(collect(DISTINCT t.subject)) AS subject, head(collect(DISTINCT dp.category)) AS dispute,
+          max(ch.amount_usd) AS amount
+     WHERE subject IS NOT NULL OR dispute IS NOT NULL
+     RETURN c.scenario_id AS scenario, c.email AS email, c.name AS name, subject, dispute, amount
+     ORDER BY scenario, name`,
+  );
+  return rows.map((r) => {
+    const usd = r.amount != null ? `$${Math.round(r.amount)}` : "this";
+    const viaBank = !r.subject;
+    return {
+      scenario: r.scenario, email: r.email, name: r.name,
+      message: r.subject ?? (BANK_MESSAGE[r.dispute ?? ""] ?? BANK_MESSAGE.not_recognized)(usd),
+      via_bank: viaBank,
+      case_in_files: viaBank ? `card dispute (${r.dispute?.replaceAll("_", " ")})` : `support ticket: "${r.subject}"`,
+    };
+  });
+}

@@ -1,3 +1,4 @@
+import { amount, isType, payloadField } from "./eventFields";
 import { query } from "./neo4j";
 
 // The demo's "now": the start of the loop month, after the Jan-Jun history (demo spec Section 5).
@@ -32,29 +33,28 @@ export async function getCustomer(email: string): Promise<CustomerInfo | null> {
     refunds: number; canceled: boolean;
   }>(
     `MATCH (c:Customer:Entity {source_system: 'stripe', email: $email})
-     MATCH (sub:Event {event_type: 'subscription.created', stripe_customer_id: c.source_key})
-     MATCH (ch:Event {event_type: 'charge.succeeded', stripe_customer_id: c.source_key})
-     WHERE ch.occurred_at <= datetime($now)
+     MATCH (sub:Event {stripe_customer_id: c.source_key}) WHERE ${isType("sub", "subscription.created")}
+     MATCH (ch:Event {stripe_customer_id: c.source_key})
+     WHERE ${isType("ch", "charge.succeeded")} AND ch.occurred_at <= datetime($now)
      WITH c, sub, ch ORDER BY ch.occurred_at DESC
      WITH c, sub, collect(ch)[0] AS last
-     OPTIONAL MATCH (r:Event {event_type: 'refund.created'})
-       WHERE r.charge_id = last.charge_id AND r.occurred_at >= datetime($now) - duration('P90D')
-     OPTIONAL MATCH (x:Event {event_type: 'subscription.canceled', stripe_customer_id: c.source_key})
-       WHERE x.occurred_at <= datetime($now)
-     RETURN c.source_key AS cus, c.name AS name, apoc.convert.fromJsonMap(sub.payload_json).started_at AS started,
-            apoc.convert.fromJsonMap(sub.payload_json).plan AS plan, last.charge_id AS charge_id,
-            apoc.convert.fromJsonMap(last.payload_json).data.object.amount / 100.0 AS amount,
+     OPTIONAL MATCH (r:Event {charge_id: last.charge_id})
+       WHERE ${isType("r", "refund.created")} AND r.occurred_at >= datetime($now) - duration('P90D')
+     OPTIONAL MATCH (x:Event {stripe_customer_id: c.source_key})
+       WHERE ${isType("x", "subscription.canceled")} AND x.occurred_at <= datetime($now)
+     RETURN c.source_key AS cus, c.name AS name, ${payloadField("sub", "started_at")} AS started,
+            ${payloadField("sub", "plan")} AS plan, last.charge_id AS charge_id, ${amount("last")} AS amount,
             count(DISTINCT r) AS refunds, count(x) > 0 AS canceled`,
     { email, now: DEMO_NOW.toISOString() },
   );
   const r = rows[0];
   if (!r) return null;
   const refunds = await query<{ date: string; amount_usd: number; charge_id: string }>(
-    `MATCH (ch:Event {event_type: 'charge.succeeded', stripe_customer_id: $cus})
-     MATCH (rf:Event {event_type: 'refund.created', charge_id: ch.charge_id})
-     WHERE rf.occurred_at <= datetime($now) AND rf.occurred_at >= datetime($now) - duration('P90D')
-     RETURN toString(date(rf.occurred_at)) AS date, rf.charge_id AS charge_id,
-            apoc.convert.fromJsonMap(rf.payload_json).data.object.amount / 100.0 AS amount_usd
+    `MATCH (ch:Event {stripe_customer_id: $cus}) WHERE ${isType("ch", "charge.succeeded")}
+     MATCH (rf:Event {charge_id: ch.charge_id})
+     WHERE ${isType("rf", "refund.created")}
+       AND rf.occurred_at <= datetime($now) AND rf.occurred_at >= datetime($now) - duration('P90D')
+     RETURN toString(date(rf.occurred_at)) AS date, rf.charge_id AS charge_id, ${amount("rf")} AS amount_usd
      ORDER BY date`,
     { cus: r.cus, now: DEMO_NOW.toISOString() },
   );
@@ -85,19 +85,18 @@ export type UsagePattern =
 export async function checkUsage(email: string): Promise<UsagePattern | null> {
   const [c] = await query<{ cus: string; charged: string | null; amount: number | null }>(
     `MATCH (c:Customer:Entity {source_system: 'stripe', email: $email})
-     OPTIONAL MATCH (ch:Event {event_type: 'charge.succeeded', stripe_customer_id: c.source_key})
-       WHERE ch.occurred_at <= datetime($now)
+     OPTIONAL MATCH (ch:Event {stripe_customer_id: c.source_key})
+       WHERE ${isType("ch", "charge.succeeded")} AND ch.occurred_at <= datetime($now)
      WITH c, ch ORDER BY ch.occurred_at DESC
      WITH c, collect(ch)[0] AS last
-     RETURN c.source_key AS cus, toString(date(last.occurred_at)) AS charged,
-            apoc.convert.fromJsonMap(last.payload_json).data.object.amount / 100.0 AS amount`,
+     RETURN c.source_key AS cus, toString(date(last.occurred_at)) AS charged, ${amount("last")} AS amount`,
     { email, now: DEMO_NOW.toISOString() },
   );
   if (!c) return null;
   const rows = await query<{ week: string; hours: number; titles: number }>(
-    `MATCH (e:Event {event_type: 'playback.weekly_summary', stripe_customer_id: $cus})
-     WHERE e.occurred_at <= datetime($now)
-     WITH apoc.convert.fromJsonMap(e.payload_json) AS p
+    `MATCH (e:Event {stripe_customer_id: $cus})
+     WHERE ${isType("e", "usage.weekly")} AND e.occurred_at <= datetime($now)
+     WITH coalesce(apoc.convert.fromJsonMap(e.data_json), apoc.convert.fromJsonMap(e.payload_json)) AS p
      RETURN p.week_start AS week, p.hours_watched AS hours, p.titles_watched AS titles
      ORDER BY week DESC LIMIT 6`,
     { cus: c.cus, now: DEMO_NOW.toISOString() },

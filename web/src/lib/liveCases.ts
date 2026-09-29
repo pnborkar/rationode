@@ -9,6 +9,7 @@ export type LiveCase = {
   message: string;
   setNumber?: number;  // loaded from the Events tab (removable)
   note?: string;       // shown with the blurb, e.g. the customer went to their bank rather than support
+  scenario?: string;   // uploaded on the Events tab ("Connect a source"), e.g. upload:streamly-spring
 };
 
 export const LIVE_CASES: LiveCase[] = [

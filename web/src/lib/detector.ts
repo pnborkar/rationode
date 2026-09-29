@@ -195,6 +195,8 @@ export class Detector {
         payload_json: JSON.stringify(e.raw), charge_id: x.charge_id ?? null, ticket_id: x.ticket_id ?? null,
         dispute_id: x.dispute_id ?? null, stripe_customer_id: x.stripe_customer_id ?? null, email: x.customer_email ?? null,
         scenario_id: this.scenario,
+        // The contract's view of the event, so readers need not know each vendor's payload shape.
+        canonical_type: e.event_type, data_json: JSON.stringify(e.data),
       });
       const charge = x.charge_id || (x.ticket_id && ticketCharge.get(x.ticket_id)) || (x.dispute_id && disputeCharge.get(x.dispute_id));
       if (e.event_type.startsWith("subscription.") || e.event_type === "usage.weekly") {   // customer-level

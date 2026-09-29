@@ -41,7 +41,12 @@ function diff(label, ts, py) {
   return problems.length === 0;
 }
 
-const detect = (reg, scenario, raw) => rowsDict(new Detector(reg, scenario).run(raw.map(toContract).filter(Boolean)));
+// The Python rows predate the contract fields on Event rows (canonical_type, data_json); compare without them.
+const detect = (reg, scenario, raw) => {
+  const rows = rowsDict(new Detector(reg, scenario).run(raw.map(toContract).filter(Boolean)));
+  rows.events = rows.events.map(({ canonical_type: _c, data_json: _d, ...rest }) => rest);
+  return rows;
+};
 
 const driver = neo4j.driver(process.env.NEO4J_URI, neo4j.auth.basic(process.env.NEO4J_USERNAME, process.env.NEO4J_PASSWORD));
 const { records } = await driver.executeQuery(REGISTRY_CYPHER, {}, { database: process.env.NEO4J_DATABASE ?? "neo4j" });

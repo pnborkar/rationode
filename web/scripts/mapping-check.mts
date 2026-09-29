@@ -26,7 +26,7 @@ const mapped = rowsDict(new Detector(reg, "upload:check").run(mappings.flatMap((
 
 // Compare the graph, not the provenance: Event rows differ by design (source type, payload = the CSV row).
 const drop = (t: string, r: Record<string, unknown>) => {
-  const { payload_json: _p, event_type: _t, source_system: _s, ...rest } = r;
+  const { payload_json: _p, event_type: _t, source_system: _s, data_json: _d, ...rest } = r;
   // Actor labels (name, version) are only as good as what the export carries; identity and kind must match.
   return t === "events" ? rest : t === "decisions" ? { ...r, source_system: undefined }
     : t === "actors" ? { actor_id: r.actor_id, kind: r.kind } : r;

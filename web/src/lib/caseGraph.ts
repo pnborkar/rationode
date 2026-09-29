@@ -1,3 +1,4 @@
+import { isType } from "./eventFields";
 import { query } from "./neo4j";
 
 export type GraphNode = { id: string; kind: string; label: string; detail?: string; option?: string | null; outcomes?: string[] };
@@ -82,8 +83,8 @@ export async function customerGraph(email: string) {
 async function addUsage(customerId: string, nodes: GraphNode[], rels: GraphRel[]) {
   const weeks = await query<{ id: string; week: string; hours: number; titles: number }>(
     `MATCH (c:Customer:Entity {entity_id: $customer})
-     MATCH (e:Event {event_type: 'playback.weekly_summary', stripe_customer_id: c.source_key})
-     WITH e, apoc.convert.fromJsonMap(e.payload_json) AS p
+     MATCH (e:Event {stripe_customer_id: c.source_key}) WHERE ${isType("e", "usage.weekly")}
+     WITH e, coalesce(apoc.convert.fromJsonMap(e.data_json), apoc.convert.fromJsonMap(e.payload_json)) AS p
      RETURN e.event_id AS id, p.week_start AS week, p.hours_watched AS hours, p.titles_watched AS titles
      ORDER BY week`,
     { customer: customerId },
@@ -94,7 +95,7 @@ async function addUsage(customerId: string, nodes: GraphNode[], rels: GraphRel[]
      WHERE dp.category = 'subscription_canceled'
      MATCH (:Decision)-[:ABOUT]->(dp)
      MATCH (ch:Charge)<-[:ABOUT]-(:Decision)-[:ABOUT]->(dp)
-     MATCH (ev:Event {event_type: 'charge.succeeded', charge_id: ch.source_key})
+     MATCH (ev:Event {charge_id: ch.source_key}) WHERE ${isType("ev", "charge.succeeded")}
      RETURN DISTINCT dp.entity_id AS dispute, toString(date(ev.occurred_at)) AS charged`,
     { customer: customerId },
   );
@@ -127,7 +128,7 @@ async function addPolicyGap(email: string, nodes: GraphNode[], rels: GraphRel[])
      OPTIONAL MATCH (t:DecisionTree {tree_id: p.tree_id})
      WITH d, c, o, e, p, pol, t WHERE p.policy_option <> o.option_key
      RETURN d.decision_id AS decision, o.option_key AS chosen, c.\`charge.risk_score\` AS risk,
-            c.\`charge.card_age_days\` AS card_age, c.\`charge.country_match\` AS country, e.payload_json AS payload,
+            c.\`charge.card_age_days\` AS card_age, c.\`charge.country_match\` AS country, coalesce(e.data_json, e.payload_json) AS payload,
             t.policy_text AS policy, p.path_label AS branch, p.policy_option AS policy_option, p.point_id AS point
      LIMIT 1`,
     { email },

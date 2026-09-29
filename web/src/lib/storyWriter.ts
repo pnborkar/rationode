@@ -11,7 +11,8 @@ const Q = {
     SET e.source_system = r.source_system, e.event_type = r.event_type, e.occurred_at = datetime(r.occurred_at),
         e.payload_json = r.payload_json, e.payload_ref = 'inline:payload_json',
         e.charge_id = r.charge_id, e.ticket_id = r.ticket_id, e.dispute_id = r.dispute_id,
-        e.stripe_customer_id = r.stripe_customer_id, e.email = r.email, e.scenario_id = r.scenario_id`,
+        e.stripe_customer_id = r.stripe_customer_id, e.email = r.email, e.scenario_id = r.scenario_id,
+        e.canonical_type = r.canonical_type, e.data_json = r.data_json`,
   entities: (label: string) => `UNWIND $rows AS r
     MERGE (e:Entity {entity_id: r.entity_id})
     SET e:${label}, e.source_system = r.source_system, e.source_key = r.source_key, e.scenario_id = r.scenario_id
