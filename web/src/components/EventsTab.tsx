@@ -139,15 +139,6 @@ export default function EventsTab({ active, onChanged }: { active: boolean; onCh
     setBusy(null);
   }
 
-  async function resetAll() {
-    setBusy("reset");
-    await fetch("/api/stories/reset", { method: "POST" });
-    setResult(null); setHistory([]); setGraph({ nodes: [], rels: [] });
-    await refresh();
-    onChanged();
-    setBusy(null);
-  }
-
   // Newest phase on top: after "60 days later", its events lead and the earlier ones follow below a divider.
   const incoming = result ? result.events.slice(0, shown) : [];
 
@@ -230,11 +221,8 @@ export default function EventsTab({ active, onChanged }: { active: boolean; onCh
           ))}
             </div>}
           </div>
-          <button onClick={resetAll} disabled={!!busy || streaming}
-                  className="w-full rounded-md border border-zinc-700 py-1.5 text-xs text-zinc-300 disabled:opacity-40">
-            {busy === "reset" ? "Resetting…" : "Reset all (removes loaded sets, uploads, and live decisions; history untouched)"}
-          </button>
-          <DeleteScenario refreshKey={uploads.length + sets.filter((x) => x.loaded).length} onDeleted={() => { refresh(); onChanged(); }} />
+          <DeleteScenario refreshKey={uploads.length + sets.filter((x) => x.loaded).length}
+                          onDeleted={() => { setResult(null); setHistory([]); setGraph({ nodes: [], rels: [] }); refresh(); onChanged(); }} />
         </div>
       </section>
 
