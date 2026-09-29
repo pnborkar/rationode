@@ -50,6 +50,7 @@ class Rows:
     outcomes: list = field(default_factory=list)
     led_to: list = field(default_factory=list)
     schema_proposals: dict = field(default_factory=dict)
+    links: list = field(default_factory=list)   # identity: PAID_WITH, FROM_DEVICE, USED
     review: list = field(default_factory=list)
 
     def counts(self) -> dict:
@@ -158,6 +159,7 @@ class Detector:
 
         cases: dict[str, list[Ev]] = defaultdict(list)
         customer_events: list[Ev] = []
+        identity_events: list[Ev] = []
         for e in evs:
             self.rows.events.append({
                 "event_id": self.pid(e.event_id), "source_system": e.source, "event_type": e.type,
@@ -165,6 +167,10 @@ class Detector:
                 "charge_id": e.charge_id, "ticket_id": e.ticket_id, "dispute_id": e.dispute_id,
                 "stripe_customer_id": e.stripe_customer_id, "email": e.email, "scenario_id": self.scenario})
             charge = e.charge_id or ticket_charge.get(e.ticket_id) or dispute_charge.get(e.dispute_id)
+            if e.data.get("card_fingerprint") or e.data.get("device_id"):
+                identity_events.append(e)
+            if e.kind == "fraudguard:charge.signals":            # identity only, not part of the case
+                continue
             if e.source in ("subscriptions", "streamly_app"):   # customer-level: outcomes and usage context
                 customer_events.append(e)
             elif charge:
@@ -174,8 +180,27 @@ class Detector:
 
         for charge_id, case_events in cases.items():
             self.case(charge_id, case_events, email_cus, cus_name)
+        for e in identity_events:
+            self.identity(e, email_cus)
         self.customer_outcomes(customer_events)
         return self.rows
+
+    # ------------------------------------------------------------ identity (card, device) behind a charge
+    def identity(self, e: Ev, email_cus: dict) -> None:
+        cus = e.stripe_customer_id or email_cus.get(e.email)
+        if not (cus and e.charge_id):
+            self.rows.review.append({"event_id": e.event_id, "reason": "identity signals without customer or charge"})
+            return
+        charge, customer = self.pid(f"stripe:{e.charge_id}"), self.pid(f"stripe:{cus}")
+        d, links = e.data, self.rows.links
+        if d.get("card_fingerprint"):
+            card = self.entity("Card", "card", d["card_fingerprint"], country=d.get("card_country"))
+            links.append({"type": "PAID_WITH", "from": charge, "to": card, "at": e.at, "ip_country": None})
+            links.append({"type": "USED", "from": customer, "to": card, "at": e.at, "ip_country": None})
+        if d.get("device_id"):
+            device = self.entity("Device", "device", d["device_id"])
+            links.append({"type": "FROM_DEVICE", "from": charge, "to": device, "at": e.at, "ip_country": d.get("ip_country")})
+            links.append({"type": "USED", "from": customer, "to": device, "at": e.at, "ip_country": None})
 
     # ------------------------------------------------------------ one case (one charge)
     def case(self, charge_id: str, evs: list[Ev], email_cus: dict, cus_name: dict) -> None:

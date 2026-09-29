@@ -89,7 +89,11 @@
       "card_age_days": 622,
       "decision": "approve",
       "rule_id": "R-APPROVE-LE75",
-      "screened_at": "2026-06-05T08:00:58Z"
+      "screened_at": "2026-06-05T08:00:58Z",
+      "card_fingerprint": "RGP1BHl3jQ88NXTu",
+      "card_country": "US",
+      "device_id": "dev_32ac96ecdae7",
+      "ip_country": "ES"
      }
     },
     {
@@ -442,7 +446,7 @@
       "source_system": "fraudguard",
       "event_type": "charge.screened",
       "occurred_at": "2026-06-05T08:00:58Z",
-      "payload_json": "{\"screening_id\":\"scr_NtHxVMPZoe3Zok\",\"charge_ref\":\"ch_cxSSYhFAALg1ZK\",\"customer_email\":\"leo.marsh.set2@example.com\",\"amount\":180.0,\"currency\":\"usd\",\"plan\":\"annual_180\",\"is_renewal\":true,\"risk_score\":18,\"country_match\":false,\"card_age_days\":622,\"decision\":\"approve\",\"rule_id\":\"R-APPROVE-LE75\",\"screened_at\":\"2026-06-05T08:00:58Z\"}",
+      "payload_json": "{\"screening_id\":\"scr_NtHxVMPZoe3Zok\",\"charge_ref\":\"ch_cxSSYhFAALg1ZK\",\"customer_email\":\"leo.marsh.set2@example.com\",\"amount\":180.0,\"currency\":\"usd\",\"plan\":\"annual_180\",\"is_renewal\":true,\"risk_score\":18,\"country_match\":false,\"card_age_days\":622,\"decision\":\"approve\",\"rule_id\":\"R-APPROVE-LE75\",\"screened_at\":\"2026-06-05T08:00:58Z\",\"card_fingerprint\":\"RGP1BHl3jQ88NXTu\",\"card_country\":\"US\",\"device_id\":\"dev_32ac96ecdae7\",\"ip_country\":\"ES\"}",
       "charge_id": "ch_cxSSYhFAALg1ZK",
       "ticket_id": null,
       "dispute_id": null,
@@ -662,6 +666,24 @@
        "category": "subscription_canceled",
        "amount_usd": 180.0
       },
+      "scenario_id": "story:leo"
+     },
+     {
+      "entity_id": "story:leo|card:RGP1BHl3jQ88NXTu",
+      "label": "Card",
+      "source_system": "card",
+      "source_key": "RGP1BHl3jQ88NXTu",
+      "props": {
+       "country": "US"
+      },
+      "scenario_id": "story:leo"
+     },
+     {
+      "entity_id": "story:leo|device:dev_32ac96ecdae7",
+      "label": "Device",
+      "source_system": "device",
+      "source_key": "dev_32ac96ecdae7",
+      "props": {},
       "scenario_id": "story:leo"
      }
     ],
@@ -1147,7 +1169,37 @@
       "window_days": 60
      }
     ],
-    "schema_proposals": []
+    "schema_proposals": [],
+    "links": [
+     {
+      "type": "PAID_WITH",
+      "from": "story:leo|stripe:ch_cxSSYhFAALg1ZK",
+      "to": "story:leo|card:RGP1BHl3jQ88NXTu",
+      "at": "2026-06-05T08:00:58Z",
+      "ip_country": null
+     },
+     {
+      "type": "USED",
+      "from": "story:leo|stripe:cus_5fADEZdlUY6fZa",
+      "to": "story:leo|card:RGP1BHl3jQ88NXTu",
+      "at": "2026-06-05T08:00:58Z",
+      "ip_country": null
+     },
+     {
+      "type": "FROM_DEVICE",
+      "from": "story:leo|stripe:ch_cxSSYhFAALg1ZK",
+      "to": "story:leo|device:dev_32ac96ecdae7",
+      "at": "2026-06-05T08:00:58Z",
+      "ip_country": "ES"
+     },
+     {
+      "type": "USED",
+      "from": "story:leo|stripe:cus_5fADEZdlUY6fZa",
+      "to": "story:leo|device:dev_32ac96ecdae7",
+      "at": "2026-06-05T08:00:58Z",
+      "ip_country": null
+     }
+    ]
    }
   },
   {
@@ -1291,7 +1343,8 @@
       "window_days": 400
      }
     ],
-    "schema_proposals": []
+    "schema_proposals": [],
+    "links": []
    }
   }
  ],

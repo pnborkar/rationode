@@ -2,13 +2,14 @@
 // columns exist, every row is accounted for, required contract fields are present, timestamps
 // parse, option values are known (or will be PROPOSED), references resolve across files, and a
 // dry run through the real detector shows what the files would become.
-import { DATA_FIELDS, type CanonicalType, type ContractEvent } from "./contract";
+import { DATA_FIELDS, ENTITY_REFS, type CanonicalType, type ContractEvent } from "./contract";
 import { Detector, rowsDict, type Registry } from "./detector";
 import { mapFile, type FileMapping, type MappedEvent, type ParsedFile, type RowProblem } from "./mapping";
 
 // Entity references each event type needs for the detector to place it.
 const REFS_REQUIRED: Record<CanonicalType, string[]> = {
   "charge.screened": ["charge_id", "customer_email"],
+  "charge.identifiers": ["charge_id"],
   "charge.succeeded": ["charge_id", "stripe_customer_id", "customer_email"],
   "refund.created": ["charge_id"],
   "dispute.created": ["dispute_id", "charge_id"],
@@ -90,7 +91,7 @@ export function validate(files: ParsedFile[], mappings: FileMapping[], registry:
     // Targets must be contract fields for their event type.
     for (const r of m.records) {
       const allowed = new Set(["event_id", "occurred_at", "received_at",
-        ...["customer_email", "stripe_customer_id", "charge_id", "ticket_id", "dispute_id", "subscription_id", "session_id"].map((x) => `refs.${x}`),
+        ...ENTITY_REFS.map((x) => `refs.${x}`),
         ...["kind", "id", "name", "team", "version"].map((x) => `actor.${x}`),
         ...[...DATA_FIELDS[r.event_type].required, ...(DATA_FIELDS[r.event_type].optional ?? [])].map((x) => `data.${x}`)]);
       const bad = r.fields.filter((fm) => !allowed.has(fm.target)).map((fm) => fm.target);

@@ -111,6 +111,8 @@ async function linkUsage(email: string, whatIfs: { action: string; dispute_rate:
   const amount = usage.latest_charge.amount_usd;
   const disputeCost = winRate == null ? null : Math.round((winRate * 15 + (1 - winRate) * (amount + 30)) * 100) / 100;
   return {
+    applies_to: "'I canceled' / 'I didn't use it' claims. Usage shows the account was used, not who authorized the " +
+      "charge, so it is not evidence against 'I never signed up' or 'my card was used without permission'.",
     basis: watched
       ? `kept watching after the charge (${usage.hours_since_charge} h across ${usage.weeks_since_charge} weeks)`
       : "no viewing after the charge",

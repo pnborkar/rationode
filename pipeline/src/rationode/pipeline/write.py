@@ -130,6 +130,27 @@ MATCH (n:{label} {{id_prop}: r.node_id}), (e:Event {event_id: r.event_id})
 MERGE (n)-[:EVIDENCED_BY]->(e)
 """
 
+Q_LINKS = {
+    "PAID_WITH": """
+UNWIND $rows AS r
+MATCH (a:Entity {entity_id: r.from}), (b:Entity {entity_id: r.to})
+MERGE (a)-[:PAID_WITH]->(b)
+""",
+    "FROM_DEVICE": """
+UNWIND $rows AS r
+MATCH (a:Entity {entity_id: r.from}), (b:Entity {entity_id: r.to})
+MERGE (a)-[l:FROM_DEVICE]->(b)
+SET l.ip_country = r.ip_country
+""",
+    "USED": """
+UNWIND $rows AS r
+MATCH (a:Entity {entity_id: r.from}), (b:Entity {entity_id: r.to})
+MERGE (a)-[u:USED]->(b)
+ON CREATE SET u.first_seen = datetime(r.at), u.last_seen = datetime(r.at)
+SET u.first_seen = CASE WHEN datetime(r.at) < u.first_seen THEN datetime(r.at) ELSE u.first_seen END,
+    u.last_seen = CASE WHEN datetime(r.at) > u.last_seen THEN datetime(r.at) ELSE u.last_seen END
+""",
+}
 Q_LED_TO = """
 UNWIND $rows AS r
 MATCH (d:Decision {decision_id: r.decision_id}), (o:Outcome {outcome_id: r.outcome_id})
@@ -182,3 +203,5 @@ def write(driver: Driver, database: str, rows: Rows, log: Callable[[str], None] 
         q = Q_EVIDENCED_BY.replace("{label}", kind).replace("{id_prop}", id_prop)
         run(f"evidenced_by:{kind}", q, [e for e in rows.evidenced_by if e["kind"] == kind])
     run("led_to", Q_LED_TO, rows.led_to)
+    for kind, q in Q_LINKS.items():
+        run(f"links {kind}", q, [x for x in rows.links if x["type"] == kind])

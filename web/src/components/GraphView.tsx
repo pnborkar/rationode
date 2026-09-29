@@ -15,6 +15,7 @@ const KIND_COLOR: Record<string, string> = {
   outcome: "#f87171", case: "#fbbf24", proposal: "#38bdf8", final: "#34d399",
   signals: "#f59e0b", rule: "#94a3b8", policy: "#0ea5e9", pattern: "#dc2626",
   usage: "#14b8a6",
+  card: "#f472b6", device: "#fb7185", account: "#64748b", fraud_account: "#dc2626",
 };
 
 export function decisionColor(outcomes: string[] = []): string {

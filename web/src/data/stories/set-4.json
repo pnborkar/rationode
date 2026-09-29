@@ -34,7 +34,11 @@
       "card_age_days": 10,
       "decision": "approve",
       "rule_id": "R-APPROVE-LE75",
-      "screened_at": "2026-06-20T05:11:58Z"
+      "screened_at": "2026-06-20T05:11:58Z",
+      "card_fingerprint": "08yWGVd0b0dQngbl",
+      "card_country": "US",
+      "device_id": "dev_bc442e6d2584",
+      "ip_country": "PL"
      }
     },
     {
@@ -195,7 +199,7 @@
       "source_system": "fraudguard",
       "event_type": "charge.screened",
       "occurred_at": "2026-06-20T05:11:58Z",
-      "payload_json": "{\"screening_id\":\"scr_jNFsvLVyp8qYFl\",\"charge_ref\":\"ch_ggf1ZEu2VBw9aQ\",\"customer_email\":\"omar.haddad.set4@example.com\",\"amount\":480.0,\"currency\":\"usd\",\"plan\":\"annual_480\",\"is_renewal\":false,\"risk_score\":70,\"country_match\":false,\"card_age_days\":10,\"decision\":\"approve\",\"rule_id\":\"R-APPROVE-LE75\",\"screened_at\":\"2026-06-20T05:11:58Z\"}",
+      "payload_json": "{\"screening_id\":\"scr_jNFsvLVyp8qYFl\",\"charge_ref\":\"ch_ggf1ZEu2VBw9aQ\",\"customer_email\":\"omar.haddad.set4@example.com\",\"amount\":480.0,\"currency\":\"usd\",\"plan\":\"annual_480\",\"is_renewal\":false,\"risk_score\":70,\"country_match\":false,\"card_age_days\":10,\"decision\":\"approve\",\"rule_id\":\"R-APPROVE-LE75\",\"screened_at\":\"2026-06-20T05:11:58Z\",\"card_fingerprint\":\"08yWGVd0b0dQngbl\",\"card_country\":\"US\",\"device_id\":\"dev_bc442e6d2584\",\"ip_country\":\"PL\"}",
       "charge_id": "ch_ggf1ZEu2VBw9aQ",
       "ticket_id": null,
       "dispute_id": null,
@@ -314,6 +318,24 @@
        "category": "unauthorized",
        "amount_usd": 480.0
       },
+      "scenario_id": "story:omar"
+     },
+     {
+      "entity_id": "story:omar|card:08yWGVd0b0dQngbl",
+      "label": "Card",
+      "source_system": "card",
+      "source_key": "08yWGVd0b0dQngbl",
+      "props": {
+       "country": "US"
+      },
+      "scenario_id": "story:omar"
+     },
+     {
+      "entity_id": "story:omar|device:dev_bc442e6d2584",
+      "label": "Device",
+      "source_system": "device",
+      "source_key": "dev_bc442e6d2584",
+      "props": {},
       "scenario_id": "story:omar"
      }
     ],
@@ -594,7 +616,37 @@
       "window_days": 60
      }
     ],
-    "schema_proposals": []
+    "schema_proposals": [],
+    "links": [
+     {
+      "type": "PAID_WITH",
+      "from": "story:omar|stripe:ch_ggf1ZEu2VBw9aQ",
+      "to": "story:omar|card:08yWGVd0b0dQngbl",
+      "at": "2026-06-20T05:11:58Z",
+      "ip_country": null
+     },
+     {
+      "type": "USED",
+      "from": "story:omar|stripe:cus_iDTbj4HILjBySE",
+      "to": "story:omar|card:08yWGVd0b0dQngbl",
+      "at": "2026-06-20T05:11:58Z",
+      "ip_country": null
+     },
+     {
+      "type": "FROM_DEVICE",
+      "from": "story:omar|stripe:ch_ggf1ZEu2VBw9aQ",
+      "to": "story:omar|device:dev_bc442e6d2584",
+      "at": "2026-06-20T05:11:58Z",
+      "ip_country": "PL"
+     },
+     {
+      "type": "USED",
+      "from": "story:omar|stripe:cus_iDTbj4HILjBySE",
+      "to": "story:omar|device:dev_bc442e6d2584",
+      "at": "2026-06-20T05:11:58Z",
+      "ip_country": null
+     }
+    ]
    }
   },
   {
@@ -731,7 +783,8 @@
       "window_days": 400
      }
     ],
-    "schema_proposals": []
+    "schema_proposals": [],
+    "links": []
    }
   }
  ],

@@ -20,6 +20,7 @@ from datetime import date, datetime, timedelta
 
 from rationode.db import REPO_ROOT
 from rationode.sim import formats as f
+from rationode.sim import identifiers
 from rationode.sim import world as wm
 from rationode.sim.generate import Sim, random_day
 from rationode.sim.stories import usage_events
@@ -42,6 +43,7 @@ def build(seed: int = 3000) -> list[dict]:
         renewal = "fraud" not in force
         c = sim.existing_customer(day) if renewal else sim.customer(day)
         case, rec = sim.case(c, day, renewal=renewal, force=dict(force))
+        identifiers.add_to_screening(case, rec, identifiers.CREW_FOR_UPLOADS)
         events.append(f.subscription_created(sim.ids, wm.dt(c.started, 10), c))
         events += case
         didnt_use = rec.get("complaint", {}).get("category") == "didnt_use"
@@ -116,7 +118,9 @@ def export(events: list[dict]) -> dict[str, int]:
                           "email": p["customer_email"], "amount": p["amount"], "plan": p["plan"],
                           "renewal": yn(p["is_renewal"]), "risk_score": p["risk_score"],
                           "ip_country_match": yn(p["country_match"]), "card_age_days": p["card_age_days"],
-                          "outcome": p["decision"].upper(), "rule": p["rule_id"]})
+                          "outcome": p["decision"].upper(), "rule": p["rule_id"],
+                          "card_fingerprint": p["card_fingerprint"], "card_country": p["card_country"],
+                          "device_id": p["device_id"], "ip_country": p["ip_country"]})
         elif src == "subscriptions":
             subs.append({"event_id": e["event_id"], "subscription_id": p["subscription_id"],
                          "customer_id": p["stripe_customer_id"], "customer_email": p.get("email"), "plan": p["plan"],
@@ -136,7 +140,8 @@ def export(events: list[dict]) -> dict[str, int]:
               "Zendesk Ticket (metadata)", "Initiated By (metadata)"], stripe)
     (OUT_DIR / "support_agent_tool_calls.jsonl").write_text("".join(json.dumps(c) + "\n" for c in calls))
     write_csv("fraudguard_screening.csv", ["screen_id", "screened_at", "charge_reference", "email", "amount", "plan",
-              "renewal", "risk_score", "ip_country_match", "card_age_days", "outcome", "rule"], fraud)
+              "renewal", "risk_score", "ip_country_match", "card_age_days", "outcome", "rule", "card_fingerprint",
+              "card_country", "device_id", "ip_country"], fraud)
     write_csv("subscriptions.csv", ["event_id", "subscription_id", "customer_id", "customer_email", "plan", "event",
               "event_at", "started_at", "cancel_reason"], subs)
     write_csv("app_usage_weekly.csv", ["row_id", "account_id", "account_email", "week_of", "watch_hours", "titles",

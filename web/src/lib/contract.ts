@@ -3,7 +3,7 @@
 // the MCP gateway. The detector reads only contract events.
 
 export const CANONICAL_TYPES = [
-  "charge.screened", "charge.succeeded", "refund.created", "dispute.created", "dispute.closed",
+  "charge.screened", "charge.identifiers", "charge.succeeded", "refund.created", "dispute.created", "dispute.closed",
   "ticket.created", "rep.decision", "ticket.closed",
   "agent.customer_lookup", "agent.proposal", "agent.dispute_lookup", "agent.dispute_response",
   "subscription.created", "subscription.renewed", "subscription.canceled", "subscription.paused",
@@ -14,6 +14,7 @@ export type CanonicalType = (typeof CANONICAL_TYPES)[number];
 
 export const ENTITY_REFS = [
   "customer_email", "stripe_customer_id", "charge_id", "ticket_id", "dispute_id", "subscription_id", "session_id",
+  "card_fingerprint", "device_id",
 ] as const;
 
 export type EntityRefs = Partial<Record<(typeof ENTITY_REFS)[number], string | null>>;
@@ -41,7 +42,8 @@ export type ContractEvent = {
 
 // Normalized data fields per canonical type: what the detector reads. Required ones must be present.
 export const DATA_FIELDS: Record<CanonicalType, { required: string[]; optional?: string[] }> = {
-  "charge.screened": { required: ["decision", "risk_score", "amount", "plan", "is_renewal", "country_match", "card_age_days"], optional: ["rule_id"] },
+  "charge.screened": { required: ["decision", "risk_score", "amount", "plan", "is_renewal", "country_match", "card_age_days"], optional: ["rule_id", "card_country", "ip_country"] },
+  "charge.identifiers": { required: [], optional: ["card_country", "ip_country"] },
   "charge.succeeded": { required: ["amount"], optional: ["name", "plan"] },
   "refund.created": { required: ["amount"], optional: ["initiated_by"] },
   "dispute.created": { required: ["amount"], optional: ["category", "status"] },

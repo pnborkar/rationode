@@ -35,7 +35,10 @@ type Step =
   | { kind: "customer"; data: Record<string, unknown> }
   | { kind: "usage"; data: Usage }
   | { kind: "precedent"; data: Precedent }
+  | { kind: "fraud"; data: FraudPatterns }
   | { kind: "proposal"; data: Proposal };
+type FraudPatterns = { facts: string[]; cluster: { accounts: number; unauthorized_disputes: number };
+                       history_baseline: { unauthorized_dispute_rate: number } };
 
 const REP = { name: "Maya Chen", team: "Team A" };
 const OPTIONS = ["full_refund", "partial_refund", "voucher", "deny", "pause_subscription"];
@@ -108,6 +111,20 @@ function StepCard({ step }: { step: Step }) {
           trend: {u.trend}
         </p>
         <p className="text-[10px] text-zinc-500">Highlighted bars: weeks after the latest charge.</p>
+      </div>
+    );
+  }
+  if (step.kind === "fraud") {
+    const f = step.data;
+    const alarming = (t: string) => /[1-9]\d* with unauthorized|[1-9]\d* had unauthorized|added \d+ day|login came from|written policy says|different cards/.test(t);
+    return (
+      <div className="rounded-lg border border-rose-900 bg-rose-950/30 p-3 text-sm">
+        <p className="text-xs text-rose-400">check_fraud_patterns · Neo4j identity graph (cards, devices, shared accounts)</p>
+        <ul className="mt-2 space-y-1 text-xs">
+          {f.facts.map((t) => (
+            <li key={t} className={alarming(t) ? "text-rose-200" : "text-zinc-300"}>{alarming(t) ? "▲ " : "· "}{t}</li>
+          ))}
+        </ul>
       </div>
     );
   }
@@ -314,6 +331,8 @@ export default function StreamlyLive() {
           setSteps((s) => [...s, { kind: "customer", data: e.result as Record<string, unknown> }]);
         } else if (e.type === "tool_result" && e.name === "check_usage_patterns" && !e.is_error) {
           setSteps((s) => [...s, { kind: "usage", data: e.result as Usage }]);
+        } else if (e.type === "tool_result" && e.name === "check_fraud_patterns" && !e.is_error) {
+          setSteps((s) => [...s, { kind: "fraud", data: e.result as FraudPatterns }]);
         } else if (e.type === "tool_result" && e.name === "check_before_act" && !e.is_error) {
           const p = e.result as Precedent;
           setSteps((s) => [...s, { kind: "precedent", data: p }]);

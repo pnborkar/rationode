@@ -75,7 +75,11 @@
       "card_age_days": 1626,
       "decision": "approve",
       "rule_id": "R-APPROVE-LE75",
-      "screened_at": "2026-06-10T18:07:58Z"
+      "screened_at": "2026-06-10T18:07:58Z",
+      "card_fingerprint": "hq9Nh2kQkiRP6Suy",
+      "card_country": "CA",
+      "device_id": "dev_b6e5e553614c",
+      "ip_country": "CA"
      }
     },
     {
@@ -339,7 +343,7 @@
       "source_system": "fraudguard",
       "event_type": "charge.screened",
       "occurred_at": "2026-06-10T18:07:58Z",
-      "payload_json": "{\"screening_id\":\"scr_btxAoa7aOPrdDy\",\"charge_ref\":\"ch_nIdEOwaqHNiqfU\",\"customer_email\":\"theo.grant.set6@example.com\",\"amount\":25.0,\"currency\":\"usd\",\"plan\":\"monthly_25\",\"is_renewal\":true,\"risk_score\":25,\"country_match\":true,\"card_age_days\":1626,\"decision\":\"approve\",\"rule_id\":\"R-APPROVE-LE75\",\"screened_at\":\"2026-06-10T18:07:58Z\"}",
+      "payload_json": "{\"screening_id\":\"scr_btxAoa7aOPrdDy\",\"charge_ref\":\"ch_nIdEOwaqHNiqfU\",\"customer_email\":\"theo.grant.set6@example.com\",\"amount\":25.0,\"currency\":\"usd\",\"plan\":\"monthly_25\",\"is_renewal\":true,\"risk_score\":25,\"country_match\":true,\"card_age_days\":1626,\"decision\":\"approve\",\"rule_id\":\"R-APPROVE-LE75\",\"screened_at\":\"2026-06-10T18:07:58Z\",\"card_fingerprint\":\"hq9Nh2kQkiRP6Suy\",\"card_country\":\"CA\",\"device_id\":\"dev_b6e5e553614c\",\"ip_country\":\"CA\"}",
       "charge_id": "ch_nIdEOwaqHNiqfU",
       "ticket_id": null,
       "dispute_id": null,
@@ -509,6 +513,24 @@
        "email": "theo.grant.set6@example.com",
        "name": "Theo Grant"
       },
+      "scenario_id": "story:theo"
+     },
+     {
+      "entity_id": "story:theo|card:hq9Nh2kQkiRP6Suy",
+      "label": "Card",
+      "source_system": "card",
+      "source_key": "hq9Nh2kQkiRP6Suy",
+      "props": {
+       "country": "CA"
+      },
+      "scenario_id": "story:theo"
+     },
+     {
+      "entity_id": "story:theo|device:dev_b6e5e553614c",
+      "label": "Device",
+      "source_system": "device",
+      "source_key": "dev_b6e5e553614c",
+      "props": {},
       "scenario_id": "story:theo"
      }
     ],
@@ -835,7 +857,37 @@
       "window_days": 1
      }
     ],
-    "schema_proposals": []
+    "schema_proposals": [],
+    "links": [
+     {
+      "type": "PAID_WITH",
+      "from": "story:theo|stripe:ch_nIdEOwaqHNiqfU",
+      "to": "story:theo|card:hq9Nh2kQkiRP6Suy",
+      "at": "2026-06-10T18:07:58Z",
+      "ip_country": null
+     },
+     {
+      "type": "USED",
+      "from": "story:theo|stripe:cus_ZKG9xkwf07fdDU",
+      "to": "story:theo|card:hq9Nh2kQkiRP6Suy",
+      "at": "2026-06-10T18:07:58Z",
+      "ip_country": null
+     },
+     {
+      "type": "FROM_DEVICE",
+      "from": "story:theo|stripe:ch_nIdEOwaqHNiqfU",
+      "to": "story:theo|device:dev_b6e5e553614c",
+      "at": "2026-06-10T18:07:58Z",
+      "ip_country": "CA"
+     },
+     {
+      "type": "USED",
+      "from": "story:theo|stripe:cus_ZKG9xkwf07fdDU",
+      "to": "story:theo|device:dev_b6e5e553614c",
+      "at": "2026-06-10T18:07:58Z",
+      "ip_country": null
+     }
+    ]
    }
   },
   {
@@ -907,7 +959,8 @@
       "window_days": 400
      }
     ],
-    "schema_proposals": []
+    "schema_proposals": [],
+    "links": []
    }
   }
  ],

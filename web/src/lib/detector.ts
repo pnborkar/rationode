@@ -40,7 +40,9 @@ export function registryFrom(records: { kind: string; key: string; dt: string; s
 export type Rows = {
   events: Row[]; entities: Row[]; same_as: Row[]; actors: Map<string, Row>; decisions: Row[]; contexts: Row[];
   considered: Row[]; made_by: Row[]; about: Row[]; preceded_by: Row[]; overrides: Row[]; under_policy: Row[];
-  evidenced_by: Row[]; outcomes: Row[]; led_to: Row[]; schema_proposals: Map<string, Row>; review: Row[];
+  evidenced_by: Row[]; outcomes: Row[]; led_to: Row[]; schema_proposals: Map<string, Row>;
+  links: Row[];   // identity: PAID_WITH, FROM_DEVICE, USED
+  review: Row[];
 };
 
 // The shape the set files and storyWriter use: actors and proposals as lists, no review queue.
@@ -67,7 +69,7 @@ export class Detector {
   readonly rows: Rows = {
     events: [], entities: [], same_as: [], actors: new Map(), decisions: [], contexts: [], considered: [], made_by: [],
     about: [], preceded_by: [], overrides: [], under_policy: [], evidenced_by: [], outcomes: [], led_to: [],
-    schema_proposals: new Map(), review: [],
+    schema_proposals: new Map(), links: [], review: [],
   };
   private entityIds = new Set<string>();
   private byCustomer = new Map<string, [string, string, string][]>();   // cus -> (at, decision_id, kind)
@@ -188,6 +190,7 @@ export class Detector {
 
     const cases = new Map<string, ContractEvent[]>();
     const customerEvents: ContractEvent[] = [];
+    const identityEvents: ContractEvent[] = [];
     for (const e of evs) {
       const x = e.entity_refs;
       this.rows.events.push({
@@ -199,6 +202,8 @@ export class Detector {
         canonical_type: e.event_type, data_json: JSON.stringify(e.data),
       });
       const charge = x.charge_id || (x.ticket_id && ticketCharge.get(x.ticket_id)) || (x.dispute_id && disputeCharge.get(x.dispute_id));
+      if (x.card_fingerprint || x.device_id) identityEvents.push(e);
+      if (e.event_type === "charge.identifiers") continue;   // identity only, not part of the case
       if (e.event_type.startsWith("subscription.") || e.event_type === "usage.weekly") {   // customer-level
         customerEvents.push(e);
       } else if (charge) {
@@ -210,8 +215,31 @@ export class Detector {
     }
 
     for (const [chargeId, caseEvents] of cases) this.case(chargeId, caseEvents, emailCus, cusName);
+    for (const e of identityEvents) this.identity(e, emailCus);
     this.customerOutcomes(customerEvents);
     return this.rows;
+  }
+
+  // ---------------------------------------------------------- identity (card, device) behind a charge
+  private identity(e: ContractEvent, emailCus: Map<string, string>): void {
+    const x = e.entity_refs;
+    const cus = x.stripe_customer_id || (x.customer_email ? emailCus.get(x.customer_email) : undefined);
+    if (!(cus && x.charge_id)) {
+      this.rows.review.push({ event_id: e.event_id, reason: "identity signals without customer or charge" });
+      return;
+    }
+    const charge = this.pid(`stripe:${x.charge_id}`), customer = this.pid(`stripe:${cus}`);
+    const links = this.rows.links, at = e.occurred_at;
+    if (x.card_fingerprint) {
+      const card = this.entity("Card", "card", x.card_fingerprint, { country: e.data.card_country ?? null });
+      links.push({ type: "PAID_WITH", from: charge, to: card, at, ip_country: null });
+      links.push({ type: "USED", from: customer, to: card, at, ip_country: null });
+    }
+    if (x.device_id) {
+      const device = this.entity("Device", "device", x.device_id, {});
+      links.push({ type: "FROM_DEVICE", from: charge, to: device, at, ip_country: e.data.ip_country ?? null });
+      links.push({ type: "USED", from: customer, to: device, at, ip_country: null });
+    }
   }
 
   // ---------------------------------------------------------- one case (one charge)

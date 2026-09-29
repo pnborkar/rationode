@@ -5,6 +5,7 @@ import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/
 import { z } from "zod";
 import type { Context } from "@/lib/features";
 import { findPrecedent } from "@/lib/findPrecedent";
+import { checkFraudPatterns } from "@/lib/fraud";
 import { checkBeforeAct } from "@/lib/precedent";
 import { why } from "@/lib/why";
 
@@ -42,6 +43,18 @@ function server() {
     },
     annotations: { readOnlyHint: true },
   }, async ({ query, decision_type, limit }) => asText(await findPrecedent(query, decision_type, limit)));
+
+  mcp.registerTool("check_fraud_patterns", {
+    title: "Check fraud patterns",
+    description: "The identity behind a customer's charge: card and device, other accounts sharing them and how their " +
+      "charges ended (unauthorized-charge disputes, fraud declines), the connected cluster, and the fraud tool's decision. " +
+      "Facts, not a verdict.",
+    inputSchema: { customer_email: z.string(), charge_id: z.string().optional() },
+    annotations: { readOnlyHint: true },
+  }, async ({ customer_email, charge_id }) => {
+    const r = await checkFraudPatterns(customer_email, charge_id);
+    return r ? asText(r) : { ...asText({ error: "No such customer" }), isError: true };
+  });
 
   mcp.registerTool("why", {
     title: "Why",

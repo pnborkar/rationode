@@ -13,7 +13,8 @@ const client = new Anthropic();
 
 // Meaning of each canonical event type and its data fields: the contract, stated once.
 const EVENT_TYPES = `
-charge.screened        a fraud/risk tool screened a card charge. data: decision (the tool's verdict: an option of charge.fraud_screen), risk_score, amount (USD), plan, is_renewal (bool), country_match (bool), card_age_days, rule_id
+charge.screened        a fraud/risk tool screened a card charge. data: decision (the tool's verdict: an option of charge.fraud_screen), risk_score, amount (USD), plan, is_renewal (bool), country_match (bool), card_age_days, rule_id, card_country, ip_country. If the row carries identity signals, also map refs.card_fingerprint (the card's fingerprint) and refs.device_id (device)
+charge.identifiers     identity signals for a charge recorded separately (card fingerprint, device, countries). refs: charge_id, card_fingerprint, device_id; data: card_country, ip_country
 charge.succeeded       a payment went through. data: amount (USD), name (cardholder/customer name), plan
 refund.created         money returned on a charge. data: amount (USD), initiated_by (who issued it). refs.ticket_id if the refund names a support ticket
 dispute.created        a chargeback was opened. data: amount (USD), category (dispute category), status

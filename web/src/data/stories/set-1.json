@@ -89,7 +89,11 @@
       "card_age_days": 1138,
       "decision": "approve",
       "rule_id": "R-APPROVE-LE75",
-      "screened_at": "2026-06-12T06:18:58Z"
+      "screened_at": "2026-06-12T06:18:58Z",
+      "card_fingerprint": "TQPLPcmxgq356yZW",
+      "card_country": "US",
+      "device_id": "dev_7e3d615be602",
+      "ip_country": "US"
      }
     },
     {
@@ -380,7 +384,7 @@
       "source_system": "fraudguard",
       "event_type": "charge.screened",
       "occurred_at": "2026-06-12T06:18:58Z",
-      "payload_json": "{\"screening_id\":\"scr_fSPdFz52CnuGc1\",\"charge_ref\":\"ch_Zf3nhmI3gLGDWp\",\"customer_email\":\"priya.shah.set1@example.com\",\"amount\":49.0,\"currency\":\"usd\",\"plan\":\"monthly_49\",\"is_renewal\":true,\"risk_score\":22,\"country_match\":true,\"card_age_days\":1138,\"decision\":\"approve\",\"rule_id\":\"R-APPROVE-LE75\",\"screened_at\":\"2026-06-12T06:18:58Z\"}",
+      "payload_json": "{\"screening_id\":\"scr_fSPdFz52CnuGc1\",\"charge_ref\":\"ch_Zf3nhmI3gLGDWp\",\"customer_email\":\"priya.shah.set1@example.com\",\"amount\":49.0,\"currency\":\"usd\",\"plan\":\"monthly_49\",\"is_renewal\":true,\"risk_score\":22,\"country_match\":true,\"card_age_days\":1138,\"decision\":\"approve\",\"rule_id\":\"R-APPROVE-LE75\",\"screened_at\":\"2026-06-12T06:18:58Z\",\"card_fingerprint\":\"TQPLPcmxgq356yZW\",\"card_country\":\"US\",\"device_id\":\"dev_7e3d615be602\",\"ip_country\":\"US\"}",
       "charge_id": "ch_Zf3nhmI3gLGDWp",
       "ticket_id": null,
       "dispute_id": null,
@@ -563,6 +567,24 @@
        "email": "priya.shah.set1@example.com",
        "name": "Priya Shah"
       },
+      "scenario_id": "story:priya"
+     },
+     {
+      "entity_id": "story:priya|card:TQPLPcmxgq356yZW",
+      "label": "Card",
+      "source_system": "card",
+      "source_key": "TQPLPcmxgq356yZW",
+      "props": {
+       "country": "US"
+      },
+      "scenario_id": "story:priya"
+     },
+     {
+      "entity_id": "story:priya|device:dev_7e3d615be602",
+      "label": "Device",
+      "source_system": "device",
+      "source_key": "dev_7e3d615be602",
+      "props": {},
       "scenario_id": "story:priya"
      }
     ],
@@ -889,7 +911,37 @@
       "window_days": 1
      }
     ],
-    "schema_proposals": []
+    "schema_proposals": [],
+    "links": [
+     {
+      "type": "PAID_WITH",
+      "from": "story:priya|stripe:ch_Zf3nhmI3gLGDWp",
+      "to": "story:priya|card:TQPLPcmxgq356yZW",
+      "at": "2026-06-12T06:18:58Z",
+      "ip_country": null
+     },
+     {
+      "type": "USED",
+      "from": "story:priya|stripe:cus_aJVm50H9ncwl6h",
+      "to": "story:priya|card:TQPLPcmxgq356yZW",
+      "at": "2026-06-12T06:18:58Z",
+      "ip_country": null
+     },
+     {
+      "type": "FROM_DEVICE",
+      "from": "story:priya|stripe:ch_Zf3nhmI3gLGDWp",
+      "to": "story:priya|device:dev_7e3d615be602",
+      "at": "2026-06-12T06:18:58Z",
+      "ip_country": "US"
+     },
+     {
+      "type": "USED",
+      "from": "story:priya|stripe:cus_aJVm50H9ncwl6h",
+      "to": "story:priya|device:dev_7e3d615be602",
+      "at": "2026-06-12T06:18:58Z",
+      "ip_country": null
+     }
+    ]
    }
   },
   {
@@ -960,7 +1012,8 @@
       "window_days": 400
      }
     ],
-    "schema_proposals": []
+    "schema_proposals": [],
+    "links": []
    }
   }
  ],

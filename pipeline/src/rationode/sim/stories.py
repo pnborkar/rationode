@@ -17,6 +17,7 @@ from rationode.db import REPO_ROOT, database, driver
 from rationode.pipeline.detect import Detector, Registry
 from rationode.pipeline.write import load_registry
 from rationode.sim import formats as f
+from rationode.sim import identifiers
 from rationode.sim import world as wm
 from rationode.sim.generate import Sim, months_before
 
@@ -166,7 +167,8 @@ def build(sim: Sim, spec: dict, registry: Registry) -> dict:
     force = dict(spec["force"])
     if team := force.pop("rep_team", None):
         force["rep"] = next(r for r in sim.reps if r["team"] == team)
-    case_events, _ = sim.case(c, charge_day, renewal=spec["renewal"], force=force)
+    case_events, rec = sim.case(c, charge_day, renewal=spec["renewal"], force=force)
+    identifiers.add_to_screening(case_events, rec, identifiers.CREW_FOR_SETS)
     events = [f.subscription_created(sim.ids, wm.dt(c.started, 10), c)] + case_events + usage_events(sim, c, spec["usage"])
     events.sort(key=lambda e: (e["occurred_at"], e["event_id"]))
     phase1 = [e for e in events if e["event_type"] not in OUTCOME_TYPES]

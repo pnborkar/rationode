@@ -75,7 +75,11 @@
       "card_age_days": 225,
       "decision": "approve",
       "rule_id": "R-APPROVE-LE75",
-      "screened_at": "2026-06-08T01:42:58Z"
+      "screened_at": "2026-06-08T01:42:58Z",
+      "card_fingerprint": "9l4fBmsz4rsqansr",
+      "card_country": "US",
+      "device_id": "dev_89616271805c",
+      "ip_country": "US"
      }
     },
     {
@@ -306,7 +310,7 @@
       "source_system": "fraudguard",
       "event_type": "charge.screened",
       "occurred_at": "2026-06-08T01:42:58Z",
-      "payload_json": "{\"screening_id\":\"scr_YtS9IeG3LjNu5g\",\"charge_ref\":\"ch_Cu6GyoJJm5OMKA\",\"customer_email\":\"nina.brooks.set5@example.com\",\"amount\":300.0,\"currency\":\"usd\",\"plan\":\"annual_300\",\"is_renewal\":true,\"risk_score\":12,\"country_match\":true,\"card_age_days\":225,\"decision\":\"approve\",\"rule_id\":\"R-APPROVE-LE75\",\"screened_at\":\"2026-06-08T01:42:58Z\"}",
+      "payload_json": "{\"screening_id\":\"scr_YtS9IeG3LjNu5g\",\"charge_ref\":\"ch_Cu6GyoJJm5OMKA\",\"customer_email\":\"nina.brooks.set5@example.com\",\"amount\":300.0,\"currency\":\"usd\",\"plan\":\"annual_300\",\"is_renewal\":true,\"risk_score\":12,\"country_match\":true,\"card_age_days\":225,\"decision\":\"approve\",\"rule_id\":\"R-APPROVE-LE75\",\"screened_at\":\"2026-06-08T01:42:58Z\",\"card_fingerprint\":\"9l4fBmsz4rsqansr\",\"card_country\":\"US\",\"device_id\":\"dev_89616271805c\",\"ip_country\":\"US\"}",
       "charge_id": "ch_Cu6GyoJJm5OMKA",
       "ticket_id": null,
       "dispute_id": null,
@@ -451,6 +455,24 @@
        "category": "subscription_canceled",
        "amount_usd": 300.0
       },
+      "scenario_id": "story:nina"
+     },
+     {
+      "entity_id": "story:nina|card:9l4fBmsz4rsqansr",
+      "label": "Card",
+      "source_system": "card",
+      "source_key": "9l4fBmsz4rsqansr",
+      "props": {
+       "country": "US"
+      },
+      "scenario_id": "story:nina"
+     },
+     {
+      "entity_id": "story:nina|device:dev_89616271805c",
+      "label": "Device",
+      "source_system": "device",
+      "source_key": "dev_89616271805c",
+      "props": {},
       "scenario_id": "story:nina"
      }
     ],
@@ -738,7 +760,37 @@
       "window_days": 60
      }
     ],
-    "schema_proposals": []
+    "schema_proposals": [],
+    "links": [
+     {
+      "type": "PAID_WITH",
+      "from": "story:nina|stripe:ch_Cu6GyoJJm5OMKA",
+      "to": "story:nina|card:9l4fBmsz4rsqansr",
+      "at": "2026-06-08T01:42:58Z",
+      "ip_country": null
+     },
+     {
+      "type": "USED",
+      "from": "story:nina|stripe:cus_xyIwJMCQR1cabn",
+      "to": "story:nina|card:9l4fBmsz4rsqansr",
+      "at": "2026-06-08T01:42:58Z",
+      "ip_country": null
+     },
+     {
+      "type": "FROM_DEVICE",
+      "from": "story:nina|stripe:ch_Cu6GyoJJm5OMKA",
+      "to": "story:nina|device:dev_89616271805c",
+      "at": "2026-06-08T01:42:58Z",
+      "ip_country": "US"
+     },
+     {
+      "type": "USED",
+      "from": "story:nina|stripe:cus_xyIwJMCQR1cabn",
+      "to": "story:nina|device:dev_89616271805c",
+      "at": "2026-06-08T01:42:58Z",
+      "ip_country": null
+     }
+    ]
    }
   },
   {
@@ -830,7 +882,8 @@
       "window_days": 120
      }
     ],
-    "schema_proposals": []
+    "schema_proposals": [],
+    "links": []
    }
   }
  ],

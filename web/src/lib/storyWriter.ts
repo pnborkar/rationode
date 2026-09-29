@@ -67,6 +67,24 @@ const Q = {
   evidenced_by: (label: string, idProp: string) => `UNWIND $rows AS r
     MATCH (n:${label} {${idProp}: r.node_id}), (e:Event {event_id: r.event_id})
     MERGE (n)-[:EVIDENCED_BY]->(e)`,
+  links: {
+    PAID_WITH: `UNWIND $rows AS r
+      MATCH (a:Entity {entity_id: r.from}), (b:Entity {entity_id: r.to}) MERGE (a)-[:PAID_WITH]->(b)`,
+    FROM_DEVICE: `UNWIND $rows AS r
+      MATCH (a:Entity {entity_id: r.from}), (b:Entity {entity_id: r.to})
+      MERGE (a)-[l:FROM_DEVICE]->(b) SET l.ip_country = r.ip_country`,
+    USED: `UNWIND $rows AS r
+      MATCH (a:Entity {entity_id: r.from}), (b:Entity {entity_id: r.to})
+      MERGE (a)-[u:USED]->(b)
+      ON CREATE SET u.first_seen = datetime(r.at), u.last_seen = datetime(r.at)
+      SET u.first_seen = CASE WHEN datetime(r.at) < u.first_seen THEN datetime(r.at) ELSE u.first_seen END,
+          u.last_seen = CASE WHEN datetime(r.at) > u.last_seen THEN datetime(r.at) ELSE u.last_seen END`,
+  } as Record<string, string>,
+  // The same card or device already seen in another scenario (e.g. history): link, never merge.
+  sameIdentity: `MATCH (x:Entity {scenario_id: $scenario}) WHERE x:Card OR x:Device
+    MATCH (h:Entity {source_system: x.source_system, source_key: x.source_key}) WHERE h.scenario_id <> $scenario
+    MERGE (x)-[s:SAME_AS]->(h)
+    SET s.confidence = 1.0, s.method = CASE WHEN x:Card THEN 'FINGERPRINT' ELSE 'DEVICE_ID' END`,
   led_to: `UNWIND $rows AS r
     MATCH (d:Decision {decision_id: r.decision_id}), (o:Outcome {outcome_id: r.outcome_id})
     MERGE (d)-[l:LED_TO]->(o)
@@ -109,6 +127,9 @@ export async function writeRows(rows: Rows): Promise<void> {
   await run(Q.evidenced_by("Decision", "decision_id"), (rows.evidenced_by ?? []).filter((e) => e.kind === "Decision"));
   await run(Q.evidenced_by("Outcome", "outcome_id"), (rows.evidenced_by ?? []).filter((e) => e.kind === "Outcome"));
   await run(Q.led_to, rows.led_to);
+  for (const [kind, cypher] of Object.entries(Q.links)) await run(cypher, (rows.links ?? []).filter((l) => l.type === kind));
+  const scenario = rows.decisions?.[0]?.scenario_id ?? rows.events?.[0]?.scenario_id;
+  if (scenario && scenario !== "history") await query(Q.sameIdentity, { scenario });
 }
 
 // Delete a scenario's nodes (never 'history'); returns how many were removed.

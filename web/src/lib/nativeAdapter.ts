@@ -42,10 +42,19 @@ export function toContract(r: RawEvent): ContractEvent | null {
   let data: Record<string, unknown> = {};
   let actor: Actor | null = null;
 
-  if (src === "fraudguard") {
+  if (src === "fraudguard" && typ === "charge.signals") {   // identity signals for a charge (enrichment feed)
+    type = "charge.identifiers";
+    refs = { charge_id: p.charge_ref, customer_email: p.customer_email ?? null, stripe_customer_id: p.stripe_customer_id ?? null,
+             card_fingerprint: p.card_fingerprint ?? null, device_id: p.device_id ?? null };
+    data = { card_country: p.card_country ?? null, ip_country: p.ip_country ?? null };
+  } else if (src === "fraudguard") {
     type = "charge.screened";
     refs = { charge_id: p.charge_ref, customer_email: p.customer_email };
     data = pick(p, ["risk_score", "plan", "is_renewal", "country_match", "card_age_days", "decision", "amount", "rule_id"]);
+    if ("card_fingerprint" in p || "device_id" in p) {   // when the screening record carries identity signals
+      refs = { ...refs, card_fingerprint: p.card_fingerprint ?? null, device_id: p.device_id ?? null };
+      data = { ...data, card_country: p.card_country ?? null, ip_country: p.ip_country ?? null };
+    }
     actor = FRAUDGUARD;
   } else if (src === "stripe") {
     const o = p.data.object;

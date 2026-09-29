@@ -5,6 +5,8 @@ from dataclasses import dataclass, field
 STRIPE_CATEGORY = {"subscription_canceled": "subscription_canceled", "unrecognized": "not_recognized",
                    "fraudulent": "unauthorized", "duplicate": "duplicate_charge"}
 
+IDENTIFIERS = ("card_fingerprint", "card_country", "device_id", "ip_country")   # fraud tool's identity signals
+
 MACRO_OPTION = {"Refund: full": "full_refund", "Refund: partial (50%)": "partial_refund",
                 "Voucher: 20% credit": "voucher", "Deny refund": "deny", "Pause subscription": "pause_subscription"}
 
@@ -37,10 +39,14 @@ def parse(raw: dict) -> Ev:
     e = Ev(raw["event_id"], raw["source_system"], raw["event_type"], raw["occurred_at"], p, raw)
     src, typ = e.source, e.type
 
-    if src == "fraudguard":
+    if src == "fraudguard" and typ == "charge.signals":   # identity signals for a charge (enrichment feed)
+        e.charge_id, e.email, e.stripe_customer_id = p["charge_ref"], p.get("customer_email"), p.get("stripe_customer_id")
+        e.data = {k: p.get(k) for k in IDENTIFIERS}
+    elif src == "fraudguard":
         e.charge_id, e.email = p["charge_ref"], p["customer_email"]
         e.data = {k: p[k] for k in ("risk_score", "plan", "is_renewal", "country_match", "card_age_days",
                                     "decision", "amount", "rule_id")}
+        e.data |= {k: p[k] for k in IDENTIFIERS if k in p}   # when the screening record carries them
     elif src == "stripe":
         o = p["data"]["object"]
         if typ == "charge.succeeded":

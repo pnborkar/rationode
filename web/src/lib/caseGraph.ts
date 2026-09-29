@@ -75,6 +75,7 @@ export async function customerGraph(email: string) {
   }
   await addUsage(r.customer, nodes, rels);
   await addPolicyGap(email, nodes, rels);
+  await addIdentity(r.customer, nodes, rels);
   return { nodes, rels };
 }
 
@@ -109,6 +110,42 @@ async function addUsage(customerId: string, nodes: GraphNode[], rels: GraphRel[]
       if (w.hours > 0 && weekEnd >= d.charged) {
         rels.push({ id: `${w.id}->${d.dispute}`, from: w.id, to: d.dispute, type: "CONTRADICTS" });
       }
+    }
+  }
+}
+
+// The identity behind the account: its cards and devices, and other accounts sharing them (in any scenario,
+// through SAME_AS), marked by how their charges ended. Shared identifiers are where fraud patterns show.
+async function addIdentity(customerId: string, nodes: GraphNode[], rels: GraphRel[]) {
+  const rows = await query<{ id: string; kind: string; key: string; country: string | null;
+                             others: { id: string; name: string | null; unauthorized: boolean; declined: boolean }[] }>(
+    `MATCH (c:Customer:Entity {entity_id: $customer})-[:USED]->(x)
+     OPTIONAL MATCH (x)-[:SAME_AS*0..2]-(x2)<-[:USED]-(o:Customer {source_system: 'stripe'}) WHERE o <> c
+     WITH x, o,
+          EXISTS { (o)<-[:ABOUT]-(:Decision)-[:ABOUT]->(:Dispute {category: 'unauthorized'}) } AS unauthorized,
+          EXISTS { (o)<-[:ABOUT]-(:Decision {decision_type: 'charge.fraud_screen'})-[:CONSIDERED {status: 'CHOSEN'}]->(:Option {option_key: 'decline'}) } AS declined
+     WITH x, collect(DISTINCT CASE WHEN o IS NULL THEN null ELSE
+            {id: o.entity_id, name: o.name, unauthorized: unauthorized, declined: declined} END)[..6] AS others
+     RETURN x.entity_id AS id, CASE WHEN x:Card THEN 'card' ELSE 'device' END AS kind, x.source_key AS key,
+            x.country AS country, others`,
+    { customer: customerId },
+  );
+  const seen = new Set(nodes.map((n) => n.id));
+  for (const x of rows) {
+    if (!seen.has(x.id)) {
+      seen.add(x.id);
+      nodes.push({ id: x.id, kind: x.kind, label: x.kind === "card" ? `Card ${x.key.slice(0, 4)}…` : `Device ${x.key.slice(4, 8)}…`,
+                   detail: x.kind === "card" ? `card fingerprint ${x.key}${x.country ? ` · ${x.country}` : ""}` : `device ${x.key}` });
+    }
+    rels.push({ id: `${customerId}->${x.id}`, from: customerId, to: x.id, type: "USED" });
+    for (const o of x.others) {
+      if (!seen.has(o.id)) {
+        seen.add(o.id);
+        const flag = o.unauthorized ? "unauthorized dispute" : o.declined ? "fraud decline" : "no fraud outcome";
+        nodes.push({ id: o.id, kind: o.unauthorized || o.declined ? "fraud_account" : "account",
+                     label: o.name ?? "account", detail: `other account · ${flag}` });
+      }
+      rels.push({ id: `${o.id}->${x.id}`, from: o.id, to: x.id, type: "USED" });
     }
   }
 }

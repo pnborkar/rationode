@@ -4,6 +4,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { checkUsage, getCustomer } from "./customer";
 import type { Context } from "./features";
+import { checkFraudPatterns } from "./fraud";
 import { checkBeforeAct } from "./precedent";
 
 const client = new Anthropic();
@@ -32,6 +33,8 @@ Resolution options:
 - pause_subscription: pause the subscription instead of refunding
 
 Guidance (v2): refunds are costly, so reduce refunds where possible. Decline requests where the customer simply didn't use the service or changed their mind: no refund and no voucher. Always issue a full refund for a genuine billing error.
+
+Usage is evidence about use, not about who authorized a charge: viewing answers "I canceled" or "I didn't use it", but not "I never signed up" or "my card was used without permission" (a fraudster paying with a stolen card is the one watching). For those claims, weigh identity evidence when you have it: the card and device behind the charge, and whether they tie the account to fraud. If the evidence points to fraud, don't deny: refund in full and say in the rationale that the account should go to the fraud team.
 
 Your goal is the best overall outcome for Streamly: the cost of refunds, disputes the customer might file with their bank (the charge plus fees), and customers who cancel. The guidance is a default. If you have strong evidence that another option leads to better outcomes, choose it and say what the evidence is.
 
@@ -107,6 +110,16 @@ const TOOLS: Record<string, Anthropic.Beta.BetaTool> = {
       required: ["decision_type", "context"],
     },
   },
+  check_fraud_patterns: {
+    name: "check_fraud_patterns",
+    description: "Ask Rationode's decision graph about the identity behind the customer's charge: the card and device " +
+      "that paid, the card's age and country versus the login country, other accounts sharing that card or device and " +
+      "how their charges ended (unauthorized-charge disputes, fraud declines), the cluster of accounts they connect to, " +
+      "and what the fraud tool decided. Facts, not a verdict. Use it when a customer says they never signed up, don't " +
+      "recognize a charge, or their card was used without permission.",
+    eager_input_streaming: true,
+    input_schema: { type: "object", properties: { email: { type: "string" } }, required: ["email"] },
+  },
   propose_resolution: {
     name: "propose_resolution",
     description: "Propose a resolution for the ticket. A human support rep reviews it before anything happens.",
@@ -139,6 +152,12 @@ async function runTool(name: string, input: unknown): Promise<ToolRun> {
     const usage = await checkUsage(p.data.email);
     return usage ? { result: usage } : { result: "No customer with that email", is_error: true };
   }
+  if (name === "check_fraud_patterns") {
+    const p = GetCustomer.safeParse(input);
+    if (!p.success) return { result: { INVALID_INPUT: p.error.message }, is_error: true };
+    const r = await checkFraudPatterns(p.data.email);
+    return r ? { result: r } : { result: "No customer with that email", is_error: true };
+  }
   if (name === "check_before_act") {
     const p = CheckBeforeAct.safeParse(input);
     if (!p.success) return { result: { INVALID_INPUT: p.error.message }, is_error: true };
@@ -162,9 +181,9 @@ export type ChatInput = {
 };
 
 export async function* runSupportAgent(input: ChatInput): AsyncGenerator<AgentEvent> {
-  // Graph off removes only decision precedent (check_before_act); customer data and usage stay.
+  // Graph off removes what only the graph knows (decision precedent, identity patterns); customer data and usage stay.
   const tools = input.graph
-    ? [TOOLS.get_customer, TOOLS.check_usage_patterns, TOOLS.check_before_act, TOOLS.propose_resolution]
+    ? [TOOLS.get_customer, TOOLS.check_usage_patterns, TOOLS.check_before_act, TOOLS.check_fraud_patterns, TOOLS.propose_resolution]
     : [TOOLS.get_customer, TOOLS.check_usage_patterns, TOOLS.propose_resolution];
   const messages: Anthropic.Beta.BetaMessageParam[] = [{
     role: "user",
