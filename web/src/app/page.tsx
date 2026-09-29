@@ -218,10 +218,24 @@ type UploadedCase = { scenario: string; email: string; name: string; message: st
 const toUploadCases = (rows: UploadedCase[]): LiveCase[] => rows.map((u, i) => ({
   key: `up-${u.email}`, name: u.name, email: u.email, ticket_id: `52${String(i + 1).padStart(4, "0")}`,
   blurb: `Uploaded (${u.scenario}). Their case in the files: ${u.case_in_files}.`, message: u.message, scenario: u.scenario,
+  question: u.case_in_files,
   note: u.via_bank
     ? `${u.name.split(" ")[0]} went to their bank, not support. Sending this message here asks: what if they had contacted support first?`
     : undefined,
 }));
+
+// A tenant's customers grouped by their case (hundreds of customers, a handful of questions), largest
+// group first; names repeat, so a repeated name within a group shows the email's name part too.
+function byQuestion(cases: LiveCase[]): [string, (LiveCase & { sameName: boolean })[]][] {
+  const groups = new Map<string, LiveCase[]>();
+  for (const c of cases) groups.set(c.question ?? "", [...(groups.get(c.question ?? "") ?? []), c]);
+  return [...groups].sort((a, b) => b[1].length - a[1].length).map(([q, cs]) => {
+    const count = new Map<string, number>();
+    cs.forEach((c) => count.set(c.name, (count.get(c.name) ?? 0) + 1));
+    return [q.replace(/^./, (x) => x.toUpperCase()),
+            [...cs].sort((a, b) => a.name.localeCompare(b.name)).map((c) => ({ ...c, sameName: count.get(c.name)! > 1 }))];
+  });
+}
 
 export default function StreamlyLive() {
   const [tab, setTab] = useState<"live" | "events">("live");
@@ -543,10 +557,13 @@ export default function StreamlyLive() {
                   className="rounded-md border border-zinc-700 bg-zinc-950 px-2 py-0.5 text-xs text-zinc-200">
             {current.key === "none" && <option value="none">No customers yet</option>}
             {[...PREPARED, ...storyCases].map((c) => <option key={c.key} value={c.key}>{c.name}{c.setNumber ? ` (Set ${c.setNumber})` : ""}</option>)}
-            {[...new Set(uploadCases.map((c) => c.scenario))].map((sc) => (
+            {DEMO ? [...new Set(uploadCases.map((c) => c.scenario))].map((sc) => (
               <optgroup key={sc} label={`Uploaded · ${sc}`}>
-                {uploadCases.filter((c) => c.scenario === sc).map((c) => (
-                  <option key={c.key} value={c.key}>{c.name}{DEMO ? "" : ` · ${c.message.slice(0, 48)}`}</option>))}
+                {uploadCases.filter((c) => c.scenario === sc).map((c) => <option key={c.key} value={c.key}>{c.name}</option>)}
+              </optgroup>
+            )) : byQuestion(uploadCases).map(([q, cs]) => (
+              <optgroup key={q} label={`${q} (${cs.length})`}>
+                {cs.map((c) => <option key={c.key} value={c.key}>{c.name}{c.sameName ? ` (${c.email.split("@")[0]})` : ""}</option>)}
               </optgroup>
             ))}
           </select>}>

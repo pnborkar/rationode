@@ -229,10 +229,11 @@ export async function uploadedCases() {
           max(ch.amount_usd) AS amount
      WHERE subject IS NOT NULL OR dispute IS NOT NULL
      RETURN c.scenario_id AS scenario, c.email AS email, c.name AS name, subject, dispute, amount
-     ORDER BY scenario, name`,
+     ORDER BY scenario, email`,
     { demo: IS_DEMO, base: SCENARIO },
   );
-  const cases = rows.map((r) => {
+  // Ordered by email, so each customer's position (their live ticket number) is stable.
+  return rows.map((r) => {
     const usd = r.amount != null ? `$${Math.round(r.amount)}` : "this";
     const viaBank = !r.subject;
     return {
@@ -242,16 +243,4 @@ export async function uploadedCases() {
       case_in_files: viaBank ? `card dispute (${r.dispute?.replaceAll("_", " ")})` : `support ticket: "${r.subject}"`,
     };
   });
-  // A tenant's history holds hundreds of customers with a handful of distinct questions (demo spec §21):
-  // the live dropdown gets one customer per question, each with a different first name so they're easy
-  // to tell apart. The demo's uploads are small and listed in full.
-  if (IS_DEMO) return cases;
-  const first = (name: string) => name.split(" ")[0];
-  const picked = new Map<string, (typeof cases)[number]>(), names = new Set<string>();
-  for (const c of cases) {
-    if (picked.has(c.case_in_files) || names.has(first(c.name))) continue;
-    picked.set(c.case_in_files, c);
-    names.add(first(c.name));
-  }
-  return [...picked.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
