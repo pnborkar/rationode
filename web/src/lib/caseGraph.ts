@@ -1,4 +1,5 @@
 import { isType } from "./eventFields";
+import { LIVE } from "./live";
 import { FRAUD_POLICY_TREE, query, SCENARIO } from "./neo4j";
 
 export type GraphNode = { id: string; kind: string; label: string; detail?: string; option?: string | null; outcomes?: string[] };
@@ -60,7 +61,7 @@ export async function customerGraph(email: string) {
   for (const d of r.decisions.sort((a, b) => a.at.localeCompare(b.at))) {
     // Live decisions (captured by the gateway and the Zendesk webhook) keep the live tab's look: the AI's
     // proposal and the rep's final decision.
-    const liveNode = d.id.startsWith("live|") && d.type === "support.complaint_resolution";
+    const liveNode = d.id.startsWith(`${LIVE}|`) && d.type === "support.complaint_resolution";
     const opt = (d.option ?? "").replaceAll("_", " ");
     nodes.push(liveNode
       ? { id: d.id, kind: d.stage === "PROPOSAL" ? "proposal" : "final", option: d.option,

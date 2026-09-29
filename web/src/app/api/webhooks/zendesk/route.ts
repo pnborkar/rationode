@@ -1,7 +1,7 @@
 // Zendesk webhook (demo spec §19): the help chat opening a ticket and the rep's macro (Approve/override)
 // arrive as Zendesk-format events and go through the live pipeline.
 import { z } from "zod";
-import { demoClock, ingestLive, newId, removeLiveTicket } from "@/lib/live";
+import { demoClock, ingestLive, LIVE, newId, removeLiveTicket } from "@/lib/live";
 import { query } from "@/lib/neo4j";
 
 const Body = z.object({ type: z.enum(["ticket.created", "macro.applied", "ticket.updated"]) }).passthrough();
@@ -18,7 +18,7 @@ export async function POST(request: Request) {
   // This ticket's decisions, so the caller can link what it drew to what was recorded.
   const ticket = String(payload.ticket?.id ?? payload.ticket_id ?? "");
   const ticketDecisions = ticket ? await query<{ id: string; stage: string }>(
-    `MATCH (d:Decision {scenario_id: 'live'})-[:EVIDENCED_BY]->(:Event {scenario_id: 'live', ticket_id: $ticket})
-     RETURN DISTINCT d.decision_id AS id, d.stage AS stage`, { ticket }) : [];
+    `MATCH (d:Decision {scenario_id: $live})-[:EVIDENCED_BY]->(:Event {scenario_id: $live, ticket_id: $ticket})
+     RETURN DISTINCT d.decision_id AS id, d.stage AS stage`, { ticket, live: LIVE }) : [];
   return Response.json({ ...result, ticket_decisions: ticketDecisions });
 }

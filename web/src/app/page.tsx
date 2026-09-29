@@ -617,7 +617,7 @@ export default function StreamlyLive() {
                   </p>
                   <p className="text-xs opacity-60">
                     {recorded
-                      ? `Recorded in Neo4j (scenario live): the AI proposal via the Rationode gateway, and this decision via ` +
+                      ? `Recorded in Neo4j (scenario ${DEMO ? "live" : `${process.env.NEXT_PUBLIC_RATIONODE_TENANT}:live`}): the AI proposal via the Rationode gateway, and this decision via ` +
                         `the Zendesk webhook${recorded.overrides ? ", with OVERRIDES on the AI proposal" : ""}. The graph now shows it.`
                       : "Recording…"}
                   </p>

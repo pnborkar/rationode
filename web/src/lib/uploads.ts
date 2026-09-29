@@ -37,7 +37,7 @@ export function parseAll(files: UploadedFile[]): ParsedFile[] {
 // second batch would duplicate every customer and decision. Same batch name = replace, which is fine.
 async function alreadyLoaded(eventIds: string[], scenario: string) {
   const scenarios = (await query<{ s: string }>(
-    `MATCH (e:Event) WITH DISTINCT e.scenario_id AS s WHERE s <> $scenario AND s <> 'live' RETURN s`, { scenario },
+    `MATCH (e:Event) WITH DISTINCT e.scenario_id AS s WHERE s <> $scenario AND s <> 'live' AND NOT s ENDS WITH ':live' RETURN s`, { scenario },
   )).map((r) => r.s);
   if (!scenarios.length || !eventIds.length) return [];
   return query<{ scenario: string; n: number }>(
