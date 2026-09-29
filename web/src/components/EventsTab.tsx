@@ -51,6 +51,7 @@ export default function EventsTab({ active, onChanged }: { active: boolean; onCh
   const [graph, setGraph] = useState<{ nodes: ViewNode[]; rels: ViewRel[] }>({ nodes: [], rels: [] });
   const [mode, setMode] = useState<"graph" | "table">("graph");
   const [connect, setConnect] = useState(false);
+  const [setsOpen, setSetsOpen] = useState(true);
   const [uploads, setUploads] = useState<{ scenario: string; events: number; decisions: number; customers: number }[]>([]);
 
   const refresh = () => Promise.all([
@@ -129,9 +130,31 @@ export default function EventsTab({ active, onChanged }: { active: boolean; onCh
       {/* Sets */}
       <section className="flex min-h-0 flex-col rounded-xl border border-zinc-800 bg-zinc-900/60">
         <header className="rounded-t-xl border-b border-zinc-800 bg-zinc-800/70 px-4 py-2">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Event sets</h2>
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Sources</h2>
         </header>
         <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
+          <div className={`rounded-lg border p-3 ${connect ? "border-emerald-700 bg-emerald-950/30" : "border-zinc-800 bg-zinc-950"}`}>
+            <p className="font-semibold">Connect a source</p>
+            <p className="mt-1 text-xs text-zinc-500">Upload exports; Claude maps them onto the event contract and you see the mapping.</p>
+            <button onClick={() => { setConnect(!connect); setSetsOpen(connect); }} disabled={streaming}
+                    className="mt-2 rounded-md bg-emerald-600 px-3 py-1 text-xs font-semibold text-white disabled:opacity-40">
+              {connect ? "Back to events" : "Open"}</button>
+            {uploads.map((u) => (
+              <div key={u.scenario} className="mt-2 flex items-center justify-between gap-2 text-xs">
+                <span className="truncate font-mono text-zinc-300" title={`${u.events} events · ${u.decisions} decisions`}>
+                  {u.scenario} <span className="text-zinc-500">· {u.customers} customers</span></span>
+                <button onClick={() => removeUpload(u.scenario)} disabled={!!busy}
+                        className="rounded-md bg-zinc-800 px-2 py-0.5 disabled:opacity-40">
+                  {busy === `remove-${u.scenario}` ? "…" : "Remove"}</button>
+              </div>
+            ))}
+          </div>
+          <div className="rounded-lg border border-zinc-800">
+            <button onClick={() => setSetsOpen(!setsOpen)} className="flex w-full items-center justify-between px-3 py-2 text-left">
+              <span className="font-semibold">Event sets <span className="text-xs font-normal text-zinc-500">· {sets.filter((x) => x.loaded).length} of {sets.length} loaded</span></span>
+              <span className="text-xs text-zinc-400">{setsOpen ? "▾" : "▸"}</span>
+            </button>
+            {setsOpen && <div className="space-y-3 border-t border-zinc-800 p-3">
           <p className="text-xs text-zinc-500">Raw events from Stripe, Zendesk, the fraud tool, and the support agent.
             Load a set and see what it brings in.</p>
           {sets.map((s) => (
@@ -163,21 +186,7 @@ export default function EventsTab({ active, onChanged }: { active: boolean; onCh
               </div>
             </div>
           ))}
-          <div className={`rounded-lg border p-3 ${connect ? "border-emerald-700 bg-emerald-950/30" : "border-zinc-800 bg-zinc-950"}`}>
-            <p className="font-semibold">Connect a source</p>
-            <p className="mt-1 text-xs text-zinc-500">Upload exports; Claude maps them onto the event contract and you see the mapping.</p>
-            <button onClick={() => setConnect(!connect)} disabled={streaming}
-                    className="mt-2 rounded-md bg-emerald-600 px-3 py-1 text-xs font-semibold text-white disabled:opacity-40">
-              {connect ? "Back to events" : "Open"}</button>
-            {uploads.map((u) => (
-              <div key={u.scenario} className="mt-2 flex items-center justify-between gap-2 text-xs">
-                <span className="truncate font-mono text-zinc-300" title={`${u.events} events · ${u.decisions} decisions`}>
-                  {u.scenario} <span className="text-zinc-500">· {u.customers} customers</span></span>
-                <button onClick={() => removeUpload(u.scenario)} disabled={!!busy}
-                        className="rounded-md bg-zinc-800 px-2 py-0.5 disabled:opacity-40">
-                  {busy === `remove-${u.scenario}` ? "…" : "Remove"}</button>
-              </div>
-            ))}
+            </div>}
           </div>
           <button onClick={resetAll} disabled={!!busy || streaming}
                   className="w-full rounded-md border border-zinc-700 py-1.5 text-xs text-zinc-300 disabled:opacity-40">

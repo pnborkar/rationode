@@ -4,7 +4,7 @@
 // and adjust the mapping, the validator checks it and dry-runs the detector, then you approve and
 // it is written to Neo4j under upload:<name>.
 import dynamic from "next/dynamic";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { DATA_FIELDS } from "@/lib/contract";
 import { mapFile, matches, parseFile, type FieldMap, type FileMapping, type ParsedFile, type RecordMap } from "@/lib/mapping";
 import type { Check, Validation } from "@/lib/validator";
@@ -441,7 +441,26 @@ function ResultView({ result, graph, active, onCustomer, onRemove, busy }: {
   result: RunResult; graph: { email: string; nodes: ViewNode[]; rels: ViewRel[] } | null; active: boolean;
   onCustomer: (email: string) => void; onRemove: () => void; busy: string | null;
 }) {
+  const [expanded, setExpanded] = useState(false);
+  useEffect(() => {   // Esc closes the expanded graph
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setExpanded(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+  const customers = (
+    <div className="flex flex-wrap gap-1">{result.customers.map((c) => (
+      <button key={c.email} onClick={() => onCustomer(c.email)}
+              className={`rounded border px-2 py-0.5 text-[11px] ${graph?.email === c.email ? "border-sky-600 bg-sky-950" : "border-zinc-700"}`}>
+        {c.name ?? c.email}</button>
+    ))}</div>
+  );
+  const expandButton = (
+    <button onClick={() => setExpanded((x) => !x)} title={expanded ? "Close (Esc)" : "Expand"}
+            className="rounded-md border border-zinc-700 px-2 py-0.5 text-xs font-normal normal-case tracking-normal text-zinc-300 hover:bg-zinc-800">
+      {expanded ? "✕ Close" : "⤢ Expand"}</button>
+  );
   return (
+    <>
     <div className="grid h-full min-h-[520px] grid-cols-[1fr_1.3fr] gap-3">
       <div className="min-h-0 space-y-3 overflow-y-auto">
         <p className="rounded-md bg-sky-950 px-3 py-2 text-sm text-sky-100">
@@ -449,11 +468,7 @@ function ResultView({ result, graph, active, onCustomer, onRemove, busy }: {
           {" "}{result.counts.decisions} decisions, {result.counts.outcomes} outcomes, {result.counts.led_to} LED_TO links.</p>
         <div>
           <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-zinc-400">Customers ({result.customers.length})</p>
-          <div className="flex flex-wrap gap-1">{result.customers.map((c) => (
-            <button key={c.email} onClick={() => onCustomer(c.email)}
-                    className={`rounded border px-2 py-0.5 text-[11px] ${graph?.email === c.email ? "border-sky-600 bg-sky-950" : "border-zinc-700"}`}>
-              {c.name ?? c.email}</button>
-          ))}</div>
+          {customers}
         </div>
         <div>
           <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-zinc-400">Decision trees updated</p>
@@ -470,10 +485,25 @@ function ResultView({ result, graph, active, onCustomer, onRemove, busy }: {
           {busy === "remove" ? "Removing…" : "Remove this batch"}</button>
       </div>
       <div className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-zinc-800">
-        <p className="border-b border-zinc-800 bg-zinc-800/70 px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-zinc-400">
-          Journey · live from Neo4j {graph && <span className="font-normal normal-case text-zinc-500">· {graph.email}</span>}</p>
-        <div className="min-h-0 flex-1">{active && graph && graph.nodes.length > 0 && <GraphView nodes={graph.nodes} rels={graph.rels} />}</div>
+        <div className="flex items-center justify-between border-b border-zinc-800 bg-zinc-800/70 px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-zinc-400">
+          <span>Journey · live from Neo4j {graph && <span className="font-normal normal-case text-zinc-500">· {graph.email}</span>}</span>
+          {expandButton}
+        </div>
+        <div className="min-h-0 flex-1">{active && !expanded && graph && graph.nodes.length > 0 && <GraphView nodes={graph.nodes} rels={graph.rels} />}</div>
       </div>
     </div>
+    {expanded && (
+      <div className="fixed inset-0 z-50 flex flex-col bg-zinc-950/95 p-4 backdrop-blur">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-300">
+            Journey · live from Neo4j <span className="font-normal normal-case text-zinc-500">· {result.scenario}{graph ? ` · ${graph.email}` : ""}</span></h2>
+          {expandButton}
+        </div>
+        <div className="mb-3">{customers}</div>
+        <div className="min-h-0 flex-1 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/60">
+          {graph && graph.nodes.length > 0 && <GraphView nodes={graph.nodes} rels={graph.rels} />}</div>
+      </div>
+    )}
+    </>
   );
 }
