@@ -33,7 +33,8 @@ async function historyBaseline() {
   return baseline;
 }
 
-export async function checkFraudPatterns(email: string, chargeId?: string) {
+export async function checkFraudPatterns(rawEmail: string, chargeId?: string) {
+  const email = rawEmail.trim().toLowerCase().replace(/^"|"$/g, "");
   // The charge: the one named, or the customer's latest.
   const [c] = await query<{ customer: string; scenario: string; name: string; charge: string | null }>(
     `MATCH (c:Customer:Entity {source_system: 'stripe', email: $email})

@@ -27,7 +27,8 @@ export type CustomerInfo = {
 
 // What the support agent's get_customer tool returns: assembled from Stripe and
 // subscription-system events already in the graph.
-export async function getCustomer(email: string): Promise<CustomerInfo | null> {
+export async function getCustomer(rawEmail: string): Promise<CustomerInfo | null> {
+  const email = rawEmail.trim().toLowerCase().replace(/^"|"$/g, "");
   const rows = await query<{
     cus: string; name: string; started: string; plan: string; charge_id: string; amount: number;
     refunds: number; canceled: boolean;
@@ -82,7 +83,8 @@ export type UsagePattern =
 
 // check_usage_patterns: weekly viewing from the Streamly app, as facts (no verdict). Only prepared
 // customers have usage data, so there is deliberately no comparison with a "typical" customer.
-export async function checkUsage(email: string): Promise<UsagePattern | null> {
+export async function checkUsage(rawEmail: string): Promise<UsagePattern | null> {
+  const email = rawEmail.trim().toLowerCase().replace(/^"|"$/g, "");
   const [c] = await query<{ cus: string; charged: string | null; amount: number | null }>(
     `MATCH (c:Customer:Entity {source_system: 'stripe', email: $email})
      OPTIONAL MATCH (ch:Event {stripe_customer_id: c.source_key})
