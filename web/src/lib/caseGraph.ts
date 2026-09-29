@@ -51,7 +51,8 @@ export async function customerGraph(email: string) {
   const nodes: GraphNode[] = [{ id: r.customer, kind: "customer", label: r.name, detail: email }];
   const rels: GraphRel[] = [];
   for (const e of r.entities) {
-    const label = e.kind === "Charge" && e.amount != null ? `Charge $${e.amount}` : e.kind;
+    const label = e.kind === "Charge" && e.amount != null ? `Charge $${e.amount}`
+      : e.kind === "Ticket" ? `Ticket #${e.key.replace(/^ticket:/, "")}` : e.kind;
     nodes.push({ id: e.id, kind: e.kind.toLowerCase(), label, detail: e.key });
   }
   const chargeEntity = new Map(r.entities.filter((e) => e.kind === "Charge").map((e) => [e.key, e.id]));
