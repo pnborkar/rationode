@@ -3,7 +3,7 @@
 // "Streamly live" (demo spec Section 10.1): customer chat, the agent's thinking, the rep console,
 // and the live decision graph.
 import dynamic from "next/dynamic";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ViewNode, ViewRel } from "@/components/GraphView";
 import EventsTab from "@/components/EventsTab";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -214,10 +214,22 @@ export default function StreamlyLive() {
   const [expanded, setExpanded] = useState(false);
 
   // Customers from sets loaded, and batches uploaded, on the Events tab join the dropdown.
-  const refreshStories = () => Promise.all([
-    fetch("/api/stories").then((r) => r.json()).then((sets: SetInfo[]) => setStoryCases(toCases(sets))),
-    fetch("/api/upload/cases").then((r) => r.json()).then((rows: UploadedCase[]) => setUploadCases(toUploadCases(rows))),
-  ]);
+  const caseKeyRef = useRef(caseKey);
+  useEffect(() => { caseKeyRef.current = caseKey; }, [caseKey]);
+  const refreshStories = async () => {
+    const [sets, rows]: [SetInfo[], UploadedCase[]] = await Promise.all([
+      fetch("/api/stories").then((r) => r.json()), fetch("/api/upload/cases").then((r) => r.json())]);
+    const s = toCases(sets), u = toUploadCases(rows);
+    setStoryCases(s);
+    setUploadCases(u);
+    // The selected customer's set or batch was removed: start over on the first live case.
+    if (![...LIVE_CASES, ...s, ...u].some((c) => c.key === caseKeyRef.current)) {
+      setCaseKey(LIVE_CASES[0].key);
+      setMessage(LIVE_CASES[0].message);
+      setBase({ nodes: [], rels: [] });
+      reset();
+    }
+  };
   useEffect(() => {
     let alive = true;
     fetch("/api/stories").then((r) => r.json()).then((sets: SetInfo[]) => { if (alive) setStoryCases(toCases(sets)); });

@@ -43,11 +43,15 @@ function toNvl(n: ViewNode): Node {
 
 export default function GraphView({ nodes, rels }: { nodes: ViewNode[]; rels: ViewRel[] }) {
   const nvlNodes = useMemo(() => nodes.map(toNvl), [nodes]);
-  const nvlRels = useMemo<Relationship[]>(() => rels.map((r) => ({
+  // Drop links whose ends aren't drawn (e.g. a customer removed while still on screen): NVL throws on them.
+  const nvlRels = useMemo<Relationship[]>(() => rels.filter((r) => {
+    const ids = new Set(nodes.map((n) => n.id));
+    return ids.has(r.from) && ids.has(r.to);
+  }).map((r) => ({
     id: r.id, from: r.from, to: r.to, caption: r.type,
     color: r.type === "OVERRIDES" || r.type === "POLICY_GAP" || r.type === "CONTRADICTS" ? "#f87171" : r.type === "SIMILAR_TO" ? "#334155" : "#64748b",
     width: r.type === "SIMILAR_TO" || r.type === "INCLUDES" ? 1 : r.type === "POLICY_GAP" || r.type === "CONTRADICTS" ? 4 : 2,
-  })), [rels]);
+  })), [nodes, rels]);
 
   // Keep everything in view as live nodes arrive.
   const nvl = useRef<NVL>(null);
