@@ -9,7 +9,8 @@ import { checkFraudPatterns } from "@/lib/fraud";
 import { checkBeforeAct } from "@/lib/precedent";
 import { why } from "@/lib/why";
 
-const DECISION_TYPES = ["support.complaint_resolution", "dispute.response", "dispute.evidence"] as const;
+// Decision types are data (any domain, §23.8): Streamly's are e.g. support.complaint_resolution, dispute.response,
+// dispute.evidence; a loaded domain adds its own (e.g. loan.offer). Unknown types simply find no precedent.
 
 function asText(value: unknown) {
   return { content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }] };
@@ -22,10 +23,11 @@ function server() {
     title: "Check before acting",
     description:
       "Before making a decision, see what happened in similar past decisions: options chosen, their dispute, " +
-      "churn, win, and cost outcomes, plus a what-if through the learned outcome tree for each possible action. " +
-      "Context uses namespaced attributes, e.g. support.tenure_months, dispute.category.",
+      "churn, win, and cost outcomes (and, for any domain, the rate of each outcome type and of good / bad outcomes), " +
+      "plus a what-if through the learned outcome tree where one exists. Context uses namespaced attributes, e.g. " +
+      "support.tenure_months, dispute.category; a loaded domain's use its own prefix (e.g. loan.requested_amount).",
     inputSchema: {
-      decision_type: z.enum(DECISION_TYPES),
+      decision_type: z.string().min(1),
       context: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])),
       customer_email: z.string().optional(),
     },
@@ -38,7 +40,7 @@ function server() {
     description: "Free-text search over past decisions' contexts (e.g. 'annual plan didn't use renewal').",
     inputSchema: {
       query: z.string(),
-      decision_type: z.enum(DECISION_TYPES).optional(),
+      decision_type: z.string().min(1).optional(),
       limit: z.number().int().min(1).max(50).optional(),
     },
     annotations: { readOnlyHint: true },

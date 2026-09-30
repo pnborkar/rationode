@@ -2,7 +2,8 @@ import { isType } from "./eventFields";
 import { LIVE } from "./live";
 import { FRAUD_POLICY_TREE, query, SCENARIO } from "./neo4j";
 
-export type GraphNode = { id: string; kind: string; label: string; detail?: string; option?: string | null; outcomes?: string[] };
+export type GraphNode = { id: string; kind: string; label: string; detail?: string; option?: string | null; outcomes?: string[];
+                          tone?: "good" | "bad" | "mixed" | null };   // any domain (§23.8): colour from outcome polarity
 export type GraphRel = { id: string; from: string; to: string; type: string };
 
 // Captions that say what happened, including the money.
@@ -239,3 +240,78 @@ async function addPolicyGap(email: string, nodes: GraphNode[], rels: GraphRel[])
     }
   }
 }
+
+// Any subject's neighbourhood (demo spec §23.8, phase B): the subject (e.g. a loan application), its parent and its
+// parts (PART_OF, e.g. its offers), the decisions about them, what those led to and who decided. The customer graph
+// above is Streamly's view (a Stripe customer); this one works for any domain.
+export async function subjectGraph(entityId: string) {
+  const [r] = await query<{
+    subject: { id: string; label: string; key: string; type: string | null };
+    parent: { id: string; label: string; key: string } | null;
+    parts: { id: string; label: string; key: string }[];
+    decisions: { id: string; type: string; stage: string; at: string; option: string | null; amount: number | null; about: string;
+                 actor: string | null; kind: string | null; rationale: string | null;
+                 outcomes: { id: string; type: string; value: number | null; polarity: string | null }[] }[];
+  }>(
+    `MATCH (s:Entity {entity_id: $id})
+     OPTIONAL MATCH (s)-[:PART_OF]->(p:Entity)
+     OPTIONAL MATCH (c:Entity)-[:PART_OF]->(s)
+     WITH s, p, collect(DISTINCT c) AS parts
+     CALL (s, parts) {
+       UNWIND [s] + parts AS x
+       MATCH (d:Decision)-[:ABOUT]->(x)
+       // A decision about a part is also about the subject: once, drawn on its most specific subject (the part).
+       WITH d, collect(x) AS xs
+       WITH d, coalesce(head([y IN xs WHERE y <> s]), s) AS x
+       OPTIONAL MATCH (d)-[k:CONSIDERED]->(o:Option) WHERE k.status IN ['CHOSEN', 'PROPOSED']
+       OPTIONAL MATCH (d)-[:MADE_BY]->(a:Actor)
+       WITH d, x, head(collect(o.option_key)) AS option, head(collect(k.amount_usd)) AS amount, head(collect(a)) AS a
+       OPTIONAL MATCH (d)-[:LED_TO]->(out:Outcome)
+       WITH d, x, option, amount, a,
+            collect(CASE WHEN out IS NULL THEN null ELSE {id: out.outcome_id, type: out.outcome_type, value: out.value_usd, polarity: out.polarity} END) AS outcomes
+       ORDER BY d.decided_at
+       RETURN collect({id: d.decision_id, type: d.decision_type, stage: d.stage, at: toString(d.decided_at), about: x.entity_id,
+                       rationale: d.rationale, option: option, amount: amount, actor: coalesce(a.name, a.actor_id), kind: a.kind,
+                       outcomes: outcomes}) AS decisions
+     }
+     RETURN {id: s.entity_id, label: head([l IN labels(s) WHERE l <> 'Entity']), key: s.source_key, type: s.subject_type} AS subject,
+            CASE WHEN p IS NULL THEN null ELSE {id: p.entity_id, label: head([l IN labels(p) WHERE l <> 'Entity']), key: p.source_key} END AS parent,
+            [c IN parts | {id: c.entity_id, label: head([l IN labels(c) WHERE l <> 'Entity']), key: c.source_key}] AS parts,
+            decisions`,
+    { id: entityId },
+  );
+  if (!r) return null;
+  const short = (key: string) => key.split(":").slice(1).join(":") || key;
+  const words = (s: string) => s.replaceAll("_", " ");
+  const tone = (ps: (string | null)[]): GraphNode["tone"] =>
+    ps.includes("good") && ps.includes("bad") ? "mixed" : ps.includes("good") ? "good" : ps.includes("bad") ? "bad" : null;
+  const nodes: GraphNode[] = [{ id: r.subject.id, kind: "customer", label: `${r.subject.label} ${short(r.subject.key)}`,
+                                detail: `${r.subject.type ?? r.subject.label} · ${r.subject.key}` }];
+  const rels: GraphRel[] = [];
+  if (r.parent) {
+    nodes.push({ id: r.parent.id, kind: "subject", label: `${r.parent.label} ${short(r.parent.key)}`, detail: r.parent.key });
+    rels.push({ id: `${r.subject.id}->part_of`, from: r.subject.id, to: r.parent.id, type: "PART_OF" });
+  }
+  for (const c of r.parts) {
+    nodes.push({ id: c.id, kind: "subject", label: `${c.label} ${short(c.key)}`, detail: c.key });
+    rels.push({ id: `${c.id}->part_of`, from: c.id, to: r.subject.id, type: "PART_OF" });
+  }
+  const seen = new Set<string>();
+  for (const d of r.decisions) {
+    nodes.push({ id: d.id, kind: "decision", label: d.type.split(".").slice(1).join(".").replaceAll("_", " ") || d.type,
+                 option: d.option, tone: tone(d.outcomes.map((o) => o.polarity)),
+                 detail: `${d.stage.toLowerCase()} by ${d.actor ?? "?"} (${(d.kind ?? "").toLowerCase().replace("_", " ")}) · ${d.at.slice(0, 10)}` +
+                         (d.amount != null ? ` · ${d.amount}` : "") + (d.rationale ? ` · reason: ${d.rationale}` : "") });
+    rels.push({ id: `${d.id}->about`, from: d.id, to: d.about, type: "ABOUT" });
+    for (const o of d.outcomes) {
+      if (!seen.has(o.id)) {
+        seen.add(o.id);
+        nodes.push({ id: o.id, kind: "outcome", label: words(o.type).replace(/^./, (x) => x.toUpperCase()) + (o.value != null ? ` ${o.value}` : ""),
+                     tone: (o.polarity as GraphNode["tone"]) ?? null, detail: `${words(o.type)}${o.polarity ? ` · ${o.polarity}` : ""}` });
+      }
+      rels.push({ id: `${d.id}->${o.id}`, from: d.id, to: o.id, type: "LED_TO" });
+    }
+  }
+  return { nodes, rels };
+}
+

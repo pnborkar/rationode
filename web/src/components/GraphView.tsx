@@ -16,7 +16,9 @@ const KIND_COLOR: Record<string, string> = {
   signals: "#f59e0b", rule: "#94a3b8", policy: "#0ea5e9", pattern: "#dc2626",
   usage: "#14b8a6",
   card: "#f472b6", device: "#fb7185", account: "#64748b", fraud_account: "#dc2626",
+  subject: "#64748b",   // any domain's related subjects (a parent, its parts)
 };
+const TONE_COLOR = { good: "#22c55e", bad: "#ef4444", mixed: "#f59e0b" } as const;   // any domain: outcome polarity
 
 export function decisionColor(outcomes: string[] = []): string {
   if (outcomes.includes("dispute_filed") || outcomes.includes("dispute_lost")) return "#ef4444";
@@ -31,7 +33,7 @@ function toNvl(n: ViewNode): Node {
   return {
     id: n.id,
     caption,
-    color: isDecision ? decisionColor(n.outcomes)
+    color: n.tone ? TONE_COLOR[n.tone] : isDecision ? decisionColor(n.outcomes)
       : n.kind === "outcome" ? (n.label === "Renewed" || n.label === "Dispute won" ? "#22c55e"
           : n.label.startsWith("Refunded") ? "#f59e0b" : "#f87171")
       : (KIND_COLOR[n.kind] ?? "#94a3b8"),

@@ -27,6 +27,7 @@ type Proposal = { status: "mapping" | "done" | "error"; mapping?: FileMapping; s
 type Stats = { support: number; dispute_rate: number | null; churn_rate: number | null; win_rate: number | null };
 type RunResult = { ok: boolean; error?: string; scenario: string; counts: Record<string, number>;
                    customers: { email: string; name: string | null }[];
+                   subjects?: { id: string; label: string; key: string }[];   // any domain (§23.8): top-level subjects loaded
                    branches: { point_id: string; tree: string; branch: string; before: Stats; after: Stats }[] };
 type ReportView = Omit<Validation, "events">;
 
@@ -198,6 +199,7 @@ export default function ConnectSource({ active, onClose, onChanged }: { active: 
       if (incremental) { setIncremental(null); refreshPending(); }
       setResult(data); setView("result"); onChanged();
       if (data.customers?.length) await showCustomer(data.customers[0].email);
+      else if (data.subjects?.length) await showSubject(data.subjects[0].id);
     } else setError(data.error ?? res.statusText);
     if (!incremental && data.ok) refreshPending();
     setBusy(null);
@@ -209,6 +211,11 @@ export default function ConnectSource({ active, onClose, onChanged }: { active: 
     await fetch(`/api/upload?scenario=${encodeURIComponent(result.scenario)}`, { method: "DELETE" });
     setResult(null); setGraph(null); setView("validate"); onChanged();
     setBusy(null);
+  }
+
+  async function showSubject(id: string) {
+    const res = await fetch(`/api/graph/subject?id=${encodeURIComponent(id)}`);
+    if (res.ok) setGraph({ email: id, ...(await res.json()) });
   }
 
   async function showCustomer(email: string) {
@@ -331,7 +338,7 @@ export default function ConnectSource({ active, onClose, onChanged }: { active: 
             )}
             {view === "validate" && report && <ValidationView report={report} />}
             {view === "result" && result && (
-              <ResultView result={result} graph={graph} active={active} onCustomer={showCustomer} onRemove={removeBatch} busy={busy} />
+              <ResultView result={result} graph={graph} active={active} onCustomer={showCustomer} onSubject={showSubject} onRemove={removeBatch} busy={busy} />
             )}
             {view !== "validate" && view !== "result" && pf && (typeof pf === "string"
               ? <p className="text-sm text-red-400">Could not read {view}: {pf}</p>
@@ -547,9 +554,9 @@ function ValidationView({ report }: { report: ReportView }) {
 }
 
 // ------------------------------------------------------------------ after loading
-function ResultView({ result, graph, active, onCustomer, onRemove, busy }: {
+function ResultView({ result, graph, active, onCustomer, onSubject, onRemove, busy }: {
   result: RunResult; graph: { email: string; nodes: ViewNode[]; rels: ViewRel[] } | null; active: boolean;
-  onCustomer: (email: string) => void; onRemove: () => void; busy: string | null;
+  onCustomer: (email: string) => void; onSubject: (id: string) => void; onRemove: () => void; busy: string | null;
 }) {
   const [expanded, setExpanded] = useState(false);
   useEffect(() => {   // Esc closes the expanded graph
@@ -557,11 +564,18 @@ function ResultView({ result, graph, active, onCustomer, onRemove, busy }: {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
-  const customers = (
+  // Streamly's customers, or (any domain) the top-level subjects loaded, e.g. applications.
+  const customers = result.customers.length || !result.subjects?.length ? (
     <div className="flex flex-wrap gap-1">{result.customers.map((c) => (
       <button key={c.email} onClick={() => onCustomer(c.email)}
               className={`rounded border px-2 py-0.5 text-[11px] ${graph?.email === c.email ? "border-sky-600 bg-sky-950" : "border-zinc-700"}`}>
         {c.name ?? c.email}</button>
+    ))}</div>
+  ) : (
+    <div className="flex flex-wrap gap-1">{result.subjects.map((x) => (
+      <button key={x.id} onClick={() => onSubject(x.id)}
+              className={`rounded border px-2 py-0.5 text-[11px] ${graph?.email === x.id ? "border-sky-600 bg-sky-950" : "border-zinc-700"}`}>
+        {x.label} {x.key}</button>
     ))}</div>
   );
   const expandButton = (
@@ -577,7 +591,8 @@ function ResultView({ result, graph, active, onCustomer, onRemove, busy }: {
           Written to Neo4j as <span className="font-mono">{result.scenario}</span>: {result.counts.events} events,
           {" "}{result.counts.decisions} decisions, {result.counts.outcomes} outcomes, {result.counts.led_to} LED_TO links.</p>
         <div>
-          <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-zinc-400">Customers ({result.customers.length})</p>
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-zinc-400">
+            {result.customers.length || !result.subjects?.length ? `Customers (${result.customers.length})` : `Subjects (first ${result.subjects.length})`}</p>
           {customers}
         </div>
         <div>

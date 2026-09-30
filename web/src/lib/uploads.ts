@@ -4,6 +4,8 @@ import { createHash } from "node:crypto";
 import { aiSettings } from "./settings";
 import { REGISTRY_CYPHER, registryFrom, rowsDict, type Registry } from "./detector";
 import { detectAll } from "./genericDetector";
+import { deriveAttributes } from "./genericFeatures";
+import { isGeneric } from "./contract";
 import { parseFile, type FileMapping, type ParsedFile } from "./mapping";
 import { IS_DEMO, query, SCENARIO } from "./neo4j";
 import { placeScenario, recomputePoints, touchedPoints } from "./storyTrees";
@@ -181,13 +183,22 @@ export async function run(parsed: ParsedFile[], mappings: FileMapping[], name: s
     new: t ? t.new : report.events.length, changed: t?.changed ?? 0, unchanged: t?.unchanged ?? 0, removed: t?.removed ?? 0,
     editedFiles, sourcesJson: sources.length ? JSON.stringify(sources) : null,
   });
+  // Generic decision types (§23.8): derive their attributes from the data and encode their contexts, so they can be
+  // precedent; and list the loaded subjects (there are no Stripe customers in another domain).
+  const genericTypes = [...new Set(report.events.filter((e) => isGeneric(e.event_type) && e.data.decision_type)
+    .map((e) => rows.decisions.find((d) => d.decision_id === `${scenario === "history" ? "" : `${scenario}|`}dec:${e.event_id}`)?.decision_type as string)
+    .filter(Boolean))];
+  const features = genericTypes.length ? await deriveAttributes(scenario, genericTypes) : null;
+  const subjects = rows.entities.filter((e) => (e.props as { subject_type?: string })?.subject_type
+      && !(rows.links ?? []).some((l) => l.type === "PART_OF" && l.from === e.entity_id))
+    .slice(0, 30).map((e) => ({ id: e.entity_id as string, label: e.label as string, key: String(e.source_key).split(":").slice(1).join(":") }));
   // A tenant's own history isn't placed into trees: its trees are built from it (pipeline, per tenant).
   const branches = scenario === SCENARIO && !IS_DEMO ? [] : await placeScenario(scenario);
   const customers = rows.entities.filter((e) => e.label === "Customer" && e.source_system === "stripe")
     .map((e) => (e.props as { email: string; name: string | null }))
     .map((p) => ({ email: p.email, name: p.name }));
   return { ok: true as const, scenario, counts: Object.fromEntries(Object.entries(rows).map(([k, v]) => [k, v.length])),
-           customers, branches };
+           customers, branches, subjects, features };
 }
 
 export async function listUploads() {

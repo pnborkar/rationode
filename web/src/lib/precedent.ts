@@ -180,13 +180,13 @@ export async function checkBeforeAct(decisionType: string, context: Context, k =
     .sort((a, b) => b.score - a.score)
     .slice(0, k);
 
-  const details = await query<{ id: string; options: string[]; outcomes: string[]; cost: number }>(
+  const details = await query<{ id: string; options: string[]; outcomes: string[]; cost: number; polarities: string[] }>(
     `UNWIND $ids AS id
      MATCH (d:Decision {decision_id: id})
      OPTIONAL MATCH (d)-[:CONSIDERED {status: 'CHOSEN'}]->(o:Option)
      WITH d, collect(o.option_key) AS options
      OPTIONAL MATCH (d)-[:LED_TO]->(out:Outcome)
-     RETURN d.decision_id AS id, options, collect(out.outcome_type) AS outcomes,
+     RETURN d.decision_id AS id, options, collect(out.outcome_type) AS outcomes, collect(out.polarity) AS polarities,
             sum(CASE WHEN out.outcome_type IN $cost THEN out.value_usd ELSE 0 END) AS cost`,
     { ids: scored.map((c) => c.id), cost: COST_OUTCOMES },
   );
@@ -206,6 +206,10 @@ export async function checkBeforeAct(decisionType: string, context: Context, k =
       option, n: rows.length, share: Math.round((rows.length / details.length) * 1000) / 1000,
       dispute_rate: rate(rows, "dispute_filed"), churn_rate: rate(rows, "churn"), win_rate: rate(rows, "dispute_won"),
       avg_cost: Math.round((rows.reduce((s, r) => s + r.cost, 0) / rows.length) * 100) / 100,
+      // Any domain (§23.8): the rate of each outcome type that followed, and of good / bad outcomes (polarity).
+      outcome_rates: Object.fromEntries([...new Set(rows.flatMap((r) => r.outcomes))].sort().map((t) => [t, rate(rows, t)])),
+      good_rate: Math.round((rows.filter((r) => r.polarities.includes("good")).length / rows.length) * 1000) / 1000,
+      bad_rate: Math.round((rows.filter((r) => r.polarities.includes("bad")).length / rows.length) * 1000) / 1000,
     }));
 
   const whatIfs = await whatIf(decisionType, context);
