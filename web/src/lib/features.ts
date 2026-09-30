@@ -24,7 +24,7 @@ export const resetAttributes = () => { attrsCache = null; };   // after a load d
 
 // Streamly's decision types have fixed attribute families; a generic type (§23.8) uses its domain, the part before
 // the first dot (loan.offer -> "loan."), matching the context keys the generic detector writes.
-const prefixOf = (decisionType: string) => TYPE_PREFIX[decisionType] ?? `${decisionType.split(".")[0]}.`;
+export const prefixOf = (decisionType: string) => TYPE_PREFIX[decisionType] ?? `${decisionType.split(".")[0]}.`;
 
 export async function attributes(): Promise<Attr[]> {
   if (!attrsCache) {

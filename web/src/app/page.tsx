@@ -8,6 +8,7 @@ import type { ViewNode, ViewRel } from "@/components/GraphView";
 import EventsTab from "@/components/EventsTab";
 import SettingsTab from "@/components/SettingsTab";
 import BrowseSubjects from "@/components/BrowseSubjects";
+import AskTab from "@/components/AskTab";
 import ThemeToggle from "@/components/ThemeToggle";
 import { LIVE_CASES, type LiveCase } from "@/lib/liveCases";
 
@@ -247,7 +248,7 @@ function byQuestion(cases: LiveCase[]): Group[] {
 const capital = (s: string) => s.replace(/^./, (x) => x.toUpperCase());
 
 export default function StreamlyLive() {
-  const [tab, setTab] = useState<"live" | "events" | "browse" | "settings">("live");
+  const [tab, setTab] = useState<"live" | "events" | "browse" | "ask" | "settings">("live");
   const [storyCases, setStoryCases] = useState<LiveCase[]>([]);
   const [uploadCases, setUploadCases] = useState<LiveCase[]>([]);
   const cases = [...PREPARED, ...storyCases, ...uploadCases];
@@ -596,7 +597,7 @@ export default function StreamlyLive() {
             <p className="text-xs text-white/70">Every decision from AI, humans, and systems, in one Neo4j graph</p>
           </div>
           <nav className="flex rounded-full bg-white/10 p-1 text-sm">
-            {([["live", "Live"], ["events", "Events"], ["browse", "Browse"]] as const).map(([k, label]) => (
+            {([["live", "Live"], ["events", "Events"], ["browse", "Browse"], ["ask", "Ask"]] as const).map(([k, label]) => (
               <button key={k} onClick={() => setTab(k)}
                       className={`rounded-full px-4 py-1 font-semibold ${tab === k ? "bg-white text-[#4c1d95]" : "text-white/80"}`}>
                 {label}
@@ -626,6 +627,8 @@ export default function StreamlyLive() {
 
       {tab === "settings" && <SettingsTab />}
       {tab === "browse" && <div className="flex min-h-0 flex-1"><BrowseSubjects active /></div>}
+      {/* Kept mounted so a conversation survives switching tabs. */}
+      <div className={tab === "ask" ? "flex min-h-0 flex-1" : "hidden"}><AskTab /></div>
 
       <div className={tab === "live" ? "grid min-h-0 flex-1 grid-cols-2 grid-rows-6 gap-3" : "hidden"}>
         <Panel title="Customer help chat" className="col-start-1 row-span-3 row-start-1" badge={
