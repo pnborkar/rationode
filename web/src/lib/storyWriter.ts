@@ -35,8 +35,12 @@ const Q = {
     SET d.decision_type = r.decision_type, d.stage = r.stage, d.decided_at = datetime(r.decided_at),
         d.recorded_at = coalesce(d.recorded_at, datetime()), d.detection_method = r.detection_method,
         d.detection_confidence = r.detection_confidence, d.source_system = r.source_system,
-        d.scenario_id = r.scenario_id, d.rationale = r.rationale
-    WITH d, r MATCH (t:DecisionType {key: r.decision_type}) MERGE (d)-[:INSTANCE_OF]->(t)`,
+        d.scenario_id = r.scenario_id, d.rationale = r.rationale, d.details_json = r.details_json
+    // A decision type first seen in a mapping (§23.8) is created PROPOSED; known types are left as they are.
+    WITH d, r MERGE (t:DecisionType {key: r.decision_type})
+      ON CREATE SET t.status = 'PROPOSED', t.created_by = 'mapping', t.created_at = datetime(),
+                    t.display_name = replace(r.decision_type, '_', ' ')
+    MERGE (d)-[:INSTANCE_OF]->(t)`,
   contexts: `UNWIND $rows AS r
     MERGE (c:Context {context_id: r.context_id})
     SET c += r.attrs, c.summary_text = r.summary_text, c.scenario_id = r.scenario_id, c.features = r.features,
@@ -64,7 +68,8 @@ const Q = {
   outcomes: `UNWIND $rows AS r
     MERGE (o:Outcome {outcome_id: r.outcome_id})
     SET o.outcome_type = r.outcome_type, o.occurred_at = datetime(r.occurred_at),
-        o.recorded_at = coalesce(o.recorded_at, datetime()), o.value_usd = r.value_usd, o.scenario_id = r.scenario_id`,
+        o.recorded_at = coalesce(o.recorded_at, datetime()), o.value_usd = r.value_usd, o.scenario_id = r.scenario_id,
+        o.polarity = r.polarity`,
   evidenced_by: (label: string, idProp: string) => `UNWIND $rows AS r
     MATCH (n:${label} {${idProp}: r.node_id}), (e:Event {event_id: r.event_id})
     MERGE (n)-[:EVIDENCED_BY]->(e)`,
@@ -80,6 +85,9 @@ const Q = {
       ON CREATE SET u.first_seen = datetime(r.at), u.last_seen = datetime(r.at)
       SET u.first_seen = CASE WHEN datetime(r.at) < u.first_seen THEN datetime(r.at) ELSE u.first_seen END,
           u.last_seen = CASE WHEN datetime(r.at) > u.last_seen THEN datetime(r.at) ELSE u.last_seen END`,
+    // Generic subjects (§23.8): a nested subject belongs to its parent (an offer to its application).
+    PART_OF: `UNWIND $rows AS r
+      MATCH (a:Entity {entity_id: r.from}), (b:Entity {entity_id: r.to}) MERGE (a)-[:PART_OF]->(b)`,
   } as Record<string, string>,
   // The same card or device already seen in another scenario (e.g. history): link, never merge.
   sameIdentity: `MATCH (x:Entity {scenario_id: $scenario}) WHERE x:Card OR x:Device

@@ -64,8 +64,8 @@ const ms = (iso: string) => Date.parse(iso);
 type Proposal = { id: string; option: string; amount: number | null; ctx: Data; actor: string; ticketEntity: string };
 
 export class Detector {
-  private reg: Registry;
-  private scenario: string;
+  protected reg: Registry;
+  protected scenario: string;
   readonly rows: Rows = {
     events: [], entities: [], same_as: [], actors: new Map(), decisions: [], contexts: [], considered: [], made_by: [],
     about: [], preceded_by: [], overrides: [], under_policy: [], evidenced_by: [], outcomes: [], led_to: [],
@@ -86,11 +86,11 @@ export class Detector {
     return this.scenario === "history" ? value : `${this.scenario}|${value}`;
   }
 
-  private approved(decisionType: string): string[] {
+  protected approved(decisionType: string): string[] {
     return Object.entries(this.reg.options[decisionType] ?? {}).filter(([, s]) => s === "APPROVED").map(([k]) => k).sort();
   }
 
-  private entity(label: string, source: string, key: string, props: Data): string {
+  protected entity(label: string, source: string, key: string, props: Data): string {
     const entityId = this.pid(`${source}:${key}`);
     if (!this.entityIds.has(entityId)) {
       this.entityIds.add(entityId);
@@ -99,7 +99,7 @@ export class Detector {
     return entityId;
   }
 
-  private actor(a: Actor): string {
+  protected actor(a: Actor): string {
     const aid = this.pid(a.id);
     if (!this.rows.actors.has(aid)) {
       this.rows.actors.set(aid, { actor_id: aid, kind: a.kind, version: a.version ?? null, name: a.name ?? null,
@@ -108,7 +108,7 @@ export class Detector {
     return aid;
   }
 
-  private optionStatus(decisionType: string, option: string, at: string): void {
+  protected optionStatus(decisionType: string, option: string, at: string): void {
     const known = (this.reg.options[decisionType] ??= {});
     if (!(option in known)) {
       known[option] = "PROPOSED";
@@ -119,17 +119,18 @@ export class Detector {
     }
   }
 
-  private decision(src: ContractEvent, decisionType: string, stage: string, o: {
+  protected decision(src: ContractEvent, decisionType: string, stage: string, o: {
     actor: string; role: string; chosen: [string, number | null][]; context: Data; summary: string; about: string[];
     evidence: ContractEvent[]; suffix?: string; confidence?: number; rejected?: string[]; proposedStatus?: boolean;
-    allOptions?: string[]; rationale?: string | null;
+    allOptions?: string[]; rationale?: string | null; extra?: Row;
   }): string {
     const at = src.occurred_at, suffix = o.suffix ?? "", rejected = o.rejected ?? [];
     const did = this.pid(`dec:${src.event_id}${suffix}`);
     const r = this.rows;
     r.decisions.push({ decision_id: did, decision_type: decisionType, stage, decided_at: at, detection_method: "RULE",
                        detection_confidence: o.confidence ?? 1.0, source_system: src.source, scenario_id: this.scenario,
-                       ...(o.rationale ? { rationale: o.rationale } : {}) });   // why, when the decider said (a rep's override note)
+                       ...(o.rationale ? { rationale: o.rationale } : {}),   // why, when the decider said (a rep's override note)
+                       ...(o.extra ?? {}) });
     r.contexts.push({ context_id: this.pid(`ctx:${src.event_id}${suffix}`), decision_id: did, attrs: o.context,
                       summary_text: o.summary, scenario_id: this.scenario });
     const chosenKeys = new Set(o.chosen.map(([k]) => k));
@@ -154,21 +155,21 @@ export class Detector {
     }
     r.made_by.push({ decision_id: did, actor_id: o.actor, role: o.role });
     for (const e of o.about) r.about.push({ decision_id: did, entity_id: e });
-    const [policyId, version] = POLICIES[decisionType];
-    r.under_policy.push({ decision_id: did, policy_id: policyId, version });
+    const policy = POLICIES[decisionType];   // generic decision types (§23.8) have no policy until one is declared
+    if (policy) r.under_policy.push({ decision_id: did, policy_id: policy[0], version: policy[1] });
     for (const e of o.evidence) r.evidenced_by.push({ node_id: did, kind: "Decision", event_id: this.pid(e.event_id) });
     return did;
   }
 
-  private outcome(src: ContractEvent, outcomeType: string, value: number | null): string {
+  protected outcome(src: ContractEvent, outcomeType: string, value: number | null, extra?: Row): string {
     const oid = this.pid(`out:${src.event_id}`);
     this.rows.outcomes.push({ outcome_id: oid, outcome_type: outcomeType, occurred_at: src.occurred_at, value_usd: value,
-                              scenario_id: this.scenario });
+                              scenario_id: this.scenario, ...(extra ?? {}) });
     this.rows.evidenced_by.push({ node_id: oid, kind: "Outcome", event_id: this.pid(src.event_id) });
     return oid;
   }
 
-  private ledTo(decisionId: string | null, outcomeId: string, outcomeType: string, method: string, confidence: number): void {
+  protected ledTo(decisionId: string | null, outcomeId: string, outcomeType: string, method: string, confidence: number): void {
     if (decisionId) {
       this.rows.led_to.push({ decision_id: decisionId, outcome_id: outcomeId, confidence, attribution_method: method,
                               window_days: this.reg.windows[outcomeType] ?? null });

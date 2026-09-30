@@ -2,8 +2,9 @@
 // columns exist, every row is accounted for, required contract fields are present, timestamps
 // parse, option values are known (or will be PROPOSED), references resolve across files, and a
 // dry run through the real detector shows what the files would become.
-import { DATA_FIELDS, ENTITY_REFS, type CanonicalType, type ContractEvent } from "./contract";
-import { Detector, rowsDict, type Registry } from "./detector";
+import { DATA_FIELDS, ENTITY_REFS, OPEN_FIELDS, type CanonicalType, type ContractEvent } from "./contract";
+import { rowsDict, type Registry } from "./detector";
+import { detectAll } from "./genericDetector";
 import { mapFile, type FileMapping, type MappedEvent, type ParsedFile, type RowProblem } from "./mapping";
 
 // Entity references each event type needs for the detector to place it.
@@ -27,6 +28,9 @@ const REFS_REQUIRED: Record<CanonicalType, string[]> = {
   "subscription.canceled": ["stripe_customer_id"],
   "subscription.paused": ["stripe_customer_id"],
   "usage.weekly": ["stripe_customer_id"],
+  // Generic decision events (§23.8): every one is about a subject.
+  "decision.proposed": ["subject_type", "subject_id"], "decision.made": ["subject_type", "subject_id"],
+  "context.observed": ["subject_type", "subject_id"], "outcome.observed": ["subject_type", "subject_id"],
 };
 const ACTOR_REQUIRED: CanonicalType[] = ["rep.decision", "ticket.closed", "agent.proposal", "agent.dispute_response", "charge.screened"];
 
@@ -97,7 +101,9 @@ export function validate(files: ParsedFile[], mappings: FileMapping[], registry:
         ...ENTITY_REFS.map((x) => `refs.${x}`),
         ...["kind", "id", "name", "team", "version"].map((x) => `actor.${x}`),
         ...[...DATA_FIELDS[r.event_type].required, ...(DATA_FIELDS[r.event_type].optional ?? [])].map((x) => `data.${x}`)]);
-      const bad = r.fields.filter((fm) => !allowed.has(fm.target)).map((fm) => fm.target);
+      const open = OPEN_FIELDS[r.event_type] ?? [];   // generic events: data.context.<name>, data.detail.<name>
+      const bad = r.fields.filter((fm) => !allowed.has(fm.target) && !open.some((p) => fm.target.startsWith(`data.${p}`) && fm.target.length > p.length + 5))
+        .map((fm) => fm.target);
       if (bad.length) checks.push({ level: "error", message: `${r.name}: not contract fields for ${r.event_type}: ${bad.join(", ")}` });
       const n = f.rows.filter((row) => !r.when || String(row[r.when.column] ?? "").trim() === r.when.equals).length;
       if (!n) checks.push({ level: "warn", message: `${r.name}: the filter matches no rows` });
@@ -133,6 +139,9 @@ export function validate(files: ParsedFile[], mappings: FileMapping[], registry:
         if (!(e.entity_refs as Record<string, unknown>)[ref]) note(`${record}: refs.${ref} is missing`, `row ${row}`);
       }
       if (ACTOR_REQUIRED.includes(e.event_type) && !e.actor?.id) note(`${record}: actor is missing`, `row ${row}`);
+      if (e.event_type === "context.observed" && !Object.keys(e.data).some((k) => k.startsWith("context."))) {
+        note(`${record}: no data.context.* facts`, `row ${row}`);
+      }
     }
     for (const [message, { count, examples }] of missingField) {
       checks.push({ level: "error", message: `${message} in ${count} rows`, examples });
@@ -208,8 +217,30 @@ export function validate(files: ParsedFile[], mappings: FileMapping[], registry:
     }
   }
 
-  // ---------------------------------------------------------- dry run through the real detector
-  const rows = new Detector(registry, scenario).run(evs);
+  // Generic decisions (§23.8): decision types and options first seen here will be PROPOSED in the schema registry.
+  const generic = evs.filter((e) => e.event_type === "decision.made" || e.event_type === "decision.proposed");
+  for (const [type, list] of [...new Map(generic.map((e) => [String(e.data.decision_type ?? ""), [] as ContractEvent[]])).keys()]
+         .map((t) => [t, generic.filter((e) => String(e.data.decision_type ?? "") === t)] as const)) {
+    if (!type) continue;
+    const known = registry.options[type];
+    const byOption = counted(list, (e) => String(e.data.option ?? "(empty)"));
+    checks.push({ level: known ? "ok" : "warn",
+                  message: `${type}: ${known ? "" : "new decision type (PROPOSED), "}options ` + byOption.map((x) => `${x.k} ×${x.count}`).join(", ") });
+  }
+
+  // ---------------------------------------------------------- dry run through the real detectors
+  const { rows, notes } = detectAll(registry, scenario, evs);
+  if (notes) {   // every default the generic detector applied, shown before approval (§23.8)
+    if (notes.defaultedActors) checks.push({ level: "warn", message: `Actor defaulted to SYSTEM (the source) for ${notes.defaultedActors} decisions: no actor mapped` });
+    const pol = Object.entries(notes.unknownPolarity);
+    if (pol.length) checks.push({ level: "warn", message: "Outcome polarity unknown (set good / bad in the mapping)", examples: pol.map(([t, n]) => `${t} ×${n}`) });
+    if (notes.laterFactsExcluded) checks.push({ level: "ok", message: `${notes.laterFactsExcluded} facts observed after a decision kept out of its context (no future information)` });
+    if (notes.unlinkedOutcomes) checks.push({ level: "warn", message: `${notes.unlinkedOutcomes} outcomes have no decision about the same subject before them in the window` });
+    for (const [t, n] of Object.entries(notes.conflicting)) {
+      checks.push({ level: "warn", message: `${t}: ${n} subjects have final decisions with different options. Is each really a choice, ` +
+                                            "or is one of them a state every case passes through?" });
+    }
+  }
   const dict = rowsDict(rows);
   const ctx = new Map(dict.contexts.map((c) => [c.decision_id as string, c.summary_text as string]));
   const outType = new Map(dict.outcomes.map((o) => [o.outcome_id as string, o.outcome_type as string]));

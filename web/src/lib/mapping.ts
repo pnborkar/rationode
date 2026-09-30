@@ -100,19 +100,20 @@ export function profile(f: ParsedFile, samples = 8) {
       if (v === undefined || v === null || v === "" || typeof v === "object") continue;
       counts.set(String(v), (counts.get(String(v)) ?? 0) + 1);
     }
-    if (counts.size > 0 && counts.size <= 15 && counts.size < f.rows.length) {
+    // Up to 60 values: process logs name 20-50 activity types, and the agent must see them all to find the decisions.
+    if (counts.size > 0 && counts.size <= 60 && counts.size < f.rows.length) {
       distinct[col] = [...counts].map(([value, count]) => ({ value, count })).sort((a, b) => b.count - a.count);
     }
   }
   // Samples: a row for every value of every "type-like" column (fewest values first), so each record
   // kind is seen even when a true/false column has fewer values than the type column; then fill from
-  // the top. Lakehouse tables have many such columns, so coverage may go past `samples`.
+  // the top. Lakehouse tables and process logs have many such values, so coverage may go past `samples` (up to 40 rows).
   const picked: Record_[] = [];
   const typeCols = Object.entries(distinct).filter(([, v]) => v.length > 1).sort((a, b) => a[1].length - b[1].length);
   for (const [col, values] of typeCols) for (const { value } of values) {
     if (picked.some((x) => String(x[col]) === value)) continue;
     const r = f.rows.find((x) => String(x[col]) === value);
-    if (r && picked.length < samples * 2) picked.push(r);
+    if (r && picked.length < Math.max(samples * 2, 40)) picked.push(r);
   }
   for (const r of f.rows) if (picked.length < samples && !picked.includes(r)) picked.push(r);
   return { file: f.name, format: f.format, rows: f.rows.length, columns: f.columns, distinct, samples: picked };

@@ -24,7 +24,25 @@ agent.proposal         the AI support agent proposed a resolution. data: option 
 agent.dispute_lookup   the AI agent fetched dispute evidence. data: category, amount_usd, tenure_months, prior_complaint (bool), available_evidence (list)
 agent.dispute_response the AI agent responded to a dispute. data: action (accept | contest), evidence (list of evidence types submitted)
 subscription.created / subscription.renewed / subscription.canceled / subscription.paused   subscription lifecycle. data: plan, started_at, reason
-usage.weekly           weekly product usage for a customer. data: week_start, hours_watched, titles_watched`;
+usage.weekly           weekly product usage for a customer. data: week_start, hours_watched, titles_watched
+
+Generic decision events, for ANY domain (travel, purchasing, insurance claims, hiring…): use these when the data is not one of the
+Streamly-style exports above. They need no domain-specific support.
+decision.made          someone chose among alternatives and it is final (an approval, a denial, a quote issued with its terms, a
+                       booking changed). data: decision_type (what kind of decision, named from its meaning as "<domain>.<decision>",
+                       lower case, e.g. trip.disruption_response, purchase.approval; usually a constant value per record type), option
+                       (the choice, snake_case, e.g. rebook, postpone, approve; a constant or a column with aliases), amount (if any),
+                       reason (if the row states why), context.<name> (facts known at that moment on the same row, e.g.
+                       context.days_to_departure), detail.<name> (details of the choice, e.g. detail.new_carrier)
+decision.proposed      a recommended choice that someone else finalises (same data as decision.made)
+context.observed       a row that only states facts about a subject at a time: data.context.<name> (at least one)
+outcome.observed       something that happened AFTER a decision and was not chosen by the decider (a trip completed or missed,
+                       goods delivered late, an invoice paid). data: outcome_type (snake_case, e.g. trip_completed), value (money or
+                       count, if any), polarity ("good" or "bad" for the organisation, as a constant)
+For all four: refs.subject_type (a constant naming what the row is about, e.g. trip, booking, purchase_order) and refs.subject_id (its
+ID column); refs.parent_type / refs.parent_id when the subject belongs to another one (a booking within a trip); refs.follows_id
+only if the row names the ID of the decision record it follows. actor.* = who decided (a person or system column; alias system or
+automated accounts to kind SYSTEM, people to HUMAN).`;
 
 function system(registry: Registry): string {
   const options = Object.entries(registry.options)
@@ -51,6 +69,16 @@ ${options}
 Known dispute categories: subscription_canceled, not_recognized, unauthorized, duplicate_charge.
 
 Rules:
+- Role tests, whatever the column or activity is called: a decision is a choice among alternatives someone could have made
+  differently; an outcome happened afterwards and wasn't chosen by the decider; context is known before the decision. One party's
+  decision can be another's outcome (a supplier accepting a buyer's order is an outcome of the buyer's decision): map from the
+  perspective of the organisation whose decisions these are. Work steps, queue mechanics and state bookkeeping are neither: skip them
+  with a reason (or map them as context.observed if they carry facts worth knowing).
+- Timing: map an outcome from the row recorded when it happened (its own event, with its own timestamp), never from a field on the
+  decision's row that was filled in later: that would put future information at the decision's time.
+- A row is mapped by the FIRST record type whose filter it matches, so a row can't be both a decision and an outcome; filter on the
+  column that says what the row is (e.g. an activity or event-type column).
+- If the rows hold no decisions at all, say so in the file's reason and map nothing: never invent decisions.
 - One record type per kind of row. If the file mixes kinds, filter with "when" on the column that says what the row is (use the distinct values given). Put row kinds the detector has no use for in "skipped" with a reason.
 - Every option value must come out as a registry option key. Use aliases to translate labels (e.g. a macro title "Refund: full" -> full_refund; "APPROVE" -> approve; a card-network reason "fraudulent" -> unauthorized). List an alias for every distinct value you saw. A label that matches no registry option gets a new snake_case key (it will be PROPOSED for review).
 - Amounts in USD as numbers (transform number). Yes/no columns: transform boolean. Lists: transform list.

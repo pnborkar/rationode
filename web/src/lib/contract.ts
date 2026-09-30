@@ -8,13 +8,21 @@ export const CANONICAL_TYPES = [
   "agent.customer_lookup", "agent.proposal", "agent.dispute_lookup", "agent.dispute_response", "agent.tool_call",
   "subscription.created", "subscription.renewed", "subscription.canceled", "subscription.paused",
   "usage.weekly",
+  // Generic decision events (demo spec §23.8): any domain's explicit decisions, with no domain pack.
+  "decision.proposed", "decision.made", "context.observed", "outcome.observed",
 ] as const;
+
+export const GENERIC_TYPES = ["decision.proposed", "decision.made", "context.observed", "outcome.observed"] as const;
+export const isGeneric = (t: string) => (GENERIC_TYPES as readonly string[]).includes(t);
 
 export type CanonicalType = (typeof CANONICAL_TYPES)[number];
 
 export const ENTITY_REFS = [
   "customer_email", "stripe_customer_id", "charge_id", "ticket_id", "dispute_id", "subscription_id", "session_id",
   "card_fingerprint", "device_id",
+  // Generic subjects (§23.8): what a decision, fact or outcome is about, its parent, and an explicit link to the
+  // decision (or proposal) it follows, by that record's own ID.
+  "subject_type", "subject_id", "parent_type", "parent_id", "follows_id",
 ] as const;
 
 export type EntityRefs = Partial<Record<(typeof ENTITY_REFS)[number], string | null>>;
@@ -62,4 +70,15 @@ export const DATA_FIELDS: Record<CanonicalType, { required: string[]; optional?:
   "subscription.canceled": { required: [], optional: ["plan", "reason"] },
   "subscription.paused": { required: [], optional: ["plan", "reason"] },
   "usage.weekly": { required: ["week_start", "hours_watched"], optional: ["titles_watched"] },
+  // Generic (§23.8). Besides these, decision and context events may carry any number of facts as data.context.<name>
+  // (known at the time) and decisions any number of details as data.detail.<name> (e.g. offered terms).
+  "decision.proposed": { required: ["decision_type", "option"], optional: ["amount", "reason"] },
+  "decision.made": { required: ["decision_type", "option"], optional: ["amount", "reason"] },
+  "context.observed": { required: [], optional: [] },
+  "outcome.observed": { required: ["outcome_type"], optional: ["value", "polarity"] },
+};
+
+// Free-form data field families allowed on generic events (validator and mapping agent).
+export const OPEN_FIELDS: Partial<Record<CanonicalType, string[]>> = {
+  "decision.proposed": ["context.", "detail."], "decision.made": ["context.", "detail."], "context.observed": ["context."],
 };

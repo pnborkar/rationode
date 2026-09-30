@@ -2,7 +2,8 @@
 // the TypeScript detector -> Neo4j under scenario upload:<name>, removable like the Events-tab sets.
 import { createHash } from "node:crypto";
 import { aiSettings } from "./settings";
-import { Detector, REGISTRY_CYPHER, registryFrom, rowsDict, type Registry } from "./detector";
+import { REGISTRY_CYPHER, registryFrom, rowsDict, type Registry } from "./detector";
+import { detectAll } from "./genericDetector";
 import { parseFile, type FileMapping, type ParsedFile } from "./mapping";
 import { IS_DEMO, query, SCENARIO } from "./neo4j";
 import { placeScenario, recomputePoints, touchedPoints } from "./storyTrees";
@@ -164,7 +165,7 @@ export async function run(parsed: ParsedFile[], mappings: FileMapping[], name: s
     await removeScenario(scenario);        // re-running a batch replaces it
     await recomputePoints(touched);
   }
-  const rows = rowsDict(new Detector(registry, scenario).run(report.events));
+  const rows = rowsDict(detectAll(registry, scenario, report.events).rows);   // Streamly and generic events (§23.8)
   const byId = new Map(report.events.map((e) => [e.event_id, e]));
   rows.events = rows.events.map((r) => {
     const id = String(r.event_id).slice(scenario.length + 1), e = byId.get(id), old = previous.get(id);
