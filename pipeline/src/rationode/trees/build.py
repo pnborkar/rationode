@@ -117,6 +117,39 @@ SPECS = [
          action_features=[Feature(f"chosen.{e}", "boolean") for e in EVIDENCE_ITEMS], title="Evidence: what wins disputes"),
 ]
 
+# ---------------------------------------------------------------- generic decision types (demo spec §23.8, phase C)
+Q_GENERIC_TYPES = """
+MATCH (t:DecisionType {status: 'APPROVED', created_by: 'mapping'})
+MATCH (d:Decision {decision_type: t.key, scenario_id: $scenario, stage: 'FINAL'})
+OPTIONAL MATCH (d)-[k:CONSIDERED {status: 'CHOSEN'}]->(o:Option)
+RETURN t.key AS type, count(DISTINCT d) AS n, count(DISTINCT o.option_key) AS options
+"""
+
+
+def polarity_label(r: dict) -> str:
+    """Any domain: a decision's outcomes as good or bad for the organisation (from the mapping's polarity)."""
+    pols = set(r.get("polarities") or [])
+    return "bad" if "bad" in pols else "good" if "good" in pols else "no_outcome"
+
+
+def generic_specs(driver: Driver, db: str, scenario: str) -> list[Spec]:
+    """Trees for decision types a mapping introduced (e.g. loan.offer): how the choice depends on context (when there is
+    more than one option) and what leads to good vs bad outcomes. Streamly's types keep their hand-written SPECS."""
+    known = {sp.decision_type for sp in SPECS}
+    out = []
+    for r in driver.execute_query(Q_GENERIC_TYPES, scenario=scenario, database_=db).records:
+        t, name = r["type"], r["type"].replace("_", " ")
+        if t in known:
+            continue
+        several = r["options"] > 1
+        if several:
+            out.append(Spec(t, "ALL", "BEHAVIOR", "FINAL", title=f"{name}: how the choice is made"))
+        out.append(Spec(t, "ALL", "OUTCOME", "FINAL", keep=lambda row: bool(row.get("polarities")), label=polarity_label,
+                        action_features=[Feature("chosen.option", "categorical")] if several else [],
+                        title=f"{name}: what leads to good outcomes"))
+    return out
+
+
 # ---------------------------------------------------------------- loading
 Q_LOAD = """
 MATCH (d:Decision {decision_type: $type, scenario_id: $scenario})
@@ -127,7 +160,7 @@ WITH d, c, a, collect(o.option_key) AS options
 OPTIONAL MATCH (d)-[:LED_TO]->(out:Outcome)
 RETURN d.decision_id AS id, d.stage AS stage, toString(d.decided_at) AS at, properties(c) AS ctx,
        a.kind AS actor_kind, a.version AS version, a.team AS team, options,
-       collect(out.outcome_type) AS outcome_types,
+       collect(out.outcome_type) AS outcome_types, collect(out.polarity) AS polarities,
        sum(CASE WHEN out.outcome_type IN $cost THEN out.value_usd ELSE 0 END) AS cost
 """
 
@@ -413,8 +446,8 @@ Q_OVERRIDE_RATE = """
 MATCH (f:Decision {decision_type: 'support.complaint_resolution', stage: 'FINAL', scenario_id: $scenario})
       -[:MADE_BY]->(:Actor {kind: 'HUMAN'})
 WITH f, EXISTS { (f)-[:OVERRIDES]->() } AS overridden
-RETURN toFloat(sum(CASE WHEN overridden THEN 1 ELSE 0 END)) / count(f) AS rate
-"""
+RETURN CASE count(f) WHEN 0 THEN null ELSE toFloat(sum(CASE WHEN overridden THEN 1 ELSE 0 END)) / count(f) END AS rate
+"""   # null when the scenario has no human complaint decisions (another domain)
 
 
 def write_tree(driver: Driver, db: str, b: Built) -> None:
@@ -432,9 +465,10 @@ def write_tree(driver: Driver, db: str, b: Built) -> None:
 
 def build_all(driver: Driver, db: str, scenario: str = "history", log: Callable[[str], None] = print) -> dict[str, Built]:
     builder = Builder(driver, db, scenario)
-    rows_by_type = {t: load_decisions(driver, db, t, scenario) for t in {s.decision_type for s in SPECS}}
+    specs = SPECS + generic_specs(driver, db, scenario)
+    rows_by_type = {t: load_decisions(driver, db, t, scenario) for t in {s.decision_type for s in specs}}
     built: dict[str, Built] = {}
-    for spec in SPECS:
+    for spec in specs:
         b = builder.build(spec, rows_by_type[spec.decision_type])
         if not b:
             log(f"  skipped {spec.tree_key} (too few decisions)")

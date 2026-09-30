@@ -59,3 +59,28 @@ export async function deriveAttributes(scenario: string, decisionTypes: string[]
   encoded = rows.length;
   return { attributes, encoded };
 }
+
+// Approving a load approves what its mapping introduced (§23.8, phase C): the validation step showed the new decision
+// types, options and outcome types before approval, so they become APPROVED in the schema registry (marked approved by
+// the mapping approval), and new outcome types are registered with their polarity and a default 90-day window. Trees
+// only use approved options and registered outcome types. Streamly's registry entries are not touched.
+export async function approveIntroduced(scenario: string, decisionTypes: string[]) {
+  await query(
+    `UNWIND $types AS t
+     MATCH (dt:DecisionType {key: t}) WHERE dt.created_by = 'mapping'
+     SET dt.status = 'APPROVED', dt.approved_by = 'mapping approval', dt.approved_at = coalesce(dt.approved_at, datetime())
+     WITH t
+     MATCH (s:SchemaElement {kind: 'OPTION', decision_type: t}) WHERE s.status = 'PROPOSED' AND s.created_by = 'detector'
+     SET s.status = 'APPROVED', s.approved_by = 'mapping approval', s.approved_at = datetime()`, { types: decisionTypes });
+  const outcomes = await query<{ type: string; polarity: string | null }>(
+    `MATCH (d:Decision {scenario_id: $scenario})-[:LED_TO]->(o:Outcome) WHERE d.decision_type IN $types
+     RETURN o.outcome_type AS type, head(collect(o.polarity)) AS polarity`, { scenario, types: decisionTypes });
+  await query(
+    `UNWIND $rows AS r
+     MERGE (s:SchemaElement {key: 'outcome.' + r.type})
+     ON CREATE SET s.kind = 'OUTCOME_TYPE', s.status = 'APPROVED', s.created_by = 'mapping', s.created_at = datetime(),
+                   s.default_window_days = 90, s.polarity = r.polarity, s.display_name = replace(r.type, '_', ' '), s.version = 1`,
+    { rows: outcomes });
+  return { outcomeTypes: outcomes.length };
+}
+

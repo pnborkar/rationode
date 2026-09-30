@@ -20,6 +20,11 @@ from rationode.analytics.features import Encoder
 TOP_K = 10
 SEED = 42
 KNN_TYPES = [("support.complaint_resolution", "FINAL"), ("dispute.response", "FINAL"), ("dispute.evidence", "FINAL")]
+Q_GENERIC_TYPES = """
+MATCH (t:DecisionType {status: 'APPROVED', created_by: 'mapping'})
+WHERE EXISTS { MATCH (:Decision {decision_type: t.key, scenario_id: $scenario, stage: 'FINAL'}) }
+RETURN t.key AS type
+"""
 
 Q_ALL_CONTEXTS = """
 MATCH (d:Decision {scenario_id: $scenario})-[:HAD_CONTEXT]->(c:Context)
@@ -142,11 +147,18 @@ def run(driver: Driver, db: str, scenario: str = "history", log: Callable[[str],
     n = write_features(driver, db, Encoder(driver, db), scenario)
     log(f"  context features written for {n} decisions in {time.time() - start:.0f}s")
 
-    for decision_type, stage in KNN_TYPES:
+    # Streamly's types, plus decision types an approved mapping introduced (§23.8) that have final decisions here.
+    generic = [(r["type"], "FINAL") for r in q(driver, db, Q_GENERIC_TYPES, scenario=scenario)
+               if r["type"] not in {t for t, _ in KNN_TYPES}]
+    for decision_type, stage in KNN_TYPES + generic:
         t0 = time.time()
         g = f"rn_{scenario}_{decision_type.replace('.', '_')}"
         q(driver, db, Q_DROP, g=g)
-        nodes = q(driver, db, Q_PROJECT_DECISIONS, g=g, type=decision_type, stage=stage, scenario=scenario)[0]["nodes"]
+        rows = q(driver, db, Q_PROJECT_DECISIONS, g=g, type=decision_type, stage=stage, scenario=scenario)
+        nodes = (rows[0]["nodes"] if rows else 0) or 0
+        if nodes < 2:   # nothing to compare in this scenario (e.g. Streamly's types in another domain's tenant)
+            q(driver, db, Q_DROP, g=g)
+            continue
         q(driver, db, Q_KNN_MUTATE, g=g, prop="features", k=TOP_K, seed=SEED)
         q(driver, db, Q_UNDIRECTED, g=g)
         q(driver, db, Q_CLEAR_SIMILAR, type=decision_type, stage=stage, scenario=scenario)
@@ -156,9 +168,13 @@ def run(driver: Driver, db: str, scenario: str = "history", log: Callable[[str],
         log(f"  {decision_type:<30} {nodes:>6} decisions  {written:>6} SIMILAR_TO  {clusters:>3} clusters  "
             f"{time.time() - t0:.0f}s")
 
-    # Peer groups of human reps: who decides differently from their peers?
+    # Peer groups of human reps: who decides differently from their peers? (Streamly complaints; none elsewhere.)
     g = f"rn_{scenario}_reps"
     reps = q(driver, db, Q_REP_PROFILES, scenario=scenario)[0]["reps"]
+    if not reps:
+        log(f"  reps: no human complaint decisions in {scenario}, no peer groups")
+        log(f"  done in {time.time() - start:.0f}s")
+        return
     q(driver, db, Q_DROP, g=g)
     q(driver, db, Q_PROJECT_REPS, g=g, scenario=scenario)
     q(driver, db, Q_KNN_MUTATE, g=g, prop="profile", k=5, seed=SEED)

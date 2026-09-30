@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { aiSettings } from "./settings";
 import { REGISTRY_CYPHER, registryFrom, rowsDict, type Registry } from "./detector";
 import { detectAll } from "./genericDetector";
-import { deriveAttributes } from "./genericFeatures";
+import { approveIntroduced, deriveAttributes } from "./genericFeatures";
 import { isGeneric } from "./contract";
 import { parseFile, type FileMapping, type ParsedFile } from "./mapping";
 import { IS_DEMO, query, SCENARIO } from "./neo4j";
@@ -189,6 +189,7 @@ export async function run(parsed: ParsedFile[], mappings: FileMapping[], name: s
     .map((e) => rows.decisions.find((d) => d.decision_id === `${scenario === "history" ? "" : `${scenario}|`}dec:${e.event_id}`)?.decision_type as string)
     .filter(Boolean))];
   const features = genericTypes.length ? await deriveAttributes(scenario, genericTypes) : null;
+  if (genericTypes.length) await approveIntroduced(scenario, genericTypes);   // what the approved mapping introduced
   const subjects = rows.entities.filter((e) => (e.props as { subject_type?: string })?.subject_type
       && !(rows.links ?? []).some((l) => l.type === "PART_OF" && l.from === e.entity_id))
     .slice(0, 30).map((e) => ({ id: e.entity_id as string, label: e.label as string, key: String(e.source_key).split(":").slice(1).join(":") }));

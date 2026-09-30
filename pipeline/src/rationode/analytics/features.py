@@ -10,6 +10,20 @@ from neo4j import Driver
 TYPE_PREFIX = {"charge.fraud_screen": "charge.", "support.complaint_resolution": "support.",
                "dispute.response": "dispute.", "dispute.evidence": "dispute."}
 
+
+def prefix_of(decision_type: str) -> str:
+    """Streamly's types have fixed attribute families; a generic type (demo spec §23.8) uses its domain (loan.offer -> "loan.")."""
+    return TYPE_PREFIX.get(decision_type, decision_type.split(".")[0] + ".")
+
+
+def _js(v) -> str:
+    """A value as JavaScript prints it (15000.0 -> "15000", True -> "true"), so texts match the web app's exactly."""
+    if isinstance(v, bool):
+        return "true" if v else "false"
+    if isinstance(v, float) and v.is_integer():
+        return str(int(v))
+    return str(v)
+
 Q_ATTRS = """
 MATCH (s:SchemaElement {kind: 'ATTRIBUTE', status: 'APPROVED'})
 RETURN s.key AS key, s.datatype AS datatype, s.encoding AS encoding, s.values AS values, s.scale_max AS scale_max
@@ -27,7 +41,7 @@ class Encoder:
         self.attrs = [dict(r) for r in driver.execute_query(Q_ATTRS, database_=db).records]
 
     def columns(self, decision_type: str) -> list[dict]:
-        return [a for a in self.attrs if a["key"].startswith(TYPE_PREFIX[decision_type])]
+        return [a for a in self.attrs if a["key"].startswith(prefix_of(decision_type))]
 
     def fit_scales(self, driver: Driver, db: str, contexts: list[dict]) -> None:
         """Record the maximum of each numeric attribute seen in history."""
@@ -65,6 +79,12 @@ def context_text(decision_type: str, c: dict) -> str:
                 f"${c.get('dispute.amount_usd', 0):.0f}, customer tenure {c.get('dispute.tenure_months')} months, "
                 f"{'complained before disputing' if c.get('dispute.prior_complaint') else 'no prior complaint'}, "
                 f"usage logs {'available' if c.get('dispute.usage_logs_available') else 'not available'}.")
-    return (f"Charge screening: {'renewal' if c.get('charge.is_renewal') else 'signup'} on {c.get('charge.plan')}, "
-            f"risk score {c.get('charge.risk_score')}, card age {c.get('charge.card_age_days')} days, card country "
-            f"{'matches' if c.get('charge.country_match') else 'does not match'}.")
+    if decision_type == "charge.fraud_screen":
+        return (f"Charge screening: {'renewal' if c.get('charge.is_renewal') else 'signup'} on {c.get('charge.plan')}, "
+                f"risk score {c.get('charge.risk_score')}, card age {c.get('charge.card_age_days')} days, card country "
+                f"{'matches' if c.get('charge.country_match') else 'does not match'}.")
+    # Any other domain (§23.8), as the web app's contextText: the decision type and its facts, sorted by name.
+    prefix = prefix_of(decision_type)
+    facts = [f"{k[len(prefix):].replace('_', ' ')} {_js(v)}" for k, v in sorted(c.items())
+             if k.startswith(prefix) and v is not None and v != ""]
+    return f"{decision_type.replace('_', ' ').replace('.', ' ', 1)}: {', '.join(facts)}."

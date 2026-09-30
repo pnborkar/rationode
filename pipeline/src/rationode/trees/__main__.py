@@ -27,7 +27,8 @@ OPTIONAL MATCH (parent:DecisionPoint)-[b:BRANCH]->(p)
 OPTIONAL MATCH (p)-[f:BRANCH]->(o:Option)
 WITH t, p, b, collect(f {.label, .share, .support, .cost_per_decision, .rate_dispute_filed, .rate_dispute_won, .rate_churn,
                           option: o.option_key}) AS fan
-RETURN t.title AS title, t.policy_text AS policy_text, p.point_id AS id, p.depth AS depth, p.is_leaf AS leaf,
+RETURN t.title AS title, t.policy_text AS policy_text, t.decision_type AS decision_type, properties(p) AS props,
+       p.point_id AS id, p.depth AS depth, p.is_leaf AS leaf,
        b.label AS condition, p.support AS support, p.top_label AS top, p.top_share AS top_share,
        p.policy_option AS policy_option, p.rate_dispute_filed AS dispute, p.rate_dispute_won AS won,
        p.rate_churn AS churn, p.cost_per_decision AS cost, fan
@@ -48,10 +49,16 @@ def show(tree_id: str) -> None:
     print(rows[0]["title"])
     if rows[0]["policy_text"]:
         print(f"Policy: {rows[0]['policy_text']}")
+    streamly = rows[0]["decision_type"] in {"charge.fraud_screen", "support.complaint_resolution", "dispute.response", "dispute.evidence"}
     for r in rows:
         indent = "    " * r["depth"]
         cond = r["condition"] or "ALL"
         line = f"{indent}{cond}  (n={r['support']})"
+        if not streamly:   # any domain (§23.8): the most likely label here and the outcome rates this point has
+            rates = sorted(((k.removeprefix("rate_"), v) for k, v in r["props"].items() if k.startswith("rate_") and v), key=lambda kv: -kv[1])
+            line += f"  mostly {r['top'] or '—'} ({pct(r['top_share']).strip()})  " + " · ".join(f"{t.replace('_', ' ')} {pct(v).strip()}" for t, v in rates)
+            print(line)
+            continue
         if r["leaf"]:
             if r["policy_option"]:
                 line += f"  policy says: {r['policy_option']}"
