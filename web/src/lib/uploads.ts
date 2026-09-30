@@ -169,8 +169,9 @@ async function validateSource(parsed: ParsedFile[], mappings: FileMapping[], sou
       report.checks.unshift({ level: "warn", message: `This would REMOVE ${t.removed.toLocaleString()} of the ${total.toLocaleString()} records ` +
         `in the source "${source}" (${Math.round((t.removed / total) * 100)}%)` +
         (t.unchanged + t.changed === 0 ? `: none of these records are in it, so these files aren't that source's files` : "") +
-        (files.length ? ` (its files: ${files.join(", ")})` : "") + `. If this is different data, give it a new source name. ` +
-        `To replace the source anyway, approve and confirm.` });
+        (files.length ? ` (its files: ${files.join(", ")})` : "") + `. If this is different data, even data about the same things ` +
+        `(e.g. collections on these loans), give it a new source name: it's added beside "${source}", and records that refer to ` +
+        `"${source}"'s subjects are linked to them (the join is shown here after validating). To replace the source anyway, approve and confirm.` });
     }
     report.checks.unshift(nothing
       ? { level: "ok", message: `Nothing new: all ${t.unchanged} records are already loaded in the source "${source}".` }

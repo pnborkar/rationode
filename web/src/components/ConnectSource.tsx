@@ -197,7 +197,8 @@ export default function ConnectSource({ active, onClose, onChanged }: { active: 
     const r = report?.removal;
     if (r && !incremental && !window.confirm(`Replace the source "${r.source}"?\n\nThis REMOVES ${r.removed.toLocaleString()} of its ` +
         `${r.total.toLocaleString()} records${r.files.length ? ` (from ${r.files.join(", ")})` : ""} and keeps only what's in these files.\n\n` +
-        `If this is different data, cancel and give it a new source name.`)) return;
+        `If this is different data, even related data, cancel and give it a new source name: it's added beside ` +
+        `"${r.source}" and linked to its subjects where the records refer to them.`)) return;
     setBusy("run"); setError(null);
     const edited_files = files.filter((f) => proposals[f.name]?.edited).map((f) => f.name);
     const res = incremental
@@ -527,7 +528,8 @@ function ValidationView({ report }: { report: ReportView }) {
           : report.removal ? `Careful: these files would REPLACE the source "${report.removal.source}", removing ` +
               `${report.removal.removed.toLocaleString()} of its ${report.removal.total.toLocaleString()} records` +
               `${report.removal.files.length ? ` (from ${report.removal.files.join(", ")})` : ""}. If this is different data, ` +
-              `change the source name to a new one and validate again.`
+              `even data related to "${report.removal.source}", change the source name to a new one and validate again: it's added ` +
+              `beside "${report.removal.source}", and records that refer to its subjects (the same IDs) are linked to them.`
           : report.target && !report.target.new && !report.target.changed && !report.target.removed
             ? `Nothing new: these files are already loaded as ${report.target.scenario}. Nothing to write.`
           : report.target ? `All checks passed. These files update ${report.target.scenario}: ${report.target.new} new, ` +
