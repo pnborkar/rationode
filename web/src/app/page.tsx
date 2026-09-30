@@ -274,11 +274,12 @@ export default function StreamlyLive() {
   const [overrideReason, setOverrideReason] = useState("");
   // "60 days later" (§19.3): the simulated outcomes of this ticket's decision, and the tree branches that moved.
   type Stats = { support: number; dispute_rate: number | null; churn_rate: number | null };
-  const [later, setLater] = useState<{ drawn: { kind: string; days: number; detail: string }[];
+  const [later, setLater] = useState<{ drawn: { kind: string; days: number; detail: string }[]; chosen_by?: "model" | "presenter";
                                         outcomes: { type: string; value: number | null }[];
                                         branches: { point_id: string; tree: string; branch: string; before: Stats; after: Stats }[];
                                         error?: string } | null>(null);
   const [laterBusy, setLaterBusy] = useState(false);
+  const [laterChoice, setLaterChoice] = useState("");   // "" = drawn from the world model; else the presenter's pick
   const [recorded, setRecorded] = useState<Recorded | null>(null);
   const [liveOfCustomer, setLiveOfCustomer] = useState<{ tickets: string[]; decisions: number }>({ tickets: [], decisions: 0 });
   const proposalVia = useRef<{ via?: string; ms?: number }>({});
@@ -394,7 +395,7 @@ export default function StreamlyLive() {
 
   function reset() {
     setChat([]); setThinking(""); setSteps([]); setProposal(null); setFinal(null); setRecorded(null);
-    setOverrideAmount(null); setOverrideReason(""); setLater(null);
+    setOverrideAmount(null); setOverrideReason(""); setLater(null); setLaterChoice("");
     setLive({ nodes: [], rels: [] });
   }
 
@@ -522,7 +523,7 @@ export default function StreamlyLive() {
   async function sixtyDaysLater() {
     setLaterBusy(true);
     const res = await fetch("/api/live/outcomes", { method: "POST", headers: { "content-type": "application/json" },
-                                                    body: JSON.stringify({ ticket_id: TICKET }) });
+                                                    body: JSON.stringify({ ticket_id: TICKET, ...(laterChoice ? { choice: laterChoice } : {}) }) });
     const data = await res.json();
     setLater(res.ok ? data : { drawn: [], outcomes: [], branches: [], error: data.error ?? res.statusText });
     // The journey graph now holds the outcomes, linked to the decision.
@@ -622,7 +623,7 @@ export default function StreamlyLive() {
       {tab === "settings" && <SettingsTab />}
 
       <div className={tab === "live" ? "grid min-h-0 flex-1 grid-cols-2 grid-rows-6 gap-3" : "hidden"}>
-        <Panel title="Streamly help chat" className="col-start-1 row-span-4 row-start-1" badge={
+        <Panel title="Streamly help chat" className="col-start-1 row-span-3 row-start-1" badge={
           <select value={isUpload ? `q:${question}` : caseKey} disabled={running}
                   onChange={(e) => (e.target.value.startsWith("q:") ? pickQuestion(e.target.value.slice(2)) : pickCase(e.target.value))}
                   className="max-w-[26rem] rounded-md border border-zinc-700 bg-zinc-950 px-2 py-0.5 text-xs text-zinc-200">
@@ -701,7 +702,7 @@ export default function StreamlyLive() {
           {!thinkingExpanded && thinkingBody}
         </Panel>
 
-        <Panel title="Support rep console" className="col-start-1 row-span-2 row-start-5" badge={<span className="text-xs text-zinc-500">{REP.name} · {REP.team}</span>}>
+        <Panel title="Support rep console" className="col-start-1 row-span-3 row-start-4" badge={<span className="text-xs text-zinc-500">{REP.name} · {REP.team}</span>}>
           {!proposal ? (
             <p className="text-sm text-zinc-500">Waiting for the AI&apos;s proposal on ticket #{TICKET}…</p>
           ) : (
@@ -728,15 +729,26 @@ export default function StreamlyLive() {
                       : "Recording…"}
                   </p>
                   {recorded && !later && (
-                    <button onClick={sixtyDaysLater} disabled={laterBusy}
-                            className="mt-1 rounded-md bg-amber-600 px-3 py-1 text-xs font-semibold text-white disabled:opacity-50"
-                            title="What happened next: outcomes drawn from the world model the history was built with (simulated)">
-                      {laterBusy ? "Waiting 60 days…" : "60 days later →"}</button>
+                    <div className="mt-1 flex flex-wrap items-center gap-2">
+                      <button onClick={sixtyDaysLater} disabled={laterBusy}
+                              className="rounded-md bg-amber-600 px-3 py-1 text-xs font-semibold text-white disabled:opacity-50"
+                              title="What happened next (simulated): drawn from the world model the history was built with, or the presenter's pick">
+                        {laterBusy ? "Waiting 60 days…" : "60 days later →"}</button>
+                      <select value={laterChoice} onChange={(e) => setLaterChoice(e.target.value)} disabled={laterBusy}
+                              className="rounded-md border border-zinc-700 bg-zinc-950 px-2 py-1 text-xs text-zinc-200">
+                        <option value="">Outcome: drawn from the world model</option>
+                        <option value="dispute">Presenter picks: bank dispute</option>
+                        <option value="churn">Presenter picks: customer cancels</option>
+                        <option value="renewal">Presenter picks: customer renews</option>
+                        <option value="none">Presenter picks: nothing happens</option>
+                      </select>
+                    </div>
                   )}
                   {later && (
                     <div className="mt-2 space-y-1 rounded-md bg-zinc-950/70 p-2 text-xs text-zinc-200">
                       {later.error ? <p className="text-red-400">{later.error}</p> : <>
-                        <p className="font-semibold">60 days later <span className="font-normal text-amber-400">· simulated outcome</span></p>
+                        <p className="font-semibold">60 days later <span className="font-normal text-amber-400">· {later.chosen_by === "presenter"
+                          ? "chosen by the presenter (simulated)" : "simulated outcome, drawn from the world model"}</span></p>
                         {later.drawn.map((d, i) => (
                           <p key={i}>• {d.detail}{d.kind !== "none" && d.kind !== "refund" ? ` (${d.days} days later)` : ""}</p>))}
                         <p className="text-zinc-400">
