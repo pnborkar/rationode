@@ -215,6 +215,7 @@ export default function ConnectSource({ active, onClose, onChanged }: { active: 
 
   async function removeBatch() {
     if (!result) return;
+    if (!window.confirm(`Remove ${result.source ? `the source "${result.source}"` : result.scenario}? Can't be undone; the files can be loaded again.`)) return;
     setBusy("remove");
     await fetch(`/api/upload?scenario=${encodeURIComponent(result.scenario)}${result.source ? `&source=${encodeURIComponent(result.source)}` : ""}`,
                 { method: "DELETE" });

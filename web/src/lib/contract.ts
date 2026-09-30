@@ -21,8 +21,10 @@ export const ENTITY_REFS = [
   "customer_email", "stripe_customer_id", "charge_id", "ticket_id", "dispute_id", "subscription_id", "session_id",
   "card_fingerprint", "device_id",
   // Generic subjects (§23.8): what a decision, fact or outcome is about, its parent, and an explicit link to the
-  // decision (or proposal) it follows, by that record's own ID.
-  "subject_type", "subject_id", "parent_type", "parent_id", "follows_id",
+  // decision (or proposal) it follows, by that record's own ID. subject_system / parent_system: whose ID it is when it
+  // isn't this file's own system (§23.9: a collections export naming the lending system's offers), so both sources
+  // point at the same subject; default: the file's source system.
+  "subject_type", "subject_id", "parent_type", "parent_id", "follows_id", "subject_system", "parent_system",
 ] as const;
 
 export type EntityRefs = Partial<Record<(typeof ENTITY_REFS)[number], string | null>>;

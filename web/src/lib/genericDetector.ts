@@ -21,7 +21,7 @@ export function safeLabel(type: string): string {
   if (!/^[A-Za-z][A-Za-z0-9]*$/.test(label)) return "Subject";
   return CORE.has(label) ? `${label}Subject` : label;
 }
-const snake = (s: string) => String(s).trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+export const snake = (s: string) => String(s).trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
 const typeKey = (s: string) => String(s).trim().toLowerCase().replace(/[^a-z0-9.]+/g, "_").replace(/^[_.]+|[_.]+$/g, "");
 const num = (v: unknown) => (v === null || v === undefined || v === "" || !Number.isFinite(Number(v)) ? null : Number(v));
 const value = (v: unknown) => (num(v) ?? v);   // numbers as numbers, the rest as they are
@@ -51,10 +51,12 @@ export class GenericDetector extends Detector {
     const subjectOf = (e: ContractEvent) => {
       const x = e.entity_refs;
       if (!x.subject_type || !x.subject_id) return null;
-      const subject = this.entity(safeLabel(x.subject_type), e.source, `${snake(x.subject_type)}:${x.subject_id}`, { subject_type: x.subject_type });
+      // A subject is identified within the system whose ID it is: the file's own, or the one the mapping names (§23.9).
+      const system = (named: string | null | undefined) => named?.trim().toLowerCase() || e.source;
+      const subject = this.entity(safeLabel(x.subject_type), system(x.subject_system), `${snake(x.subject_type)}:${x.subject_id}`, { subject_type: x.subject_type });
       let parent: string | null = null;
       if (x.parent_type && x.parent_id) {
-        parent = this.entity(safeLabel(x.parent_type), e.source, `${snake(x.parent_type)}:${x.parent_id}`, { subject_type: x.parent_type });
+        parent = this.entity(safeLabel(x.parent_type), system(x.parent_system ?? x.subject_system), `${snake(x.parent_type)}:${x.parent_id}`, { subject_type: x.parent_type });
         if (!this.rows.links.some((l) => l.type === "PART_OF" && l.from === subject)) this.rows.links.push({ type: "PART_OF", from: subject, to: parent });
       }
       return { subject, parent };

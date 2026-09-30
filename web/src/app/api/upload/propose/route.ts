@@ -2,7 +2,7 @@ import { z } from "zod";
 import { profile } from "@/lib/mapping";
 import { proposeMapping } from "@/lib/mappingAgent";
 import { readParsed } from "@/lib/sources";
-import { loadRegistry, parseAll } from "@/lib/uploads";
+import { knownSubjects, loadRegistry, parseAll } from "@/lib/uploads";
 import { withTenant } from "@/lib/tenant";
 
 export const maxDuration = 120;
@@ -20,7 +20,7 @@ async function POST_(request: Request) {
   try {
     const file = body.data.table ? await readParsed(body.data.table) : parseAll([body.data.file!])[0];
     const started = Date.now();
-    const mapping = await proposeMapping(file, await loadRegistry());
+    const mapping = await proposeMapping(file, await loadRegistry(), await knownSubjects());   // a workspace: its subjects so far
     return Response.json({ profile: profile(file), mapping, seconds: Math.round((Date.now() - started) / 100) / 10 });
   } catch (err) {
     return Response.json({ error: (err as Error).message }, { status: 422 });

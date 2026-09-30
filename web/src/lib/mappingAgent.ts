@@ -41,7 +41,10 @@ outcome.observed       something that happened AFTER a decision and was not chos
                        count, if any), polarity ("good" or "bad" for the organisation, as a constant)
 For all four: refs.subject_type (a constant naming what the row is about, e.g. trip, booking, purchase_order) and refs.subject_id (its
 ID column); refs.parent_type / refs.parent_id when the subject belongs to another one (a booking within a trip); refs.follows_id
-only if the row names the ID of the decision record it follows. actor.* = who decided (a person or system column; alias system or
+only if the row names the ID of the decision record it follows. refs.subject_system / refs.parent_system (a constant) only when the
+ID is another system's, i.e. the workspace already holds these subjects from another source (listed with the file, with example
+IDs) and this file names the same ones by the same IDs: set the other system's name so both sources point at the same subject.
+Leave them out for the file's own subjects. actor.* = who decided (a person or system column; alias system or
 automated accounts to kind SYSTEM, people to HUMAN).`;
 
 function system(registry: Registry): string {
@@ -87,7 +90,11 @@ Rules:
 - Reasons: one short line each, specific to the evidence (column name, sample values).`;
 }
 
-export async function proposeMapping(file: ParsedFile, registry: Registry): Promise<FileMapping> {
+// Subjects the workspace already holds, by type and system, with example IDs: so a file that names the same subjects
+// (another system's IDs) can be mapped onto them (refs.subject_system).
+export type KnownSubjects = { type: string; system: string; count: number; examples: string[] }[];
+
+export async function proposeMapping(file: ParsedFile, registry: Registry, known: KnownSubjects = []): Promise<FileMapping> {
   const p = profile(file);
   const [{ mappingModel }, client] = await Promise.all([aiSettings(), anthropicClient()]);
   const response = await client.messages.parse({
@@ -98,7 +105,9 @@ export async function proposeMapping(file: ParsedFile, registry: Registry): Prom
     system: system(registry),
     messages: [{
       role: "user",
-      content: `Propose the mapping for this file.\n\n${JSON.stringify(p, null, 1)}`,
+      content: `Propose the mapping for this file.\n\n${JSON.stringify(p, null, 1)}` + (known.length
+        ? `\n\nSubjects already in this workspace (from earlier sources):\n${known.map((k) =>
+            `- ${k.type} from system "${k.system}": ${k.count} (e.g. ${k.examples.join(", ")})`).join("\n")}` : ""),
     }],
   });
   const mapping = response.parsed_output;

@@ -82,6 +82,11 @@ export default function EventsTab({ active, onChanged }: { active: boolean; onCh
   }, []);
 
   async function removeUpload(scenario: string, source?: string) {
+    const u = uploads.find((x) => (x.source ?? x.scenario) === (source ?? scenario));
+    if (!window.confirm(source
+      ? `Remove the source "${source}" (${u?.events.toLocaleString() ?? "?"} records, ${u?.decisions.toLocaleString() ?? "?"} decisions)?\n\n` +
+        `Decisions are worked out again from the other sources. Can't be undone; the files can be loaded again.`
+      : `Remove ${scenario}? Can't be undone; the files can be loaded again.`)) return;
     setBusy(`remove-${source ?? scenario}`);
     await fetch(`/api/upload?scenario=${encodeURIComponent(scenario)}${source ? `&source=${encodeURIComponent(source)}` : ""}`, { method: "DELETE" });
     await refresh();

@@ -6,11 +6,12 @@
 import { createHash } from "node:crypto";
 import { aiSettings } from "./settings";
 import { REGISTRY_CYPHER, registryFrom, rowsDict, type Registry } from "./detector";
-import { detectAll } from "./genericDetector";
+import { detectAll, snake } from "./genericDetector";
 import { approveIntroduced, deriveAttributes } from "./genericFeatures";
 import { isGeneric } from "./contract";
 import { mapFile, parseFile, type FileMapping, type ParsedFile, type Record_ } from "./mapping";
 import type { ContractEvent } from "./contract";
+import type { KnownSubjects } from "./mappingAgent";
 import { demoMode, query, baseScenario } from "./neo4j";
 import { placeScenario, recomputePoints, touchedPoints } from "./storyTrees";
 import { removeScenario, writeRows, type Rows } from "./storyWriter";
@@ -153,6 +154,7 @@ async function validateSource(parsed: ParsedFile[], mappings: FileMapping[], sou
       (o.source ? `the source "${o.source}"; load them as "${o.source}" to update it.` : `this workspace from a load with no source name.`) });
     report.ok = false;
   }
+  report.checks.unshift(...await subjectJoins(scenario, report.events));
   const others = (await listSources()).filter((x) => x.source !== source);
   const exists = (await query(`MATCH (e:Event {scenario_id: $scenario, source_name: $source}) RETURN e LIMIT 1`, { scenario, source })).length > 0;
   if (exists) {
@@ -262,6 +264,53 @@ async function labelSources(scenario: string) {
   await query(
     `MATCH (e:Event {scenario_id: $scenario}) WHERE e.source_name IS NULL AND e.batch_id IS NOT NULL
      MATCH (b:UploadBatch {batch_id: e.batch_id}) SET e.source_name = b.source_name`, { scenario });
+}
+
+// Subjects the workspace already holds (for the mapping agent: a new file may name the same ones, §23.9).
+export async function knownSubjects(): Promise<KnownSubjects> {
+  if (demoMode()) return [];
+  const rows = await query<{ type: string; system: string; count: number; keys: string[] }>(
+    `MATCH (e:Entity {scenario_id: $scenario}) WHERE e.subject_type IS NOT NULL
+     WITH e.subject_type AS type, e.source_system AS system, count(*) AS count, collect(e.source_key)[..3] AS keys
+     RETURN type, system, count, keys ORDER BY count DESC LIMIT 20`, { scenario: baseScenario() });
+  return rows.map((r) => ({ type: r.type, system: r.system, count: r.count, examples: r.keys.map((k) => k.split(":").slice(1).join(":")) }));
+}
+
+// How a load's subjects meet the workspace's: joined to existing subjects of another system (refs.subject_system), or
+// sharing type and ID with another system's subjects while mapped as separate ones (probably the same things: say so).
+async function subjectJoins(scenario: string, events: ContractEvent[]) {
+  const keys = new Map<string, { type: string; key: string; system: string; own: string }>();
+  for (const e of events) {
+    const x = e.entity_refs, own = e.source;
+    const add = (type?: string | null, id?: string | null, named?: string | null) => {
+      if (!type || !id) return;
+      const system = named?.trim().toLowerCase() || own, key = `${snake(type)}:${id}`;
+      keys.set(`${system}|${key}`, { type, key, system, own });
+    };
+    add(x.subject_type, x.subject_id, x.subject_system);
+    add(x.parent_type, x.parent_id, x.parent_system ?? x.subject_system);
+  }
+  if (!keys.size) return [];
+  // One pass over the workspace's subjects with these keys, then matched here.
+  const existing = await query<{ key: string; system: string }>(
+    `MATCH (e:Entity {scenario_id: $scenario}) WHERE e.subject_type IS NOT NULL AND e.source_key IN $keys
+     RETURN e.source_key AS key, e.source_system AS system`, { scenario, keys: [...new Set([...keys.values()].map((k) => k.key))] });
+  const systemsOf = new Map<string, string[]>();
+  for (const x of existing) systemsOf.set(x.key, [...(systemsOf.get(x.key) ?? []), x.system]);
+  const counts = new Map<string, { type: string; mapped: string; existing: string; n: number }>();
+  for (const k of keys.values()) {
+    for (const sys of systemsOf.get(k.key) ?? []) {
+      if (sys === k.own) continue;   // this source's own subjects (an update)
+      const id = `${k.type}|${k.system}|${sys}`;
+      const c = counts.get(id) ?? counts.set(id, { type: k.type, mapped: k.system, existing: sys, n: 0 }).get(id)!;
+      c.n++;
+    }
+  }
+  return [...counts.values()].map((f) => f.mapped === f.existing
+    ? { level: "ok" as const, message: `${f.n} ${f.type} subject(s) in these files are existing ones from "${f.existing}": they join that source's ${f.type}s.` }
+    : { level: "warn" as const, message: `${f.n} ${f.type} ID(s) in these files match ${f.type}s already in the workspace from "${f.existing}", ` +
+        `but are mapped as "${f.mapped}" ${f.type}s, so they'll be separate. If they're the same ${f.type}s, set refs.subject_system ` +
+        `(or refs.parent_system for the parent) to "${f.existing}".` });
 }
 
 export type SourceInfo = { source: string; events: number; decisions: number; files: string[]; loaded_at: string | null };
