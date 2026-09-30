@@ -1,4 +1,5 @@
 import neo4j from "neo4j-driver";
+import { LIVE } from "./live";
 import { IS_DEMO, query, SCENARIO } from "./neo4j";
 
 // find_precedent(query): free-text search over decision contexts (Neo4j full-text index),
@@ -10,7 +11,8 @@ export async function findPrecedent(text: string, decisionType?: string, limit =
   return query(
     `CALL db.index.fulltext.queryNodes('context_text', $terms) YIELD node AS c, score
      MATCH (d:Decision {stage: 'FINAL'})-[:HAD_CONTEXT]->(c)
-     WHERE (d.scenario_id = $scenario OR ($stories AND d.scenario_id STARTS WITH 'story:'))
+     WHERE (d.scenario_id = $scenario OR ($stories AND d.scenario_id STARTS WITH 'story:')
+            OR (d.scenario_id = $live AND d.outcome_window_closed_at IS NOT NULL))   // live, once its outcome window closed
        AND ($type IS NULL OR d.decision_type = $type)
      WITH d, c, score ORDER BY score DESC LIMIT $limit
      MATCH (d)-[:MADE_BY]->(a:Actor)
@@ -20,6 +22,6 @@ export async function findPrecedent(text: string, decisionType?: string, limit =
      RETURN d.decision_id AS decision_id, d.decision_type AS decision_type, round(score, 3) AS score,
             c.summary_text AS summary, a.kind AS actor_kind, options, collect(DISTINCT out.outcome_type) AS outcomes
      ORDER BY score DESC`,
-    { terms, scenario: SCENARIO, stories: IS_DEMO, type: decisionType ?? null, limit: neo4j.int(Math.min(Math.max(Math.trunc(limit), 1), 50)) },
+    { terms, scenario: SCENARIO, stories: IS_DEMO, live: LIVE, type: decisionType ?? null, limit: neo4j.int(Math.min(Math.max(Math.trunc(limit), 1), 50)) },
   );
 }

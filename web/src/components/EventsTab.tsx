@@ -60,7 +60,8 @@ export default function EventsTab({ active, onChanged }: { active: boolean; onCh
     return () => window.removeEventListener("keydown", onKey);
   }, []);
   const [uploads, setUploads] = useState<{ scenario: string; events: number; decisions: number; customers: number }[]>([]);
-  const [live, setLive] = useState<{ decisions: number; proposals: number; finals: number; overrides: number; tickets: number } | null>(null);
+  const [live, setLive] = useState<{ decisions: number; proposals: number; finals: number; overrides: number; tickets: number;
+                                     with_outcomes?: number } | null>(null);
 
   const refresh = () => Promise.all([
     fetch("/api/stories").then((r) => r.json()).then(setSets),
@@ -174,7 +175,8 @@ export default function EventsTab({ active, onChanged }: { active: boolean; onCh
             <p className="mt-1 text-xs text-zinc-500">The live agent&apos;s tool calls pass through Rationode&apos;s gateway; the rep&apos;s
               Approve comes in by Zendesk webhook. Both land in the graph as they happen.</p>
             <p className="mt-1 text-xs">{live && live.decisions
-              ? <>{live.proposals} AI proposal(s), {live.finals} rep decision(s), {live.overrides} override(s) across {live.tickets} ticket(s)</>
+              ? <>{live.proposals} AI proposal(s), {live.finals} rep decision(s), {live.overrides} override(s) across {live.tickets} ticket(s).{" "}
+                  Rep decisions with outcomes (60 days later): {live.with_outcomes ?? 0}; awaiting outcomes: {live.finals - (live.with_outcomes ?? 0)}.</>
               : <span className="text-zinc-500">Nothing captured yet: run a case on the Streamly live tab.</span>}</p>
             {live && live.decisions > 0 && (
               <button onClick={showLive} disabled={!!busy || streaming}

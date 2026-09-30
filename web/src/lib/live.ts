@@ -5,6 +5,7 @@ import type { ContractEvent } from "./contract";
 import { DEMO_NOW } from "./customer";
 import { toContract, type RawEvent } from "./nativeAdapter";
 import { IS_DEMO, query, SCENARIO } from "./neo4j";
+import { recomputePoints } from "./storyTrees";
 import { writeRows } from "./storyWriter";
 import { loadRegistry } from "./uploads";
 
@@ -114,16 +115,22 @@ async function ingestNow(raws: RawEvent[], opts: { prune?: boolean }) {
   };
 }
 
-// Re-running a case replaces that ticket's earlier live events and decisions.
+// Re-running a case replaces that ticket's earlier live events and decisions, with their outcomes and the
+// outcome events (a dispute or cancellation names no ticket); tree branches the ticket was placed in are restored.
 export async function removeLiveTicket(ticketId: string) {
+  const touched = (await query<{ id: string }>(
+    `MATCH (d:Decision {scenario_id: $live})-[:EVIDENCED_BY]->(:Event {scenario_id: $live, ticket_id: $ticket})
+     MATCH (d)-[:AT_POINT]->(p:DecisionPoint) RETURN DISTINCT p.point_id AS id`, { live: LIVE, ticket: ticketId })).map((r) => r.id);
   await query(
     `MATCH (e:Event {scenario_id: $live, ticket_id: $ticket})
      OPTIONAL MATCH (d:Decision {scenario_id: $live})-[:EVIDENCED_BY]->(e)
      OPTIONAL MATCH (d)-[:HAD_CONTEXT]->(c:Context)
      OPTIONAL MATCH (d)-[:LED_TO]->(o:Outcome {scenario_id: $live})
-     DETACH DELETE e, d, c, o`,
+     OPTIONAL MATCH (o)-[:EVIDENCED_BY]->(oe:Event {scenario_id: $live})
+     DETACH DELETE e, d, c, o, oe`,
     { live: LIVE, ticket: ticketId },
   );
+  if (touched.length) await recomputePoints(touched);
   await query(`MATCH (t:Entity {scenario_id: $live, source_key: $key}) DETACH DELETE t`, { live: LIVE, key: `ticket:${ticketId}` });
 }
 
@@ -192,14 +199,16 @@ export async function removeLiveCustomer(rawEmail: string) {
 }
 
 export async function liveSummary() {
-  const [r] = await query<{ decisions: number; proposals: number; finals: number; overrides: number; tickets: number }>(
+  const [r] = await query<{ decisions: number; proposals: number; finals: number; overrides: number; tickets: number;
+                            with_outcomes: number }>(
     `OPTIONAL MATCH (d:Decision {scenario_id: $live})
      WITH count(d) AS decisions, sum(CASE d.stage WHEN 'PROPOSAL' THEN 1 ELSE 0 END) AS proposals,
-          sum(CASE d.stage WHEN 'FINAL' THEN 1 ELSE 0 END) AS finals
+          sum(CASE d.stage WHEN 'FINAL' THEN 1 ELSE 0 END) AS finals,
+          sum(CASE WHEN d.stage = 'FINAL' AND d.outcome_window_closed_at IS NOT NULL THEN 1 ELSE 0 END) AS with_outcomes
      OPTIONAL MATCH (:Decision {scenario_id: $live})-[o:OVERRIDES]->()
-     WITH decisions, proposals, finals, count(o) AS overrides
+     WITH decisions, proposals, finals, with_outcomes, count(o) AS overrides
      OPTIONAL MATCH (e:Event {scenario_id: $live})
-     RETURN decisions, proposals, finals, overrides, count(DISTINCT e.ticket_id) AS tickets`,
+     RETURN decisions, proposals, finals, overrides, with_outcomes, count(DISTINCT e.ticket_id) AS tickets`,
     { live: LIVE },
   );
   return r;

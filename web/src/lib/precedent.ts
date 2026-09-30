@@ -2,6 +2,7 @@
 import liveEmbeddings from "../data/live-embeddings.json";
 import { checkUsage } from "./customer";
 import { contextText, encode, type Context } from "./features";
+import { LIVE } from "./live";
 import { IS_DEMO, query, SCENARIO } from "./neo4j";
 
 const COST_OUTCOMES = ["refund_cost", "dispute_won", "dispute_lost"];
@@ -158,10 +159,23 @@ export async function checkBeforeAct(decisionType: string, context: Context, k =
      RETURN d.decision_id AS id, null AS text_score, c.features AS features, properties(c) AS ctx`,
     { type: decisionType },
   ));
+  // Live decisions count once their outcome window has closed ("60 days later", §19.3), with or without outcome
+  // events ("no dispute, no churn" is an outcome too). Before that, a decision whose outcome isn't known yet
+  // would read as "nothing bad happened" and bias every rate.
+  candidates.push(...await query<Candidate>(
+    `MATCH (d:Decision {decision_type: $type, stage: 'FINAL', scenario_id: $live})-[:HAD_CONTEXT]->(c:Context)
+     WHERE d.outcome_window_closed_at IS NOT NULL
+     RETURN d.decision_id AS id, null AS text_score, c.features AS features, properties(c) AS ctx`,
+    { type: decisionType, live: LIVE },
+  ));
   const scored = candidates
     .map((c) => {
       const feature = cosine(features, c.features ?? []);
-      return { ...c, score: vector ? 0.3 * (c.text_score ?? 0.9) + 0.7 * feature : feature };
+      // Decisions not in the vector index (live, sets) get their text similarity from the embedding of their
+      // context text when there is one (0.9 otherwise), so an exact match isn't ranked below history by default.
+      const own = vector && c.text_score == null ? EMBEDDINGS[contextText(decisionType, c.ctx)] : undefined;
+      const text = c.text_score ?? (own ? cosine(vector!, own) : 0.9);
+      return { ...c, score: vector ? 0.3 * text + 0.7 * feature : feature };
     })
     .sort((a, b) => b.score - a.score)
     .slice(0, k);
@@ -210,6 +224,15 @@ export async function checkBeforeAct(decisionType: string, context: Context, k =
       const d = details.find((x) => x.id === c.id);
       return { decision_id: c.id, score: Math.round(c.score * 1000) / 1000, option: d?.options[0] ?? null,
                outcomes: d?.outcomes ?? [], cost: d?.cost ?? 0 };
+    }),
+    // Recent live decisions among the similar ones, once their outcome window closed ("60 days later"): listed on
+    // their own because they have no precomputed text embedding, so they rank below equally similar history
+    // decisions and would rarely reach the top 16. They count in `options` either way.
+    recent_live: scored.filter((c) => c.id.startsWith(`${LIVE}|`)).slice(0, 5).map((c) => {
+      const d = details.find((x) => x.id === c.id);
+      return { decision_id: c.id, score: Math.round(c.score * 1000) / 1000, rank: scored.indexOf(c) + 1,
+               option: d?.options[0] ?? null, outcomes: d?.outcomes ?? [], cost: d?.cost ?? 0,
+               context: contextText(decisionType, c.ctx) };
     }),
     examples: scored.slice(0, 3).map((c) => ({
       decision_id: c.id, score: Math.round(c.score * 1000) / 1000, context: contextText(decisionType, c.ctx),

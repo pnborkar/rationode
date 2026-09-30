@@ -62,6 +62,7 @@ const MONEY_OPTIONS = new Set(["full_refund", "partial_refund", "voucher"]);   /
 const cents = (n: number) => Math.round(n * 100) / 100;
 
 const pct = (v: number | null | undefined) => (v == null ? "—" : `${Math.round(v * 100)}%`);
+const pct1 = (v: number | null | undefined) => (v == null ? "—" : `${(v * 100).toFixed(1)}%`);   // small moves (one decision)
 const words = (s: string) => s.replaceAll("_", " ");
 
 function Panel({ title, badge, children, className = "" }: {
@@ -271,6 +272,13 @@ export default function StreamlyLive() {
   // Override: the amount the rep gives (null = the suggested default for the option) and why.
   const [overrideAmount, setOverrideAmount] = useState<string | null>(null);
   const [overrideReason, setOverrideReason] = useState("");
+  // "60 days later" (§19.3): the simulated outcomes of this ticket's decision, and the tree branches that moved.
+  type Stats = { support: number; dispute_rate: number | null; churn_rate: number | null };
+  const [later, setLater] = useState<{ drawn: { kind: string; days: number; detail: string }[];
+                                        outcomes: { type: string; value: number | null }[];
+                                        branches: { point_id: string; tree: string; branch: string; before: Stats; after: Stats }[];
+                                        error?: string } | null>(null);
+  const [laterBusy, setLaterBusy] = useState(false);
   const [recorded, setRecorded] = useState<Recorded | null>(null);
   const [liveOfCustomer, setLiveOfCustomer] = useState<{ tickets: string[]; decisions: number }>({ tickets: [], decisions: 0 });
   const proposalVia = useRef<{ via?: string; ms?: number }>({});
@@ -386,7 +394,7 @@ export default function StreamlyLive() {
 
   function reset() {
     setChat([]); setThinking(""); setSteps([]); setProposal(null); setFinal(null); setRecorded(null);
-    setOverrideAmount(null); setOverrideReason("");
+    setOverrideAmount(null); setOverrideReason(""); setLater(null);
     setLive({ nodes: [], rels: [] });
   }
 
@@ -509,6 +517,19 @@ export default function StreamlyLive() {
                detail: `${overridden ? "overrode the AI proposal" : "approved the AI proposal"} · ${REP.name} (${REP.team})`,
                live: true }],
             [{ id: `${finalId}->proposal`, from: finalId, to: `proposal:${TICKET}`, type: overridden ? "OVERRIDES" : "APPROVED" }]);
+  }
+
+  async function sixtyDaysLater() {
+    setLaterBusy(true);
+    const res = await fetch("/api/live/outcomes", { method: "POST", headers: { "content-type": "application/json" },
+                                                    body: JSON.stringify({ ticket_id: TICKET }) });
+    const data = await res.json();
+    setLater(res.ok ? data : { drawn: [], outcomes: [], branches: [], error: data.error ?? res.statusText });
+    // The journey graph now holds the outcomes, linked to the decision.
+    const g = await fetch(`/api/graph/customer?email=${encodeURIComponent(current.email)}`);
+    if (g.ok) setBase(await g.json());
+    setLaterBusy(false);
+    refreshLiveOfCustomer();
   }
 
   const nodes = [...base.nodes, ...live.nodes];
@@ -703,9 +724,33 @@ export default function StreamlyLive() {
                   <p className="text-xs opacity-60">
                     {recorded
                       ? `Recorded in Neo4j (scenario ${DEMO ? "live" : `${process.env.NEXT_PUBLIC_RATIONODE_TENANT}:live`}): the AI proposal via the Rationode gateway, and this decision via ` +
-                        `the Zendesk webhook${recorded.overrides ? ", with OVERRIDES on the AI proposal" : ""}. The graph now shows it.`
+                        `the Zendesk webhook${final.overridden ? ", with OVERRIDES on the AI proposal" : ", linked APPROVED to the AI proposal"}. The graph now shows it.`
                       : "Recording…"}
                   </p>
+                  {recorded && !later && (
+                    <button onClick={sixtyDaysLater} disabled={laterBusy}
+                            className="mt-1 rounded-md bg-amber-600 px-3 py-1 text-xs font-semibold text-white disabled:opacity-50"
+                            title="What happened next: outcomes drawn from the world model the history was built with (simulated)">
+                      {laterBusy ? "Waiting 60 days…" : "60 days later →"}</button>
+                  )}
+                  {later && (
+                    <div className="mt-2 space-y-1 rounded-md bg-zinc-950/70 p-2 text-xs text-zinc-200">
+                      {later.error ? <p className="text-red-400">{later.error}</p> : <>
+                        <p className="font-semibold">60 days later <span className="font-normal text-amber-400">· simulated outcome</span></p>
+                        {later.drawn.map((d, i) => (
+                          <p key={i}>• {d.detail}{d.kind !== "none" && d.kind !== "refund" ? ` (${d.days} days later)` : ""}</p>))}
+                        <p className="text-zinc-400">
+                          {later.outcomes.length
+                            ? `Linked to this decision: ${later.outcomes.map((o) => o.type.replaceAll("_", " ") + (o.value ? ` $${o.value}` : "")).join(", ")}. `
+                            : "No outcome events, which is an outcome too. "}
+                          The outcome window has closed: this decision now counts as precedent for similar cases.</p>
+                        {later.branches.map((b) => (
+                          <p key={b.point_id} className="text-zinc-400">Tree branch {b.branch}: decisions {b.before.support} → {b.after.support}
+                            {b.after.dispute_rate != null ? ` · disputes ${pct1(b.before.dispute_rate)} → ${pct1(b.after.dispute_rate)}` : ""}
+                            {b.after.churn_rate != null ? ` · churn ${pct1(b.before.churn_rate)} → ${pct1(b.after.churn_rate)}` : ""}</p>))}
+                      </>}
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-2">

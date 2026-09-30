@@ -101,15 +101,17 @@ export async function recomputePoints(pointIds: string[]) {
   await recompute(pointIds);
 }
 
-export async function placeScenario(scenario: string): Promise<BranchChange[]> {
+// onlyIds: place just these decisions (live tickets are placed once their outcomes arrive, §19.3).
+export async function placeScenario(scenario: string, onlyIds?: string[]): Promise<BranchChange[]> {
   const decisions = await query<ScenarioDecision>(
     `MATCH (d:Decision {scenario_id: $scenario})-[:HAD_CONTEXT]->(c:Context)
+     WHERE $ids IS NULL OR d.decision_id IN $ids
      OPTIONAL MATCH (d)-[k:CONSIDERED]->(o:Option) WHERE k.status IN ['CHOSEN', 'PROPOSED']
      WITH d, c, collect(o.option_key) AS options
      OPTIONAL MATCH (d)-[:LED_TO]->(out:Outcome)
      RETURN d.decision_id AS id, d.decision_type AS type, d.stage AS stage, properties(c) AS ctx, options,
             collect(out.outcome_type) AS outcomes`,
-    { scenario },
+    { scenario, ids: onlyIds ?? null },
   );
   const approved = new Set((await query<{ key: string }>(
     `MATCH (s:SchemaElement {kind: 'OPTION', status: 'APPROVED'}) RETURN s.key AS key`)).map((r) => r.key));
