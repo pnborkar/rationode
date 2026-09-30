@@ -45,11 +45,11 @@ async function describeDecisions() {
 }
 
 const Filter = z.object({ fact: z.string(), op: z.enum(["=", "!=", ">=", "<=", "in"]), value: z.union([z.string(), z.number(), z.boolean(), z.array(z.union([z.string(), z.number()]))]) });
-const RatesInput = z.object({ decision_type: z.string(), group_by: z.string().optional(), filters: z.array(Filter).optional() });
+export const RatesInput = z.object({ decision_type: z.string(), group_by: z.string().optional(), filters: z.array(Filter).optional() });
 
 // Outcome rates for a decision type (FINAL decisions), overall or grouped by one fact (numbers in quartile bands) or
 // by the option chosen ("option"), optionally filtered. The workhorse for "what leads to what" questions.
-async function outcomeRates(input: z.infer<typeof RatesInput>) {
+export async function outcomeRates(input: z.infer<typeof RatesInput>) {
   const rows = await query<{ option: string | null; ctx: Record<string, unknown>; outcomes: string[]; polarities: (string | null)[] }>(
     `MATCH (d:Decision {scenario_id: $s, decision_type: $t, stage: 'FINAL'})-[:HAD_CONTEXT]->(c:Context)
      OPTIONAL MATCH (d)-[:CONSIDERED {status: 'CHOSEN'}]->(o:Option)
@@ -57,7 +57,14 @@ async function outcomeRates(input: z.infer<typeof RatesInput>) {
      OPTIONAL MATCH (d)-[:LED_TO]->(out:Outcome)
      RETURN option, properties(c) AS ctx, collect(out.outcome_type) AS outcomes, collect(out.polarity) AS polarities
      LIMIT 50000`, { s: SCENARIO, t: input.decision_type });
-  const value = (r: (typeof rows)[number], fact: string) => (fact === "option" ? r.option : r.ctx[fact]);
+  // Fact names as the model writes them: "loan.requested_amount", "requested_amount" or "requested amount" all work.
+  const prefix = prefixOf(input.decision_type);
+  const keyOf = (fact: string) => {
+    if (fact === "option" || rows.some((r) => fact in r.ctx)) return fact;
+    const bare = fact.trim().toLowerCase().replace(/[^a-z0-9.]+/g, "_").replace(/^_|_$/g, "");
+    return bare.startsWith(prefix) ? bare : `${prefix}${bare}`;
+  };
+  const value = (r: (typeof rows)[number], fact: string) => (fact === "option" ? r.option : r.ctx[keyOf(fact)]);
   const kept = rows.filter((r) => (input.filters ?? []).every((f) => {
     const v = value(r, f.fact);
     if (f.op === "in") return Array.isArray(f.value) && f.value.map(String).includes(String(v));

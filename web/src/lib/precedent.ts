@@ -133,7 +133,8 @@ async function linkUsage(email: string, whatIfs: { action: string; dispute_rate:
   };
 }
 
-export async function checkBeforeAct(decisionType: string, context: Context, k = 150, customerEmail?: string) {
+// exclude: decisions to leave out, e.g. the case itself when a past case is replayed as new (else it finds its own answer).
+export async function checkBeforeAct(decisionType: string, context: Context, k = 150, customerEmail?: string, exclude: string[] = []) {
   const text = contextText(decisionType, context);
   const vector = EMBEDDINGS[text];
   const features = await encode(decisionType, context);
@@ -168,7 +169,7 @@ export async function checkBeforeAct(decisionType: string, context: Context, k =
      RETURN d.decision_id AS id, null AS text_score, c.features AS features, properties(c) AS ctx`,
     { type: decisionType, live: LIVE },
   ));
-  const scored = candidates
+  const scored = candidates.filter((c) => !exclude.includes(c.id))
     .map((c) => {
       const feature = cosine(features, c.features ?? []);
       // Decisions not in the vector index (live, sets) get their text similarity from the embedding of their

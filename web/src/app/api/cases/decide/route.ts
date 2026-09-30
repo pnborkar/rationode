@@ -1,0 +1,29 @@
+import { z } from "zod";
+import { decide } from "@/lib/decide";
+
+export const maxDuration = 120;
+
+const Case = z.object({
+  id: z.string(), decision_type: z.string(), decided_at: z.string(),
+  subject: z.object({ id: z.string(), label: z.string(), key: z.string() }),
+  parent: z.object({ id: z.string(), label: z.string(), key: z.string() }).nullable(),
+  facts: z.record(z.string(), z.unknown()), options: z.array(z.object({ option: z.string(), n: z.number() })),
+  details: z.array(z.string()), related: z.array(z.string()),
+});
+
+// POST {case}: the generic decision agent's steps and proposal, streamed as server-sent events.
+export async function POST(request: Request) {
+  const parsed = Case.safeParse(await request.json().catch(() => ({})));
+  if (!parsed.success) return Response.json({ error: parsed.error.message }, { status: 400 });
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream({
+    async start(controller) {
+      try {
+        for await (const e of decide(parsed.data)) controller.enqueue(encoder.encode(`data: ${JSON.stringify(e)}\n\n`));
+      } catch (err) {
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "error", message: err instanceof Error ? err.message : String(err) })}\n\n`));
+      } finally { controller.close(); }
+    },
+  });
+  return new Response(stream, { headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache, no-transform", Connection: "keep-alive" } });
+}

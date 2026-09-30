@@ -9,6 +9,7 @@ import EventsTab from "@/components/EventsTab";
 import SettingsTab from "@/components/SettingsTab";
 import BrowseSubjects from "@/components/BrowseSubjects";
 import AskTab from "@/components/AskTab";
+import GenericLive from "@/components/GenericLive";
 import ThemeToggle from "@/components/ThemeToggle";
 import { LIVE_CASES, type LiveCase } from "@/lib/liveCases";
 
@@ -251,6 +252,7 @@ export default function StreamlyLive() {
   const [tab, setTab] = useState<"live" | "events" | "browse" | "ask" | "settings">("live");
   const [storyCases, setStoryCases] = useState<LiveCase[]>([]);
   const [uploadCases, setUploadCases] = useState<LiveCase[]>([]);
+  const [casesLoaded, setCasesLoaded] = useState(false);   // a workspace without Streamly cases gets the generic Live
   const cases = [...PREPARED, ...storyCases, ...uploadCases];
   const [caseKey, setCaseKey] = useState((PREPARED[0] ?? EMPTY).key);
   // Uploaded customers: the question group chosen in the dropdown (batch + question); caseKey "pick" until a
@@ -322,6 +324,7 @@ export default function StreamlyLive() {
       if (!alive) return;
       const u = toUploadCases(rows);
       setUploadCases(u);
+      setCasesLoaded(true);
       // Another tenant has no prepared customers: start on its most-asked question.
       const [first] = byQuestion(u);
       if (!DEMO && first && caseKeyRef.current === "none") { setQuestion(first.key); setCaseKey("pick"); setMessage(""); }
@@ -606,7 +609,7 @@ export default function StreamlyLive() {
           </nav>
         </div>
         <div className="flex items-center gap-3">
-          {tab === "live" && (
+          {tab === "live" && (DEMO || !casesLoaded || uploadCases.length > 0) && (
           <button onClick={() => setGraphOn((g) => !g)} disabled={running}
                   className={`rounded-full px-4 py-1.5 text-sm font-semibold transition ${
                     graphOn ? "bg-white text-[#0369a1]" : "bg-white/15 text-white"}`}>
@@ -630,7 +633,11 @@ export default function StreamlyLive() {
       {/* Kept mounted so a conversation survives switching tabs. */}
       <div className={tab === "ask" ? "flex min-h-0 flex-1" : "hidden"}><AskTab /></div>
 
-      <div className={tab === "live" ? "grid min-h-0 flex-1 grid-cols-2 grid-rows-6 gap-3" : "hidden"}>
+      {/* A workspace with no Streamly support cases (another domain, e.g. lending): the generic Live, replaying cases. */}
+      {!DEMO && casesLoaded && uploadCases.length === 0 && (
+        <div className={tab === "live" ? "flex min-h-0 flex-1" : "hidden"}><GenericLive workspace={process.env.NEXT_PUBLIC_RATIONODE_TENANT ?? ""} /></div>
+      )}
+      <div className={tab === "live" && (DEMO || !casesLoaded || uploadCases.length > 0) ? "grid min-h-0 flex-1 grid-cols-2 grid-rows-6 gap-3" : "hidden"}>
         <Panel title="Customer help chat" className="col-start-1 row-span-3 row-start-1" badge={
           <select value={isUpload ? `q:${question}` : caseKey} disabled={running}
                   onChange={(e) => (e.target.value.startsWith("q:") ? pickQuestion(e.target.value.slice(2)) : pickCase(e.target.value))}
