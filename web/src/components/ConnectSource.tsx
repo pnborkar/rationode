@@ -194,13 +194,17 @@ export default function ConnectSource({ active, onClose, onChanged }: { active: 
   }
 
   async function runAll() {
+    const r = report?.removal;
+    if (r && !incremental && !window.confirm(`Replace the source "${r.source}"?\n\nThis REMOVES ${r.removed.toLocaleString()} of its ` +
+        `${r.total.toLocaleString()} records${r.files.length ? ` (from ${r.files.join(", ")})` : ""} and keeps only what's in these files.\n\n` +
+        `If this is different data, cancel and give it a new source name.`)) return;
     setBusy("run"); setError(null);
     const edited_files = files.filter((f) => proposals[f.name]?.edited).map((f) => f.name);
     const res = incremental
       ? await fetch("/api/databricks/changes", { method: "POST", headers: { "content-type": "application/json" },
                                                  body: JSON.stringify({ apply: true, ranges: incremental.ranges, batch: name }) })
       : await fetch("/api/upload/run", { method: "POST", headers: { "content-type": "application/json" },
-                                         body: JSON.stringify({ name, ...sources(), mappings, edited_files }) });
+                                         body: JSON.stringify({ name, ...sources(), mappings, edited_files, confirm_removal: !!report?.removal }) });
     const body = await res.json();
     const data = incremental ? (body.result ?? body) : body;
     if (res.ok && data.ok !== false) {
@@ -287,9 +291,10 @@ export default function ConnectSource({ active, onClose, onChanged }: { active: 
                   className="rounded-md bg-amber-600 px-3 py-1 font-semibold text-white disabled:opacity-40">
             {busy === "validate" ? "Checking…" : "Validate + dry run"}</button>
           <button onClick={runAll} disabled={!report?.ok || nothingNew || !!busy}
-                  className="rounded-md bg-emerald-600 px-3 py-1 font-semibold text-white disabled:opacity-40">
+                  className={`rounded-md px-3 py-1 font-semibold text-white disabled:opacity-40 ${report?.removal ? "bg-red-600" : "bg-emerald-600"}`}>
             {busy === "run" ? "Loading…" : nothingNew ? "Nothing new to load"
               : incremental ? `Approve changes to ${report?.target?.source ?? report?.target?.scenario ?? name}`
+              : report?.removal ? `Approve + replace "${report.removal.source}" (removes ${report.removal.removed.toLocaleString()})`
               : report?.target ? `Approve + update ${report.target.source ? `"${report.target.source}"` : report.target.scenario}`
               : DEMO ? "Approve + load into Neo4j" : "Approve + add source"}</button>
         </span>
@@ -517,8 +522,12 @@ function ValidationView({ report }: { report: ReportView }) {
   const d = report.dryRun;
   return (
     <div className="space-y-4">
-      <p className={`rounded-md px-3 py-2 text-sm ${report.ok ? "bg-emerald-950 text-emerald-200" : "bg-red-950 text-red-200"}`}>
+      <p className={`rounded-md px-3 py-2 text-sm ${report.ok && !report.removal ? "bg-emerald-950 text-emerald-200" : "bg-red-950 text-red-200"}`}>
         {!report.ok ? "Fix the errors below (edit the mapping or re-map) before loading."
+          : report.removal ? `Careful: these files would REPLACE the source "${report.removal.source}", removing ` +
+              `${report.removal.removed.toLocaleString()} of its ${report.removal.total.toLocaleString()} records` +
+              `${report.removal.files.length ? ` (from ${report.removal.files.join(", ")})` : ""}. If this is different data, ` +
+              `change the source name to a new one and validate again.`
           : report.target && !report.target.new && !report.target.changed && !report.target.removed
             ? `Nothing new: these files are already loaded as ${report.target.scenario}. Nothing to write.`
           : report.target ? `All checks passed. These files update ${report.target.scenario}: ${report.target.new} new, ` +

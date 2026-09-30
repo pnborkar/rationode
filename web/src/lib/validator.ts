@@ -64,6 +64,9 @@ export type Validation = {
   };
   events: ContractEvent[];
   // Set by the upload layer when these records are already loaded: the batch (or workspace source) they update and what differs.
+  // A workspace update that would remove most of a source's records (probably the wrong source name): approving needs
+  // an explicit confirmation (§23.9).
+  removal?: { source: string; removed: number; total: number; files: string[] };
   target?: { scenario: string; source?: string; new: number; changed: number; unchanged: number; removed: number; examples: string[] };
 };
 

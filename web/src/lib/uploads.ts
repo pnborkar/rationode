@@ -161,6 +161,17 @@ async function validateSource(parsed: ParsedFile[], mappings: FileMapping[], sou
     const t = await diffAgainst(scenario, report.events, source);
     report.target = t;
     const nothing = t.new === 0 && t.changed === 0 && t.removed === 0;
+    // Picking an existing source for different files would replace it: say so loudly and require a confirmation.
+    const total = t.unchanged + t.changed + t.removed;
+    if (t.removed > 0 && (t.unchanged + t.changed === 0 || t.removed / total >= 0.5)) {
+      const files = (await listSources()).find((x) => x.source === source)?.files ?? [];
+      report.removal = { source, removed: t.removed, total, files };
+      report.checks.unshift({ level: "warn", message: `This would REMOVE ${t.removed.toLocaleString()} of the ${total.toLocaleString()} records ` +
+        `in the source "${source}" (${Math.round((t.removed / total) * 100)}%)` +
+        (t.unchanged + t.changed === 0 ? `: none of these records are in it, so these files aren't that source's files` : "") +
+        (files.length ? ` (its files: ${files.join(", ")})` : "") + `. If this is different data, give it a new source name. ` +
+        `To replace the source anyway, approve and confirm.` });
+    }
     report.checks.unshift(nothing
       ? { level: "ok", message: `Nothing new: all ${t.unchanged} records are already loaded in the source "${source}".` }
       : { level: "ok", message: `Updates the source "${source}" with ${t.new} new and ${t.changed} changed records` +
@@ -204,8 +215,8 @@ export async function removeBatches(scenario: string) {
 // Validate again server-side (never trust the client's copy), then write and place in the trees. `sources`:
 // the Databricks tables and versions read, kept on the batch so the next load reads only what changed.
 export async function run(parsed: ParsedFile[], mappings: FileMapping[], name: string, editedFiles: string[] = [],
-                          sources: TableSource[] = []) {
-  if (!demoMode()) return runSource(parsed, mappings, name.trim(), editedFiles, sources);
+                          sources: TableSource[] = [], confirmRemoval = false) {
+  if (!demoMode()) return runSource(parsed, mappings, name.trim(), editedFiles, sources, confirmRemoval);
   const registry = await loadRegistry();
   const report = await validateAll(parsed, mappings, name, registry);
   if (!report.ok) return { ok: false as const, error: "The mapping has validation errors", report: { ...report, events: undefined } };
@@ -437,10 +448,15 @@ async function rebuild(scenario: string, except: string | null, events: Contract
   return { rows, removed, features, genericTypes };
 }
 
-async function runSource(parsed: ParsedFile[], mappings: FileMapping[], source: string, editedFiles: string[], sources: TableSource[]) {
+async function runSource(parsed: ParsedFile[], mappings: FileMapping[], source: string, editedFiles: string[], sources: TableSource[],
+                         confirmRemoval: boolean) {
   const registry = await loadRegistry();
   const report = await validateSource(parsed, mappings, source, registry);
   if (!report.ok) return { ok: false as const, error: "The mapping has validation errors", report: { ...report, events: undefined } };
+  if (report.removal && !confirmRemoval) {
+    return { ok: false as const, error: `Not loaded: this would remove ${report.removal.removed} of the ${report.removal.total} records in the ` +
+      `source "${source}". Use a new source name for different data, or confirm the replacement.` };
+  }
   const t = report.target;
   if (t && t.new === 0 && t.changed === 0 && t.removed === 0) {
     return { ok: false as const, error: `Nothing new: all records are already loaded in the source "${source}".` };

@@ -12,6 +12,7 @@ const Body = z.object({
   tables: z.array(z.object({ table: z.string().regex(/^[A-Za-z0-9_]+$/), version: z.number().int().nonnegative() })).default([]),
   mappings: z.array(FileMappingSchema),
   edited_files: z.array(z.string()).default([]),   // files whose mapping the reviewer changed
+  confirm_removal: z.boolean().default(false),       // replace a source even though most of its records would go
 }).refine((b) => b.files.length + b.tables.length > 0, "no files or tables");
 
 // Approve -> run: detector over the mapped events, written to Neo4j. Tables are read at the versions that
@@ -20,8 +21,8 @@ async function POST_(request: Request) {
   const body = Body.safeParse(await request.json());
   if (!body.success) return Response.json({ error: body.error.message }, { status: 400 });
   try {
-    const { files, tables, mappings, name, edited_files } = body.data;
-    const result = await run(await resolve(files, tables), mappings, name, edited_files, tables);
+    const { files, tables, mappings, name, edited_files, confirm_removal } = body.data;
+    const result = await run(await resolve(files, tables), mappings, name, edited_files, tables, confirm_removal);
     return Response.json(result, { status: result.ok ? 200 : 422 });
   } catch (err) {
     return Response.json({ ok: false, error: (err as Error).message }, { status: 422 });

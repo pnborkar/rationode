@@ -103,5 +103,5 @@ export async function incremental(apply: boolean, given?: Range[], name?: string
   if (!apply) return { batch: batch.name, scenario: batch.scenario, ranges, changes: counts, mappings: batch.mappings,
                        report: await check(files, batch.mappings, batch.name) };
   return { batch: batch.name, scenario: batch.scenario, ranges, changes: counts,
-           result: await run(files, batch.mappings, batch.name, [], sources) };
+           result: await run(files, batch.mappings, batch.name, [], sources, true) };   // deletions made in Databricks, approved in the check
 }
