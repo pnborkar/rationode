@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ask } from "@/lib/ask";
+import { withTenant } from "@/lib/tenant";
 
 export const maxDuration = 120;
 
@@ -9,7 +10,7 @@ const Body = z.object({
 });
 
 // "Ask": a question about this tenant's decisions, answered with tools over the graph; steps streamed as server-sent events.
-export async function POST(request: Request) {
+async function POST_(request: Request) {
   const parsed = Body.safeParse(await request.json().catch(() => ({})));
   if (!parsed.success) return Response.json({ error: parsed.error.message }, { status: 400 });
   const encoder = new TextEncoder();
@@ -26,3 +27,6 @@ export async function POST(request: Request) {
   });
   return new Response(stream, { headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache, no-transform", Connection: "keep-alive" } });
 }
+
+// Every request runs in its workspace (demo spec §23.9).
+export const POST = withTenant(POST_);

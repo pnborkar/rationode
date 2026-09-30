@@ -2,8 +2,8 @@
 import liveEmbeddings from "../data/live-embeddings.json";
 import { checkUsage } from "./customer";
 import { contextText, encode, type Context } from "./features";
-import { LIVE } from "./live";
-import { IS_DEMO, query, SCENARIO } from "./neo4j";
+import { liveScenario } from "./live";
+import { demoMode, query, baseScenario } from "./neo4j";
 
 const COST_OUTCOMES = ["refund_cost", "dispute_won", "dispute_lost"];
 const EMBEDDINGS = liveEmbeddings as Record<string, number[]>;
@@ -52,7 +52,7 @@ export async function route(decisionType: string, kind: string, x: Context) {
             p.rate_dispute_won AS win_rate, p.rate_churn AS churn_rate, p.cost_per_decision AS cost,
             collect(CASE WHEN child IS NULL THEN null ELSE {to: child.point_id, attribute: b.attribute,
                     operator: b.operator, value: b.value} END) AS branches`,
-    { type: decisionType, kind, scenario: SCENARIO },
+    { type: decisionType, kind, scenario: baseScenario() },
   );
   if (!rows.length) return null;
   const points = new Map(rows.map((r) => [r.id, r]));
@@ -105,7 +105,7 @@ async function linkUsage(email: string, whatIfs: { action: string; dispute_rate:
      WHERE sent = $watched
      MATCH (d)-[:LED_TO]->(o:Outcome) WHERE o.outcome_type IN ['dispute_won', 'dispute_lost']
      RETURN count(o) AS n, sum(CASE o.outcome_type WHEN 'dispute_won' THEN 1 ELSE 0 END) AS won`,
-    { watched, scenario: SCENARIO, stories: IS_DEMO },
+    { watched, scenario: baseScenario(), stories: demoMode() },
   );
   const winRate = p && p.n ? Math.round((p.won / p.n) * 1000) / 1000 : null;
   const deny = whatIfs.find((w) => w.action === "deny");
@@ -146,15 +146,15 @@ export async function checkBeforeAct(decisionType: string, context: Context, k =
         `CALL db.index.vector.queryNodes('context_embedding_v1', 1500, $vector) YIELD node AS c, score
          MATCH (d:Decision {decision_type: $type, stage: 'FINAL', scenario_id: $scenario})-[:HAD_CONTEXT]->(c)
          RETURN d.decision_id AS id, score AS text_score, c.features AS features, properties(c) AS ctx`,
-        { vector, type: decisionType, scenario: SCENARIO },
+        { vector, type: decisionType, scenario: baseScenario() },
       )
     : await query<Candidate>(
         `MATCH (d:Decision {decision_type: $type, stage: 'FINAL', scenario_id: $scenario})-[:HAD_CONTEXT]->(c:Context)
          RETURN d.decision_id AS id, null AS text_score, c.features AS features, properties(c) AS ctx`,
-        { type: decisionType, scenario: SCENARIO },
+        { type: decisionType, scenario: baseScenario() },
       );
   // Decisions from loaded Events-tab sets are evidence too (they have features but no embedding); demo only.
-  if (IS_DEMO) candidates.push(...await query<Candidate>(
+  if (demoMode()) candidates.push(...await query<Candidate>(
     `MATCH (d:Decision {decision_type: $type, stage: 'FINAL'})-[:HAD_CONTEXT]->(c:Context)
      WHERE d.scenario_id STARTS WITH 'story:'
      RETURN d.decision_id AS id, null AS text_score, c.features AS features, properties(c) AS ctx`,
@@ -167,7 +167,7 @@ export async function checkBeforeAct(decisionType: string, context: Context, k =
     `MATCH (d:Decision {decision_type: $type, stage: 'FINAL', scenario_id: $live})-[:HAD_CONTEXT]->(c:Context)
      WHERE d.outcome_window_closed_at IS NOT NULL
      RETURN d.decision_id AS id, null AS text_score, c.features AS features, properties(c) AS ctx`,
-    { type: decisionType, live: LIVE },
+    { type: decisionType, live: liveScenario() },
   ));
   const scored = candidates.filter((c) => !exclude.includes(c.id))
     .map((c) => {
@@ -233,7 +233,7 @@ export async function checkBeforeAct(decisionType: string, context: Context, k =
     // Recent live decisions among the similar ones, once their outcome window closed ("60 days later"): listed on
     // their own because they have no precomputed text embedding, so they rank below equally similar history
     // decisions and would rarely reach the top 16. They count in `options` either way.
-    recent_live: scored.filter((c) => c.id.startsWith(`${LIVE}|`)).slice(0, 5).map((c) => {
+    recent_live: scored.filter((c) => c.id.startsWith(`${liveScenario()}|`)).slice(0, 5).map((c) => {
       const d = details.find((x) => x.id === c.id);
       return { decision_id: c.id, score: Math.round(c.score * 1000) / 1000, rank: scored.indexOf(c) + 1,
                option: d?.options[0] ?? null, outcomes: d?.outcomes ?? [], cost: d?.cost ?? 0,

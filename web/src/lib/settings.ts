@@ -4,7 +4,7 @@
 // Anthropic, the access code) stay in the environment and are only reported as set or not.
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 import Anthropic from "@anthropic-ai/sdk";
-import { query, SCENARIO } from "./neo4j";
+import { query, baseScenario } from "./neo4j";
 
 export type DatabricksSettings = { host: string; warehouse: string; schema: string; token: string };
 
@@ -54,7 +54,7 @@ async function saved(): Promise<Saved | null> {
   const [r] = await query<Saved>(
     `MATCH (t:TenantConfig {tenant: $tenant, kind: 'databricks'})
      RETURN t.host AS host, t.warehouse AS warehouse, t.schema AS schema, t.token_enc AS token_enc,
-            toString(t.updated_at) AS updated_at`, { tenant: SCENARIO });
+            toString(t.updated_at) AS updated_at`, { tenant: baseScenario() });
   return r ?? null;
 }
 
@@ -95,11 +95,11 @@ export async function saveDatabricks(v: { host: string; warehouse: string; schem
   await query(
     `MERGE (t:TenantConfig {tenant: $tenant, kind: 'databricks'})
      SET t.host = $host, t.warehouse = $warehouse, t.schema = $schema, t.token_enc = $tokenEnc, t.updated_at = datetime()`,
-    { tenant: SCENARIO, ...c, tokenEnc });
+    { tenant: baseScenario(), ...c, tokenEnc });
 }
 
 export async function clearDatabricks() {
-  await query(`MATCH (t:TenantConfig {tenant: $tenant, kind: 'databricks'}) DELETE t`, { tenant: SCENARIO });
+  await query(`MATCH (t:TenantConfig {tenant: $tenant, kind: 'databricks'}) DELETE t`, { tenant: baseScenario() });
 }
 
 // A token entered in the form but not saved yet, for "Test" before "Save".
@@ -125,7 +125,7 @@ async function savedAi(): Promise<SavedAi | null> {
   const [r] = await query<SavedAi>(
     `MATCH (t:TenantConfig {tenant: $tenant, kind: 'ai'})
      RETURN t.agent_model AS agent_model, t.mapping_model AS mapping_model, t.key_enc AS key_enc,
-            toString(t.updated_at) AS updated_at`, { tenant: SCENARIO });
+            toString(t.updated_at) AS updated_at`, { tenant: baseScenario() });
   return r ?? null;
 }
 
@@ -166,11 +166,11 @@ export async function saveAi(v: { agentModel: string; mappingModel: string; apiK
   await query(
     `MERGE (t:TenantConfig {tenant: $tenant, kind: 'ai'})
      SET t.agent_model = $agent, t.mapping_model = $mapping, t.key_enc = $keyEnc, t.updated_at = datetime()`,
-    { tenant: SCENARIO, agent: Model(v.agentModel), mapping: Model(v.mappingModel), keyEnc });
+    { tenant: baseScenario(), agent: Model(v.agentModel), mapping: Model(v.mappingModel), keyEnc });
 }
 
 export async function clearAi() {
-  await query(`MATCH (t:TenantConfig {tenant: $tenant, kind: 'ai'}) DELETE t`, { tenant: SCENARIO });
+  await query(`MATCH (t:TenantConfig {tenant: $tenant, kind: 'ai'}) DELETE t`, { tenant: baseScenario() });
 }
 
 // "Test": one small request shaped like the agent's (adaptive thinking, effort), with the form's model and key.

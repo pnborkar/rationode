@@ -4,6 +4,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { z } from "zod";
 import { checkUsage, getCustomer } from "@/lib/customer";
+import { withTenant } from "@/lib/tenant";
 
 const asText = (value: unknown) => ({ content: [{ type: "text" as const, text: JSON.stringify(value) }] });
 const OPTIONS = ["full_refund", "partial_refund", "voucher", "deny", "pause_subscription"] as const;
@@ -45,4 +46,5 @@ async function handle(request: Request): Promise<Response> {
   return transport.handleRequest(request);
 }
 
-export { handle as GET, handle as POST, handle as DELETE };
+const handleInTenant = withTenant(handle);
+export { handleInTenant as GET, handleInTenant as POST, handleInTenant as DELETE };

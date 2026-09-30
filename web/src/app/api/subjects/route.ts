@@ -3,12 +3,13 @@
 // the 500 top-level subjects with the most recent decisions (any domain's generic subjects, e.g. applications, and
 // Streamly's customers), newest first, with how many decisions and outcomes concern them (their parts included).
 import neo4j from "neo4j-driver";
-import { query, SCENARIO } from "@/lib/neo4j";
+import { query, baseScenario } from "@/lib/neo4j";
 import { ownScenario } from "@/lib/scenarios";
+import { withTenant } from "@/lib/tenant";
 
 
 
-export async function GET(request: Request) {
+async function GET_(request: Request) {
   const params = new URL(request.url).searchParams;
   const type = params.get("type")?.trim() || null;
   const q = params.get("q")?.trim().toLowerCase() || null;
@@ -16,7 +17,7 @@ export async function GET(request: Request) {
   const found = (await query<{ scenario: string; n: number }>(
     `MATCH (d:Decision) WHERE d.scenario_id IS NOT NULL RETURN d.scenario_id AS scenario, count(*) AS n ORDER BY scenario`))
     .filter((x) => ownScenario(x.scenario));
-  const scenario = params.get("scenario") && ownScenario(params.get("scenario")!) ? params.get("scenario")! : found[0]?.scenario ?? SCENARIO;
+  const scenario = params.get("scenario") && ownScenario(params.get("scenario")!) ? params.get("scenario")! : found[0]?.scenario ?? baseScenario();
   // The 500 subjects with the most recent decisions, newest first: each decision's subject, or the subject it is part of.
   const subjects = await query<{ id: string; label: string; key: string; type: string; email: string | null; last: string;
                                  parts: number; decisions: number; outcomes: number }>(
@@ -37,3 +38,6 @@ export async function GET(request: Request) {
     .map(([t, n]) => ({ type: t, n }));
   return Response.json({ scenarios: found, scenario, types, subjects });
 }
+
+// Every request runs in its workspace (demo spec §23.9).
+export const GET = withTenant(GET_);

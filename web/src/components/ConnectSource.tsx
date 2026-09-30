@@ -9,11 +9,12 @@ import { DATA_FIELDS } from "@/lib/contract";
 import { mapFile, matches, parseFile, type FieldMap, type FileMapping, type ParsedFile, type RecordMap } from "@/lib/mapping";
 import type { Check, Validation } from "@/lib/validator";
 import type { ViewNode, ViewRel } from "./GraphView";
+import { WORKSPACE } from "@/lib/workspace";
 
 const GraphView = dynamic(() => import("./GraphView"), { ssr: false });
 
 const SAMPLE_DIR = "/samples/streamly-spring";
-const TENANT = process.env.NEXT_PUBLIC_RATIONODE_TENANT ?? "history";
+const TENANT = WORKSPACE;   // the page's workspace (§23.9)
 const DEMO = TENANT === "history";
 const SAMPLE_FILES = ["zendesk_ticket_events.csv", "stripe_activity.csv", "support_agent_tool_calls.jsonl",
                       "fraudguard_screening.csv", "subscriptions.csv", "app_usage_weekly.csv"];

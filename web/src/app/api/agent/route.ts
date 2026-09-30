@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { runSupportAgent } from "@/lib/agent";
+import { withTenant } from "@/lib/tenant";
 
 // An agent run takes ~20 s; allow headroom so a slow run isn't cut off mid-demo.
 export const maxDuration = 60;
@@ -13,7 +14,7 @@ const Body = z.object({
 });
 
 // Streams the agent's steps to the browser as server-sent events.
-export async function POST(request: Request) {
+async function POST_(request: Request) {
   const parsed = Body.safeParse(await request.json());
   if (!parsed.success) return Response.json({ error: parsed.error.message }, { status: 400 });
 
@@ -36,3 +37,6 @@ export async function POST(request: Request) {
     headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache, no-transform", Connection: "keep-alive" },
   });
 }
+
+// Every request runs in its workspace (demo spec §23.9).
+export const POST = withTenant(POST_);

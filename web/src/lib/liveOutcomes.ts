@@ -5,7 +5,7 @@
 // have arrived (marked simulated) and records them through the Stripe webhook path. Then the ticket's
 // outcome window is closed: its decisions count as precedent and are placed in the decision trees.
 import model from "../data/outcome-model.json";
-import { LIVE } from "./live";
+import { liveScenario } from "./live";
 import { query } from "./neo4j";
 import { placeScenario, type BranchChange } from "./storyTrees";
 import { recordStripe } from "./stripeWebhook";
@@ -50,7 +50,7 @@ async function facts(ticket: string): Promise<Facts | null> {
      RETURN d.decision_id AS decision, toString(d.decided_at) AS decided_at, o.option_key AS option, k.amount_usd AS amount,
             properties(c) AS ctx, ch.source_key AS charge, ch.amount_usd AS charge_amount, cu.source_key AS customer,
             toString(d.outcome_window_closed_at) AS window_closed
-     LIMIT 1`, { live: LIVE, ticket });
+     LIMIT 1`, { live: liveScenario(), ticket });
   return f ?? null;
 }
 
@@ -70,7 +70,7 @@ export type Drawn = { kind: "refund" | "dispute" | "churn" | "renewal" | "none";
 
 // Draw the outcome as generate.py does for a complaint's final decision, and build the Stripe events for it.
 function draw(ticket: string, f: Facts, subscription: string | null, choice?: Choice) {
-  const r = rng(`${LIVE}:${ticket}:${f.decision}`);
+  const r = rng(`${liveScenario()}:${ticket}:${f.decision}`);
   const ctx = f.ctx;
   const amount = Number(ctx["support.amount_usd"] ?? f.charge_amount ?? 0);
   const category = String(ctx["support.complaint_category"] ?? "didnt_use");
@@ -142,8 +142,8 @@ export async function sixtyDaysLater(ticket: string, choice?: Choice) {
     `MATCH (d:Decision {scenario_id: $live})-[:EVIDENCED_BY]->(:Event {scenario_id: $live, ticket_id: $ticket})
      SET d.outcome_window_closed_at = datetime($closed), d.outcome_simulated = $how
      RETURN DISTINCT d.decision_id AS id`,
-    { live: LIVE, ticket, closed: new Date(addDays(f.decided_at, 60) * 1000).toISOString(), how: choice ? "presenter" : "model" })).map((r) => r.id);
-  const branches: BranchChange[] = await placeScenario(LIVE, ids);
+    { live: liveScenario(), ticket, closed: new Date(addDays(f.decided_at, 60) * 1000).toISOString(), how: choice ? "presenter" : "model" })).map((r) => r.id);
+  const branches: BranchChange[] = await placeScenario(liveScenario(), ids);
   const outcomes = await query<{ type: string; value: number | null; link: string }>(
     `MATCH (d:Decision {decision_id: $id})-[l:LED_TO]->(o:Outcome)
      RETURN o.outcome_type AS type, o.value_usd AS value, l.attribution_method AS link`, { id: f.decision });

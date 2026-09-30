@@ -27,3 +27,6 @@ rationode-demo-spec.md
 
 # Architecture notes (kept local)
 ARCHITECTURE.md
+
+# Third-party datasets (downloaded, not committed)
+data/external/

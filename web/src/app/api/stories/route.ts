@@ -1,9 +1,10 @@
-import { IS_DEMO } from "@/lib/neo4j";
+import { demoMode } from "@/lib/neo4j";
 import { complaintText, SETS, status } from "@/lib/stories";
+import { withTenant } from "@/lib/tenant";
 
 // Sets with their load status; loaded sets also carry what the live tab needs.
-export async function GET() {
-  if (!IS_DEMO) return Response.json([]);   // the Events-tab sets are the Streamly demo's
+async function GET_() {
+  if (!demoMode()) return Response.json([]);   // the Events-tab sets are the Streamly demo's
   const st = await status();
   return Response.json(SETS.map((s) => {
     const x = st.find((y) => y.set === s.set)!;
@@ -15,3 +16,6 @@ export async function GET() {
     };
   }));
 }
+
+// Every request runs in its workspace (demo spec §23.9).
+export const GET = withTenant(GET_);

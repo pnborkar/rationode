@@ -1,5 +1,6 @@
+import { withTenant } from "@/lib/tenant";
 // Which settings this deployment has (never their values), for checking a Vercel deploy.
-export function GET() {
+function GET_() {
   const set = (name: string) => Boolean(process.env[name]?.trim());
   return Response.json({
     ok: true,
@@ -8,3 +9,6 @@ export function GET() {
     ),
   });
 }
+
+// Every request runs in its workspace (demo spec §23.9).
+export const GET = withTenant(GET_);

@@ -7,7 +7,7 @@ import { detectAll } from "./genericDetector";
 import { approveIntroduced, deriveAttributes } from "./genericFeatures";
 import { isGeneric } from "./contract";
 import { parseFile, type FileMapping, type ParsedFile } from "./mapping";
-import { IS_DEMO, query, SCENARIO } from "./neo4j";
+import { demoMode, query, baseScenario } from "./neo4j";
 import { placeScenario, recomputePoints, touchedPoints } from "./storyTrees";
 import { removeScenario, writeRows } from "./storyWriter";
 import { validate, type Validation } from "./validator";
@@ -24,7 +24,7 @@ export async function loadRegistry(): Promise<Registry> {
 // In the demo, each load is its own removable batch (upload:<name>). For another tenant (cold start), loads
 // are that tenant's own history: they land in its base scenario, and its trees are built from them.
 export function scenarioFor(name: string): string {
-  if (!IS_DEMO) return SCENARIO;
+  if (!demoMode()) return baseScenario();
   const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "batch";
   return `upload:${slug}`;
 }
@@ -194,7 +194,7 @@ export async function run(parsed: ParsedFile[], mappings: FileMapping[], name: s
       && !(rows.links ?? []).some((l) => l.type === "PART_OF" && l.from === e.entity_id))
     .slice(0, 30).map((e) => ({ id: e.entity_id as string, label: e.label as string, key: String(e.source_key).split(":").slice(1).join(":") }));
   // A tenant's own history isn't placed into trees: its trees are built from it (pipeline, per tenant).
-  const branches = scenario === SCENARIO && !IS_DEMO ? [] : await placeScenario(scenario);
+  const branches = scenario === baseScenario() && !demoMode() ? [] : await placeScenario(scenario);
   const customers = rows.entities.filter((e) => e.label === "Customer" && e.source_system === "stripe")
     .map((e) => (e.props as { email: string; name: string | null }))
     .map((p) => ({ email: p.email, name: p.name }));
@@ -210,14 +210,14 @@ export async function listUploads() {
      WITH scenario, events, count(d) AS decisions
      OPTIONAL MATCH (c:Customer:Entity {scenario_id: scenario, source_system: 'stripe'})
      RETURN scenario, events, decisions, count(c) AS customers ORDER BY scenario`,
-    { demo: IS_DEMO, base: SCENARIO },
+    { demo: demoMode(), base: baseScenario() },
   );
 }
 
 export async function removeUpload(scenario: string) {
   // The demo removes its upload batches; a tenant only its own loaded history (never another app's data).
-  if (IS_DEMO ? !scenario.startsWith("upload:") : scenario !== SCENARIO) throw new Error("not an upload scenario of this app");
-  if (!IS_DEMO) return removeTenantData();   // a tenant's loaded history: with its trees, analytics and batches
+  if (demoMode() ? !scenario.startsWith("upload:") : scenario !== baseScenario()) throw new Error("not an upload scenario of this app");
+  if (!demoMode()) return removeTenantData();   // a tenant's loaded history: with its trees, analytics and batches
   const touched = await touchedPoints(scenario);
   const removed = await removeScenario(scenario);
   await removeBatches(scenario);
@@ -231,9 +231,9 @@ export async function removeUpload(scenario: string) {
 const TENANT_LABELS = ["DecisionPoint", "DecisionTree", "Event", "Decision", "Context", "Entity", "Outcome", "Actor", "UploadBatch"];
 
 export async function removeTenantData() {
-  if (IS_DEMO) throw new Error("refusing: this is the demo, not a tenant");
+  if (demoMode()) throw new Error("refusing: this is the demo, not a tenant");
   const removed: Record<string, number> = {};
-  for (const scenario of [SCENARIO, `${SCENARIO}:live`]) {
+  for (const scenario of [baseScenario(), `${baseScenario()}:live`]) {
     for (const label of TENANT_LABELS) {
       for (let n = -1; n !== 0;) {   // in chunks until none are left
         const [r] = await query<{ n: number }>(
@@ -244,7 +244,7 @@ export async function removeTenantData() {
     }
   }
   await query(`MATCH (m:Mapping) WHERE NOT EXISTS { (:UploadBatch)-[:USED_MAPPING]->(m) } DELETE m`);
-  return { tenant: SCENARIO, removed };
+  return { tenant: baseScenario(), removed };
 }
 
 // Uploaded customers with a case (a support ticket or a card dispute), for the live tab's dropdown.
@@ -270,7 +270,7 @@ export async function uploadedCases() {
      WHERE subject IS NOT NULL OR dispute IS NOT NULL
      RETURN c.scenario_id AS scenario, c.email AS email, c.name AS name, subject, dispute, amount
      ORDER BY scenario, email`,
-    { demo: IS_DEMO, base: SCENARIO },
+    { demo: demoMode(), base: baseScenario() },
   );
   // Ordered by email, so each customer's position (their live ticket number) is stable.
   return rows.map((r) => {

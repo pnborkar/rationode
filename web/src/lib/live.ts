@@ -4,13 +4,13 @@ import { rowsDict, Detector } from "./detector";
 import type { ContractEvent } from "./contract";
 import { DEMO_NOW } from "./customer";
 import { toContract, type RawEvent } from "./nativeAdapter";
-import { IS_DEMO, query, SCENARIO } from "./neo4j";
+import { demoMode, query, baseScenario } from "./neo4j";
 import { recomputePoints } from "./storyTrees";
 import { writeRows } from "./storyWriter";
 import { loadRegistry } from "./uploads";
 
 // Live data per tenant: the demo's is "live", another tenant's "<tenant>:live".
-export const LIVE = IS_DEMO ? "live" : `${SCENARIO}:live`;
+export const liveScenario = () => (demoMode() ? "live" : `${baseScenario()}:live`);
 
 // Live events sit on the demo's day (DEMO_NOW's date) at the current time of day, in the story's timeline.
 export function demoClock(): string {
@@ -35,7 +35,7 @@ async function resolveEntities(rows: Record<string, Record<string, unknown>[]>) 
      WHERE e.scenario_id <> $live AND ($demo OR e.scenario_id = $base)   // a tenant resolves only to its own nodes
      WITH k, e ORDER BY CASE e.scenario_id WHEN $base THEN 0 ELSE 1 END
      RETURN k.id AS id, collect(e.entity_id)[0] AS existing`,
-    { keys, live: LIVE, demo: IS_DEMO, base: SCENARIO },
+    { keys, live: liveScenario(), demo: demoMode(), base: baseScenario() },
   );
   const map = new Map(found.map((f) => [f.id, f.existing]));
   const to = (id: unknown) => map.get(id as string) ?? id;
@@ -61,18 +61,18 @@ async function ingestNow(raws: RawEvent[], opts: { prune?: boolean }) {
   // Write the incoming events first, so any other recording that reads after this sees them.
   if (raws.length) {
     const registry = await loadRegistry();
-    const own = rowsDict(new Detector(registry, LIVE).run(raws.map(toContract).filter((e): e is ContractEvent => !!e)));
+    const own = rowsDict(new Detector(registry, liveScenario()).run(raws.map(toContract).filter((e): e is ContractEvent => !!e)));
     await writeRows({ events: own.events });
   }
   const stored = await query<{ id: string; source: string; type: string; at: string; payload: string }>(
     `MATCH (e:Event {scenario_id: $live})
      RETURN e.event_id AS id, e.source_system AS source, e.event_type AS type, toString(e.occurred_at) AS at,
             e.payload_json AS payload`,
-    { live: LIVE },
+    { live: liveScenario() },
   );
   const incoming = new Set(raws.map((r) => r.event_id));
   const all: RawEvent[] = [
-    ...stored.map((s) => ({ event_id: s.id.slice(LIVE.length + 1), source_system: s.source, event_type: s.type,
+    ...stored.map((s) => ({ event_id: s.id.slice(liveScenario().length + 1), source_system: s.source, event_type: s.type,
                             occurred_at: s.at.replace(/\.\d+Z$/, "Z"), payload: JSON.parse(s.payload) }))
       .filter((r) => !incoming.has(r.event_id)),
     ...raws,
@@ -96,7 +96,7 @@ async function ingestNow(raws: RawEvent[], opts: { prune?: boolean }) {
       if (t) e.entity_refs.ticket_id = t;
     });
   }
-  const rows = rowsDict(new Detector(await loadRegistry(), LIVE).run(events));
+  const rows = rowsDict(new Detector(await loadRegistry(), liveScenario()).run(events));
   await resolveEntities(rows);
   // On an explicit re-run, live decisions it no longer produces (e.g. after a correction) are removed.
   if (opts.prune) {
@@ -104,7 +104,7 @@ async function ingestNow(raws: RawEvent[], opts: { prune?: boolean }) {
       `MATCH (d:Decision {scenario_id: $live}) WHERE NOT d.decision_id IN $ids
        OPTIONAL MATCH (d)-[:HAD_CONTEXT]->(c:Context)
        DETACH DELETE d, c`,
-      { live: LIVE, ids: rows.decisions.map((d) => d.decision_id) },
+      { live: liveScenario(), ids: rows.decisions.map((d) => d.decision_id) },
     );
   }
   await writeRows(rows);
@@ -120,7 +120,7 @@ async function ingestNow(raws: RawEvent[], opts: { prune?: boolean }) {
 export async function removeLiveTicket(ticketId: string) {
   const touched = (await query<{ id: string }>(
     `MATCH (d:Decision {scenario_id: $live})-[:EVIDENCED_BY]->(:Event {scenario_id: $live, ticket_id: $ticket})
-     MATCH (d)-[:AT_POINT]->(p:DecisionPoint) RETURN DISTINCT p.point_id AS id`, { live: LIVE, ticket: ticketId })).map((r) => r.id);
+     MATCH (d)-[:AT_POINT]->(p:DecisionPoint) RETURN DISTINCT p.point_id AS id`, { live: liveScenario(), ticket: ticketId })).map((r) => r.id);
   await query(
     `MATCH (e:Event {scenario_id: $live, ticket_id: $ticket})
      OPTIONAL MATCH (d:Decision {scenario_id: $live})-[:EVIDENCED_BY]->(e)
@@ -128,10 +128,10 @@ export async function removeLiveTicket(ticketId: string) {
      OPTIONAL MATCH (d)-[:LED_TO]->(o:Outcome {scenario_id: $live})
      OPTIONAL MATCH (o)-[:EVIDENCED_BY]->(oe:Event {scenario_id: $live})
      DETACH DELETE e, d, c, o, oe`,
-    { live: LIVE, ticket: ticketId },
+    { live: liveScenario(), ticket: ticketId },
   );
   if (touched.length) await recomputePoints(touched);
-  await query(`MATCH (t:Entity {scenario_id: $live, source_key: $key}) DETACH DELETE t`, { live: LIVE, key: `ticket:${ticketId}` });
+  await query(`MATCH (t:Entity {scenario_id: $live, source_key: $key}) DETACH DELETE t`, { live: liveScenario(), key: `ticket:${ticketId}` });
 }
 
 // What the gateway and webhooks captured, event by event, with what each became (for the Events tab).
@@ -150,7 +150,7 @@ export async function liveEvents() {
      RETURN raw AS event_id, e.source_system AS source_system, e.event_type AS event_type,
             toString(e.occurred_at) AS occurred_at, e.payload_json AS payload, e.ticket_id AS ticket, e.email AS email, became
      ORDER BY occurred_at DESC`,
-    { live: LIVE },
+    { live: liveScenario() },
   );
   // The customer of the latest ticket, for the journey graph.
   const latest = rows.find((r) => r.email)?.email ?? null;
@@ -169,7 +169,7 @@ export async function liveEvents() {
 async function liveTicketsOf(email: string): Promise<string[]> {
   return (await query<{ t: string }>(
     `MATCH (e:Event {scenario_id: $live, email: $email}) WHERE e.ticket_id IS NOT NULL RETURN DISTINCT e.ticket_id AS t`,
-    { live: LIVE, email },
+    { live: liveScenario(), email },
   )).map((r) => r.t);
 }
 
@@ -179,7 +179,7 @@ export async function liveCustomerSummary(rawEmail: string) {
   const [r] = await query<{ decisions: number }>(
     `MATCH (d:Decision {scenario_id: $live})-[:EVIDENCED_BY]->(e:Event {scenario_id: $live}) WHERE e.ticket_id IN $tickets
      RETURN count(DISTINCT d) AS decisions`,
-    { live: LIVE, tickets },
+    { live: liveScenario(), tickets },
   );
   return { tickets, decisions: r?.decisions ?? 0 };
 }
@@ -192,9 +192,9 @@ export async function removeLiveCustomer(rawEmail: string) {
   for (const t of before.tickets) await removeLiveTicket(t);
   // Anything left for them outside a ticket (e.g. a lookup that never led to a proposal), and their live
   // Zendesk identity node if one was created.
-  await query(`MATCH (e:Event {scenario_id: $live, email: $email}) DETACH DELETE e`, { live: LIVE, email });
+  await query(`MATCH (e:Event {scenario_id: $live, email: $email}) DETACH DELETE e`, { live: liveScenario(), email });
   await query(`MATCH (u:Entity {scenario_id: $live, source_system: 'zendesk', source_key: $key}) DETACH DELETE u`,
-              { live: LIVE, key: `user:${email}` });
+              { live: liveScenario(), key: `user:${email}` });
   return { cleared_tickets: before.tickets, cleared_decisions: before.decisions };
 }
 
@@ -209,7 +209,7 @@ export async function liveSummary() {
      WITH decisions, proposals, finals, with_outcomes, count(o) AS overrides
      OPTIONAL MATCH (e:Event {scenario_id: $live})
      RETURN decisions, proposals, finals, overrides, with_outcomes, count(DISTINCT e.ticket_id) AS tickets`,
-    { live: LIVE },
+    { live: liveScenario() },
   );
   return r;
 }

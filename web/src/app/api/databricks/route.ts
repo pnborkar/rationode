@@ -1,11 +1,12 @@
 import { z } from "zod";
 import { databricksConfig, listTables } from "@/lib/databricks";
 import { tablePreview } from "@/lib/sources";
+import { withTenant } from "@/lib/tenant";
 
 export const maxDuration = 120;
 
 // GET: whether Databricks is configured (?check=1: just that), and the schema's tables with row counts.
-export async function GET(request: Request) {
+async function GET_(request: Request) {
   const cfg = await databricksConfig();
   if (!cfg) return Response.json({ configured: false });
   if (new URL(request.url).searchParams.has("check")) return Response.json({ configured: true, schema: cfg.schema });
@@ -20,7 +21,7 @@ const Body = z.object({ tables: z.array(z.string().regex(/^[A-Za-z0-9_]+$/)).min
 
 // POST {tables}: for Connect a source, each table's current version, row count and a preview; the rows stay
 // on the server (propose, validate and approve read them by reference, §21.2).
-export async function POST(request: Request) {
+async function POST_(request: Request) {
   const body = Body.safeParse(await request.json());
   if (!body.success) return Response.json({ error: body.error.message }, { status: 400 });
   try {
@@ -29,3 +30,7 @@ export async function POST(request: Request) {
     return Response.json({ error: (err as Error).message }, { status: 502 });
   }
 }
+
+// Every request runs in its workspace (demo spec §23.9).
+export const GET = withTenant(GET_);
+export const POST = withTenant(POST_);

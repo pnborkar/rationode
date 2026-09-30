@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { ACCESS_COOKIE } from "@/proxy";
+import { withTenant } from "@/lib/tenant";
 
-export async function POST(request: Request) {
+async function POST_(request: Request) {
   const form = await request.formData();
   const code = String(form.get("code") ?? "").trim();
   const expected = process.env.DEMO_ACCESS_CODE?.trim();
@@ -14,3 +15,6 @@ export async function POST(request: Request) {
   }
   return response;
 }
+
+// Every request runs in its workspace (demo spec §23.9).
+export const POST = withTenant(POST_);

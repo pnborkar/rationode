@@ -5,8 +5,8 @@ import set3 from "../data/stories/set-3.json";
 import set4 from "../data/stories/set-4.json";
 import set5 from "../data/stories/set-5.json";
 import set6 from "../data/stories/set-6.json";
-import { IS_DEMO, query } from "./neo4j";
-import { LIVE } from "./live";
+import { demoMode, query } from "./neo4j";
+import { liveScenario } from "./live";
 import { placeScenario, recomputePoints, touchedPoints, type BranchChange } from "./storyTrees";
 import { removeScenario, writeRows, type Rows } from "./storyWriter";
 import { removeBatches } from "./uploads";
@@ -34,7 +34,7 @@ export function complaintText(s: StorySet): string {
 }
 
 export async function status() {
-  if (!IS_DEMO) return SETS.map((s) => ({ set: s.set, key: s.key, loaded: false, outcomesLoaded: false }));
+  if (!demoMode()) return SETS.map((s) => ({ set: s.set, key: s.key, loaded: false, outcomesLoaded: false }));
   const loaded = await query<{ scenario: string; events: string[] }>(
     `MATCH (e:Event) WHERE e.scenario_id STARTS WITH 'story:'
      RETURN e.scenario_id AS scenario, collect(e.event_id) AS events`,
@@ -66,11 +66,11 @@ export async function removeSet(n: number) {
 // Remove every loaded set, uploaded batch, and the live tab's decisions; the history is never touched.
 export async function resetAll() {
   // Another tenant: Reset all clears only its live decisions, never its history.
-  if (!IS_DEMO) {
-    const touched = await touchedPoints(LIVE);
-    const removed = await removeScenario(LIVE);
+  if (!demoMode()) {
+    const touched = await touchedPoints(liveScenario());
+    const removed = await removeScenario(liveScenario());
     await recomputePoints(touched);
-    return { removed, scenarios: [LIVE], branchesRestored: touched.length };
+    return { removed, scenarios: [liveScenario()], branchesRestored: touched.length };
   }
   const scenarios = (await query<{ s: string }>(
     `MATCH (d:Event) WHERE d.scenario_id STARTS WITH 'story:' OR d.scenario_id STARTS WITH 'upload:' OR d.scenario_id = 'live'

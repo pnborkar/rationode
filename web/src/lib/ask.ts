@@ -8,7 +8,7 @@ import { subjectGraph } from "./caseGraph";
 import { attributes, prefixOf, type Context } from "./features";
 import { findPrecedent } from "./findPrecedent";
 import neo4j from "neo4j-driver";
-import { query, SCENARIO } from "./neo4j";
+import { query, baseScenario } from "./neo4j";
 import { checkBeforeAct } from "./precedent";
 import { ownScenario } from "./scenarios";
 import { aiSettings, anthropicClient } from "./settings";
@@ -27,15 +27,15 @@ const round = (v: number) => Math.round(v * 1000) / 1000;
 async function describeDecisions() {
   const types = await query<{ type: string; n: number; stages: string[] }>(
     `MATCH (d:Decision {scenario_id: $s}) RETURN d.decision_type AS type, count(*) AS n, collect(DISTINCT d.stage) AS stages ORDER BY n DESC`,
-    { s: SCENARIO });
+    { s: baseScenario() });
   const attrs = await attributes();
   return Promise.all(types.map(async (t) => {
     const options = await query<{ option: string; n: number }>(
       `MATCH (d:Decision {scenario_id: $s, decision_type: $t})-[:CONSIDERED {status: 'CHOSEN'}]->(o:Option)
-       RETURN o.option_key AS option, count(*) AS n ORDER BY n DESC`, { s: SCENARIO, t: t.type });
+       RETURN o.option_key AS option, count(*) AS n ORDER BY n DESC`, { s: baseScenario(), t: t.type });
     const outcomes = await query<{ outcome: string; n: number; polarity: string | null }>(
       `MATCH (d:Decision {scenario_id: $s, decision_type: $t})-[:LED_TO]->(o:Outcome)
-       RETURN o.outcome_type AS outcome, count(DISTINCT o) AS n, head(collect(o.polarity)) AS polarity ORDER BY n DESC`, { s: SCENARIO, t: t.type });
+       RETURN o.outcome_type AS outcome, count(DISTINCT o) AS n, head(collect(o.polarity)) AS polarity ORDER BY n DESC`, { s: baseScenario(), t: t.type });
     const prefix = prefixOf(t.type);
     return { decision_type: t.type, decisions: t.n, stages: t.stages, options, outcomes,
              facts: attrs.filter((a) => a.key.startsWith(prefix))
@@ -56,7 +56,7 @@ export async function outcomeRates(input: z.infer<typeof RatesInput>) {
      WITH d, c, head(collect(o.option_key)) AS option
      OPTIONAL MATCH (d)-[:LED_TO]->(out:Outcome)
      RETURN option, properties(c) AS ctx, collect(out.outcome_type) AS outcomes, collect(out.polarity) AS polarities
-     LIMIT 50000`, { s: SCENARIO, t: input.decision_type });
+     LIMIT 50000`, { s: baseScenario(), t: input.decision_type });
   // Fact names as the model writes them: "loan.requested_amount", "requested_amount" or "requested amount" all work.
   const prefix = prefixOf(input.decision_type);
   const keyOf = (fact: string) => {
@@ -130,14 +130,14 @@ async function recentSubjects(limit: number) {
      WITH s, max(d.decided_at) AS last, count(DISTINCT d) AS decisions ORDER BY last DESC LIMIT $limit
      RETURN coalesce(s.name, split(s.source_key, ':')[1], s.source_key) + coalesce(' <' + s.email + '>', '') AS subject,
             coalesce(s.subject_type, 'customer') AS type, toString(last) AS last, decisions`,
-    { s: SCENARIO, limit: neo4j.int(Math.min(Math.max(Math.trunc(limit), 1), 25)) });
+    { s: baseScenario(), limit: neo4j.int(Math.min(Math.max(Math.trunc(limit), 1), 25)) });
 }
 
 // The learned trees for a decision type: each leaf's path, size, most likely label and outcome rates.
 async function decisionTrees(decisionType: string) {
   const trees = await query<{ id: string; title: string; kind: string; n: number }>(
     `MATCH (t:DecisionTree {scenario_id: $s, decision_type: $t}) RETURN t.tree_id AS id, t.title AS title, t.kind AS kind, t.n_decisions AS n`,
-    { s: SCENARIO, t: decisionType });
+    { s: baseScenario(), t: decisionType });
   return Promise.all(trees.map(async (t) => {
     const points = await query<{ id: string; depth: number; leaf: boolean; cond: string | null; props: Record<string, unknown> }>(
       `MATCH (p:DecisionPoint {tree_id: $id}) OPTIONAL MATCH (:DecisionPoint)-[b:BRANCH]->(p)
@@ -206,7 +206,7 @@ const summaryOf = (name: string, r: unknown): string => {
 
 // ------------------------------------------------------------------ the loop
 const system = () => `You answer questions about the decisions recorded in an organisation's decision graph (Rationode; this
-workspace: "${SCENARIO === "history" ? "demo" : SCENARIO}"). A decision is a choice among options by a person, an AI agent or a system;
+workspace: "${baseScenario() === "history" ? "demo" : baseScenario()}"). A decision is a choice among options by a person, an AI agent or a system;
 each has the facts known at the time and the outcomes that followed.
 
 How to answer:

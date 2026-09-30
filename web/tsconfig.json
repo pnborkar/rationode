@@ -38,7 +38,11 @@
     ".next-dbx/types/**/*.ts",
     ".next-dbx/dev/types/**/*.ts",
     ".next-build/types/**/*.ts",
-    ".next-build/dev/types/**/*.ts"
+    ".next-build/dev/types/**/*.ts",
+    ".next-lending/types/**/*.ts",
+    ".next-lending/dev/types/**/*.ts",
+    ".next-ws/types/**/*.ts",
+    ".next-ws/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"

@@ -8,6 +8,7 @@ import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprot
 import { after } from "next/server";
 import { demoClock, ingestLive, newId } from "@/lib/live";
 import { appAuth, jsonResult, withMcp } from "@/lib/mcpClient";
+import { withTenant } from "@/lib/tenant";
 
 export const maxDuration = 60;
 
@@ -45,4 +46,5 @@ async function handle(request: Request): Promise<Response> {
   return transport.handleRequest(request);
 }
 
-export { handle as GET, handle as POST, handle as DELETE };
+const handleInTenant = withTenant(handle);
+export { handleInTenant as GET, handleInTenant as POST, handleInTenant as DELETE };

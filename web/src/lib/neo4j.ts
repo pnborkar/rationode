@@ -1,3 +1,4 @@
+import { currentTenant } from "./tenant";
 import neo4j, { type Driver, isInt, isDateTime, isDate } from "neo4j-driver";
 
 // One driver per server process (reused across requests and hot reloads).
@@ -36,8 +37,9 @@ export async function query<T = Record<string, unknown>>(
 
 // The tenant this app serves (demo spec §21): its base scenario. "history" is the Streamly demo; another
 // tenant (e.g. "dbx", loaded from Databricks) sees only its own data, trees and precedent.
-export const SCENARIO = process.env.RATIONODE_TENANT?.trim() || "history";
-export const IS_DEMO = SCENARIO === "history";   // the demo's sets and prepared live customers are Streamly-only
+// Per request (§23.9): the workspace the request runs in (lib/tenant.ts), not a startup constant.
+export const baseScenario = () => currentTenant();
+export const demoMode = () => baseScenario() === "history";   // the demo's sets and prepared live customers are Streamly-only
 // A tenant's IDs carry its prefix (as the pipeline writes them), e.g. its trees: "dbx|tree:…".
-export const tenantId = (id: string) => (IS_DEMO ? id : `${SCENARIO}|${id}`);
-export const FRAUD_POLICY_TREE = tenantId("tree:charge.fraud_screen:policy:policy");
+export const tenantId = (id: string) => (demoMode() ? id : `${baseScenario()}|${id}`);
+export const fraudPolicyTree = () => tenantId("tree:charge.fraud_screen:policy:policy");

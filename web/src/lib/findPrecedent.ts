@@ -1,6 +1,6 @@
 import neo4j from "neo4j-driver";
-import { LIVE } from "./live";
-import { IS_DEMO, query, SCENARIO } from "./neo4j";
+import { liveScenario } from "./live";
+import { demoMode, query, baseScenario } from "./neo4j";
 
 // find_precedent(query): free-text search over decision contexts (Neo4j full-text index),
 // returning final decisions with what was chosen and what followed.
@@ -22,6 +22,6 @@ export async function findPrecedent(text: string, decisionType?: string, limit =
      RETURN d.decision_id AS decision_id, d.decision_type AS decision_type, round(score, 3) AS score,
             c.summary_text AS summary, a.kind AS actor_kind, options, collect(DISTINCT out.outcome_type) AS outcomes
      ORDER BY score DESC`,
-    { terms, scenario: SCENARIO, stories: IS_DEMO, live: LIVE, type: decisionType ?? null, limit: neo4j.int(Math.min(Math.max(Math.trunc(limit), 1), 50)) },
+    { terms, scenario: baseScenario(), stories: demoMode(), live: liveScenario(), type: decisionType ?? null, limit: neo4j.int(Math.min(Math.max(Math.trunc(limit), 1), 50)) },
   );
 }

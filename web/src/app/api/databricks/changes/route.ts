@@ -1,10 +1,11 @@
 import { z } from "zod";
 import { incremental, lastDatabricksLoad, pendingRanges } from "@/lib/sources";
+import { withTenant } from "@/lib/tenant";
 
 export const maxDuration = 300;
 
 // GET: the last load from Databricks and which tables changed since (nothing is read but versions).
-export async function GET() {
+async function GET_() {
   try {
     const batch = await lastDatabricksLoad();
     if (!batch) return Response.json({ batch: null });
@@ -22,7 +23,7 @@ const Body = z.object({
 });
 
 // POST: check (validator + dry run over the merged rows, nothing written) or apply the changes since the last load.
-export async function POST(request: Request) {
+async function POST_(request: Request) {
   const body = Body.safeParse(await request.json().catch(() => ({})));
   if (!body.success) return Response.json({ error: body.error.message }, { status: 400 });
   try {
@@ -32,3 +33,7 @@ export async function POST(request: Request) {
     return Response.json({ error: (err as Error).message }, { status: 502 });
   }
 }
+
+// Every request runs in its workspace (demo spec §23.9).
+export const GET = withTenant(GET_);
+export const POST = withTenant(POST_);

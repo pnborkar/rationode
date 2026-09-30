@@ -1,6 +1,6 @@
 import { isType } from "./eventFields";
-import { LIVE } from "./live";
-import { FRAUD_POLICY_TREE, query, SCENARIO } from "./neo4j";
+import { liveScenario } from "./live";
+import { fraudPolicyTree, query, baseScenario } from "./neo4j";
 
 export type GraphNode = { id: string; kind: string; label: string; detail?: string; option?: string | null; outcomes?: string[];
                           tone?: "good" | "bad" | "mixed" | null };   // any domain (§23.8): colour from outcome polarity
@@ -63,7 +63,7 @@ export async function customerGraph(email: string) {
   for (const d of r.decisions.sort((a, b) => a.at.localeCompare(b.at))) {
     // Live decisions (captured by the gateway and the Zendesk webhook) keep the live tab's look: the AI's
     // proposal and the rep's final decision.
-    const liveNode = d.id.startsWith(`${LIVE}|`) && d.type === "support.complaint_resolution";
+    const liveNode = d.id.startsWith(`${liveScenario()}|`) && d.type === "support.complaint_resolution";
     const opt = (d.option ?? "").replaceAll("_", " ");
     nodes.push(liveNode
       ? { id: d.id, kind: d.stage === "PROPOSAL" ? "proposal" : "final", option: d.option,
@@ -193,7 +193,7 @@ async function addPolicyGap(email: string, nodes: GraphNode[], rels: GraphRel[])
             c.\`charge.card_age_days\` AS card_age, c.\`charge.country_match\` AS country, coalesce(e.data_json, e.payload_json) AS payload,
             t.policy_text AS policy, p.path_label AS branch, p.policy_option AS policy_option, p.point_id AS point
      LIMIT 1`,
-    { email, policyTree: FRAUD_POLICY_TREE },
+    { email, policyTree: fraudPolicyTree() },
   );
   if (!g) return;
   const rule = (JSON.parse(g.payload) as { rule_id?: string }).rule_id ?? "rule";
@@ -202,7 +202,7 @@ async function addPolicyGap(email: string, nodes: GraphNode[], rels: GraphRel[])
      MATCH (h)-[:CONSIDERED {status: 'CHOSEN'}]->(:Option {option_key: $chosen})
      WITH h, EXISTS { (h)-[:LED_TO]->(:Outcome {outcome_type: 'dispute_filed'}) } AS disputed
      RETURN count(h) AS n, sum(CASE WHEN disputed THEN 1 ELSE 0 END) AS disputed`,
-    { point: g.point, chosen: g.chosen, base: SCENARIO },
+    { point: g.point, chosen: g.chosen, base: baseScenario() },
   );
   const sample = await query<{ id: string; outcomes: string[]; risk: number }>(
     `MATCH (h:Decision {scenario_id: $base})-[:AT_POINT]->(:DecisionPoint {point_id: $point})
@@ -212,7 +212,7 @@ async function addPolicyGap(email: string, nodes: GraphNode[], rels: GraphRel[])
      OPTIONAL MATCH (h)-[:LED_TO]->(o:Outcome)
      RETURN h.decision_id AS id, collect(DISTINCT o.outcome_type) AS outcomes, c.\`charge.risk_score\` AS risk
      ORDER BY abs(c.\`charge.risk_score\` - $risk), id LIMIT 10`,
-    { point: g.point, chosen: g.chosen, risk: g.risk, base: SCENARIO },
+    { point: g.point, chosen: g.chosen, risk: g.risk, base: baseScenario() },
   );
 
   const id = (k: string) => `${g.decision}~${k}`;

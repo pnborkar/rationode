@@ -8,6 +8,7 @@ import { findPrecedent } from "@/lib/findPrecedent";
 import { checkFraudPatterns } from "@/lib/fraud";
 import { checkBeforeAct } from "@/lib/precedent";
 import { why } from "@/lib/why";
+import { withTenant } from "@/lib/tenant";
 
 // Decision types are data (any domain, §23.8): Streamly's are e.g. support.complaint_resolution, dispute.response,
 // dispute.evidence; a loaded domain adds its own (e.g. loan.offer). Unknown types simply find no precedent.
@@ -77,4 +78,5 @@ async function handle(request: Request): Promise<Response> {
   return transport.handleRequest(request);
 }
 
-export { handle as GET, handle as POST, handle as DELETE };
+const handleInTenant = withTenant(handle);
+export { handleInTenant as GET, handleInTenant as POST, handleInTenant as DELETE };

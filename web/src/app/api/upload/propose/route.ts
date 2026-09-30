@@ -3,6 +3,7 @@ import { profile } from "@/lib/mapping";
 import { proposeMapping } from "@/lib/mappingAgent";
 import { readParsed } from "@/lib/sources";
 import { loadRegistry, parseAll } from "@/lib/uploads";
+import { withTenant } from "@/lib/tenant";
 
 export const maxDuration = 120;
 
@@ -13,7 +14,7 @@ const Body = z.object({
 }).refine((b) => !!b.file !== !!b.table, "send a file or a table");
 
 // The mapping agent's proposal for one file (the Events tab calls this once per file, in parallel).
-export async function POST(request: Request) {
+async function POST_(request: Request) {
   const body = Body.safeParse(await request.json());
   if (!body.success) return Response.json({ error: body.error.message }, { status: 400 });
   try {
@@ -25,3 +26,6 @@ export async function POST(request: Request) {
     return Response.json({ error: (err as Error).message }, { status: 422 });
   }
 }
+
+// Every request runs in its workspace (demo spec §23.9).
+export const POST = withTenant(POST_);

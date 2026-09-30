@@ -3,7 +3,7 @@
 // never passes through the browser (and loads fit serverless request limits). Incremental loads read only
 // the rows that changed since the last load (Change Data Feed) and merge them into the rows already stored.
 import { readChanges, readTable, tableVersion, type Change } from "./databricks";
-import { IS_DEMO, query, SCENARIO } from "./neo4j";
+import { demoMode, query, baseScenario } from "./neo4j";
 import { mapFile, parseFile, profile, type FileMapping, type ParsedFile, type Record_ } from "./mapping";
 import { check, parseAll, run, storedEvents, type TableSource, type UploadedFile } from "./uploads";
 
@@ -36,7 +36,7 @@ export async function lastDatabricksLoad(): Promise<Batch | null> {
      WHERE b.sources_json IS NOT NULL AND (($demo AND b.scenario_id STARTS WITH 'upload:') OR (NOT $demo AND b.scenario_id = $base))
        AND NOT EXISTS { (:UploadBatch)-[:SUPERSEDES]->(b) }
      RETURN b.scenario_id AS scenario, b.name AS name, b.sources_json AS sources, m.mapping_json AS mapping,
-            toString(b.loaded_at) AS at ORDER BY b.loaded_at DESC LIMIT 1`, { demo: IS_DEMO, base: SCENARIO });
+            toString(b.loaded_at) AS at ORDER BY b.loaded_at DESC LIMIT 1`, { demo: demoMode(), base: baseScenario() });
   return r ? { scenario: r.scenario, name: r.name, sources: JSON.parse(r.sources), mappings: JSON.parse(r.mapping), loadedAt: r.at } : null;
 }
 

@@ -8,7 +8,7 @@ import { z } from "zod";
 import { outcomeRates, RatesInput } from "./ask";
 import type { Case } from "./cases";
 import type { Context } from "./features";
-import { SCENARIO } from "./neo4j";
+import { baseScenario } from "./neo4j";
 import { checkBeforeAct } from "./precedent";
 import { aiSettings, anthropicClient } from "./settings";
 
@@ -40,7 +40,7 @@ export async function* decide(c: Case): AsyncGenerator<DecideEvent> {
         rationale: { type: "string", description: "two or three sentences: the evidence from similar cases behind the proposal" } },
         required: ["option", "rationale"] } },
   ];
-  const system = `You are the AI decision assistant for an organisation (Rationode; workspace "${SCENARIO}"). A case needs a
+  const system = `You are the AI decision assistant for an organisation (Rationode; workspace "${baseScenario()}"). A case needs a
 "${c.decision_type}" decision${c.subject ? ` about ${c.subject.label} ${c.subject.key}` : ""}. A person reviews your proposal and approves or overrides it.
 
 Options chosen for this decision type in the past: ${c.options.map((o) => `${o.option} (${o.n})`).join(", ") || "unknown"}.

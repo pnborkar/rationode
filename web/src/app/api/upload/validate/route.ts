@@ -2,6 +2,7 @@ import { z } from "zod";
 import { FileMappingSchema } from "@/lib/mapping";
 import { resolve } from "@/lib/sources";
 import { check } from "@/lib/uploads";
+import { withTenant } from "@/lib/tenant";
 
 export const maxDuration = 120;
 
@@ -14,7 +15,7 @@ const Body = z.object({
 }).refine((b) => b.files.length + b.tables.length > 0, "no files or tables");
 
 // Validator + dry run: nothing is written.
-export async function POST(request: Request) {
+async function POST_(request: Request) {
   const body = Body.safeParse(await request.json());
   if (!body.success) return Response.json({ error: body.error.message }, { status: 400 });
   try {
@@ -23,3 +24,6 @@ export async function POST(request: Request) {
     return Response.json({ error: (err as Error).message }, { status: 422 });
   }
 }
+
+// Every request runs in its workspace (demo spec §23.9).
+export const POST = withTenant(POST_);

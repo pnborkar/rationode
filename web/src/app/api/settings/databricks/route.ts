@@ -1,10 +1,11 @@
 import { z } from "zod";
 import { clearDatabricks, databricksStatus, saveDatabricks } from "@/lib/settings";
+import { withTenant } from "@/lib/tenant";
 
 const Body = z.object({ host: z.string(), warehouse: z.string(), schema: z.string(), token: z.string().optional() });
 
 // PUT: save this tenant's Databricks connection (a blank token keeps the saved one for the same host).
-export async function PUT(request: Request) {
+async function PUT_(request: Request) {
   const body = Body.safeParse(await request.json());
   if (!body.success) return Response.json({ error: body.error.message }, { status: 400 });
   try {
@@ -16,7 +17,11 @@ export async function PUT(request: Request) {
 }
 
 // DELETE: forget the saved connection (the environment's DATABRICKS_*, if any, applies again).
-export async function DELETE() {
+async function DELETE_() {
   await clearDatabricks();
   return Response.json(await databricksStatus());
 }
+
+// Every request runs in its workspace (demo spec §23.9).
+export const PUT = withTenant(PUT_);
+export const DELETE = withTenant(DELETE_);

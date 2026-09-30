@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { decide } from "@/lib/decide";
+import { withTenant } from "@/lib/tenant";
 
 export const maxDuration = 120;
 
@@ -12,7 +13,7 @@ const Case = z.object({
 });
 
 // POST {case}: the generic decision agent's steps and proposal, streamed as server-sent events.
-export async function POST(request: Request) {
+async function POST_(request: Request) {
   const parsed = Case.safeParse(await request.json().catch(() => ({})));
   if (!parsed.success) return Response.json({ error: parsed.error.message }, { status: 400 });
   const encoder = new TextEncoder();
@@ -27,3 +28,6 @@ export async function POST(request: Request) {
   });
   return new Response(stream, { headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache, no-transform", Connection: "keep-alive" } });
 }
+
+// Every request runs in its workspace (demo spec §23.9).
+export const POST = withTenant(POST_);
