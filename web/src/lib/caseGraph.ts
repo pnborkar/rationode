@@ -299,7 +299,7 @@ export async function subjectGraph(entityId: string) {
   const seen = new Set<string>();
   for (const d of r.decisions) {
     nodes.push({ id: d.id, kind: "decision", label: d.type.split(".").slice(1).join(".").replaceAll("_", " ") || d.type,
-                 option: d.option, tone: tone(d.outcomes.map((o) => o.polarity)),
+                 option: d.option, tone: tone(d.outcomes.map((o) => o.polarity)), outcomes: d.outcomes.map((o) => o.type),
                  detail: `${d.stage.toLowerCase()} by ${d.actor ?? "?"} (${(d.kind ?? "").toLowerCase().replace("_", " ")}) · ${d.at.slice(0, 10)}` +
                          (d.amount != null ? ` · ${d.amount}` : "") + (d.rationale ? ` · reason: ${d.rationale}` : "") });
     rels.push({ id: `${d.id}->about`, from: d.id, to: d.about, type: "ABOUT" });

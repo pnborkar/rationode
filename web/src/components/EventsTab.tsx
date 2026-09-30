@@ -4,7 +4,6 @@
 // and see the story emerge, its journey in the graph, and the tree branches it updates.
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
-import BrowseSubjects from "./BrowseSubjects";
 import ConnectSource from "./ConnectSource";
 import DeleteScenario from "./DeleteScenario";
 import type { ViewNode, ViewRel } from "./GraphView";
@@ -53,8 +52,7 @@ export default function EventsTab({ active, onChanged }: { active: boolean; onCh
   const [graph, setGraph] = useState<{ nodes: ViewNode[]; rels: ViewRel[] }>({ nodes: [], rels: [] });
   const [mode, setMode] = useState<"graph" | "table">("graph");
   const [connect, setConnect] = useState(false);
-  const [browse, setBrowse] = useState(false);   // Browse loaded subjects (any domain, §23.8)
-  const panel = connect || browse;               // a panel replaces the events and journey columns
+  const panel = connect;   // the Connect a source panel replaces the events and journey columns
   const [setsOpen, setSetsOpen] = useState(true);
   const [graphExpanded, setGraphExpanded] = useState(false);
   useEffect(() => {   // Esc closes the expanded journey graph
@@ -157,7 +155,7 @@ export default function EventsTab({ active, onChanged }: { active: boolean; onCh
           <div className={`rounded-lg border p-3 ${connect ? "border-emerald-700 bg-emerald-950/30" : "border-zinc-800 bg-zinc-950"}`}>
             <p className="font-semibold">Connect a source</p>
             <p className="mt-1 text-xs text-zinc-500">Upload exports; Claude maps them onto the event contract and you see the mapping.</p>
-            <button onClick={() => { setConnect(!connect); setBrowse(false); setSetsOpen(connect); }} disabled={streaming}
+            <button onClick={() => { setConnect(!connect); setSetsOpen(connect); }} disabled={streaming}
                     className="mt-2 rounded-md bg-emerald-600 px-3 py-1 text-xs font-semibold text-white disabled:opacity-40">
               {connect ? "Back to events" : "Open"}</button>
             {uploads.map((u) => (
@@ -169,13 +167,6 @@ export default function EventsTab({ active, onChanged }: { active: boolean; onCh
                   {busy === `remove-${u.scenario}` ? "…" : "Remove"}</button>
               </div>
             ))}
-          </div>
-          <div className={`rounded-lg border p-3 ${browse ? "border-sky-700 bg-sky-950/30" : "border-zinc-800 bg-zinc-950"}`}>
-            <p className="font-semibold">Browse loaded subjects</p>
-            <p className="mt-1 text-xs text-zinc-500">Any domain&apos;s loaded records (e.g. loan applications): pick one to see its decisions and what they led to.</p>
-            <button onClick={() => { setBrowse(!browse); setConnect(false); }} disabled={streaming}
-                    className="mt-2 rounded-md bg-sky-600 px-3 py-1 text-xs font-semibold text-white disabled:opacity-40">
-              {browse ? "Back to events" : "Open"}</button>
           </div>
           <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-3">
             <div className="flex items-baseline justify-between">
@@ -241,11 +232,7 @@ export default function EventsTab({ active, onChanged }: { active: boolean; onCh
       <div className={connect ? "col-span-2 flex min-h-0" : "hidden"}>
         <ConnectSource active={active && connect} onClose={() => setConnect(false)} onChanged={() => { refresh(); onChanged(); }} />
       </div>
-      {browse && (
-        <div className="col-span-2 flex min-h-0">
-          <BrowseSubjects active={active && browse} onClose={() => setBrowse(false)} />
-        </div>
-      )}
+
 
       {/* Incoming events */}
       <section className={`${panel ? "hidden" : "flex"} min-h-0 flex-col rounded-xl border border-zinc-800 bg-zinc-900/60`}>

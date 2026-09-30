@@ -8,6 +8,10 @@ import { resetAll } from "./stories";
 import { removeScenario } from "./storyWriter";
 import { removeTenantData, removeUpload } from "./uploads";
 
+// The scenarios this app may look at (Browse, graphs): never another tenant's.
+export const ownScenario = (s: string) =>
+  IS_DEMO ? s === "history" || s === LIVE || s.startsWith("story:") || s.startsWith("upload:") : s === SCENARIO || s === LIVE;
+
 export type ScenarioInfo = { scenario: string; kind: string; events: number; decisions: number };
 
 // The demo's "everything loaded" entry (what the old one-click Reset all did): all sets, uploads and live
