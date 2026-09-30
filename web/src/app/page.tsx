@@ -594,7 +594,7 @@ export default function StreamlyLive() {
             <p className="text-xs text-white/70">Every decision from AI, humans, and systems, in one Neo4j graph</p>
           </div>
           <nav className="flex rounded-full bg-white/10 p-1 text-sm">
-            {([["live", "Streamly live"], ["events", "Events"], ["settings", "Settings"]] as const).map(([k, label]) => (
+            {([["live", "Streamly live"], ["events", "Events"]] as const).map(([k, label]) => (
               <button key={k} onClick={() => setTab(k)}
                       className={`rounded-full px-4 py-1 font-semibold ${tab === k ? "bg-white text-[#4c1d95]" : "text-white/80"}`}>
                 {label}
@@ -603,15 +603,17 @@ export default function StreamlyLive() {
           </nav>
         </div>
         <div className="flex items-center gap-3">
-          {tab === "live" && <>
+          {tab === "live" && (
           <button onClick={() => setGraphOn((g) => !g)} disabled={running}
                   className={`rounded-full px-4 py-1.5 text-sm font-semibold transition ${
                     graphOn ? "bg-white text-[#0369a1]" : "bg-white/15 text-white"}`}>
             Decision graph: {graphOn ? "ON" : "OFF"}
           </button>
-          <button onClick={reset} disabled={running}
-                  className="rounded-full bg-white/15 px-3 py-1.5 text-sm text-white hover:bg-white/25">Reset</button>
-          </>}
+          )}
+          {/* Settings is admin, not part of the demo's flow: a button beside the theme toggle, on every tab. */}
+          <button onClick={() => setTab(tab === "settings" ? "live" : "settings")} title={tab === "settings" ? "Close settings" : "Settings"}
+                  className={`rounded-full px-3 py-1.5 text-sm ${tab === "settings" ? "bg-white font-semibold text-[#4c1d95]" : "bg-white/15 text-white hover:bg-white/25"}`}>
+            {tab === "settings" ? "✕ Settings" : "⚙ Settings"}</button>
           <ThemeToggle />
         </div>
       </header>
