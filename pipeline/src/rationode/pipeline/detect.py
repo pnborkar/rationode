@@ -99,13 +99,15 @@ class Detector:
     def decision(self, source_event: Ev, decision_type: str, stage: str, *, actor: str, role: str,
                  chosen: list[tuple[str, float | None]], context: dict, summary: str, about: list[str],
                  evidence: list[Ev], suffix: str = "", at: str | None = None, confidence: float = 1.0,
-                 rejected: list[str] = (), proposed_status: bool = False, all_options: list[str] | None = None) -> str:
+                 rejected: list[str] = (), proposed_status: bool = False, all_options: list[str] | None = None,
+                 rationale: str | None = None) -> str:
         at = at or source_event.at
         did = self.pid(f"dec:{source_event.event_id}{suffix}")
         r = self.rows
         r.decisions.append({"decision_id": did, "decision_type": decision_type, "stage": stage, "decided_at": at,
                             "detection_method": "RULE", "detection_confidence": confidence,
-                            "source_system": source_event.source, "scenario_id": self.scenario})
+                            "source_system": source_event.source, "scenario_id": self.scenario,
+                            **({"rationale": rationale} if rationale else {})})   # why, when the decider said
         r.contexts.append({"context_id": self.pid(f"ctx:{source_event.event_id}{suffix}"), "decision_id": did,
                            "attrs": context, "summary_text": summary, "scenario_id": self.scenario})
         chosen_keys = {o for o, _ in chosen}
@@ -285,14 +287,19 @@ class Detector:
                 else:
                     actor = proposal["actor"]
                 overridden = option != proposal["option"]
-                amount_final = proposal["amount"] if not overridden else None
+                # The rep's own amount and reason when given (an override); otherwise the proposal's amount if approved.
+                rep_amount = e.data.get("amount_usd") if human else None
+                reason = e.data.get("reason") if human else None
+                amount_final = rep_amount if rep_amount is not None else (proposal["amount"] if not overridden else None)
                 complaint_final = self.decision(
                     e, "support.complaint_resolution", "FINAL", actor=actor, role="DECIDER",
                     chosen=[(option, amount_final)], rejected=[proposal["option"]] if overridden else [],
-                    context=dict(proposal["ctx"]), confidence=1.0 if human else AI_FINAL_CONFIDENCE,
+                    context=dict(proposal["ctx"]), confidence=1.0 if human else AI_FINAL_CONFIDENCE, rationale=reason,
                     summary=self.complaint_summary(
                         proposal["ctx"], (f"{e.data['group']} rep chose {option}" if human else f"AI executed {option}")
-                        + (f", overriding AI proposal {proposal['option']}" if overridden else "")),
+                        + (f" (${rep_amount:g})" if rep_amount is not None else "")
+                        + (f", overriding AI proposal {proposal['option']}" if overridden else "")
+                        + (f". Reason: {reason}" if reason else "")),
                     about=[proposal["ticket_entity"], charge, customer], evidence=[e])
                 finals[e.ticket_id] = complaint_final
                 self.rows.preceded_by.append({"from": complaint_final, "to": proposal["id"]})

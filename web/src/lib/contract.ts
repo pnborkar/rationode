@@ -50,7 +50,7 @@ export const DATA_FIELDS: Record<CanonicalType, { required: string[]; optional?:
   "dispute.created": { required: ["amount"], optional: ["category", "status"] },
   "dispute.closed": { required: ["amount", "status"], optional: ["category"] },
   "ticket.created": { required: ["category", "channel"], optional: ["subject", "name"] },
-  "rep.decision": { required: ["option"], optional: ["macro"] },
+  "rep.decision": { required: ["option"], optional: ["macro", "amount_usd", "reason"] },
   "ticket.closed": { required: [], optional: ["status"] },
   "agent.customer_lookup": { required: ["tenure_months", "plan", "charge_amount_usd", "prior_refunds_90d"] },
   "agent.proposal": { required: ["option"], optional: ["amount_usd", "category"] },

@@ -35,7 +35,7 @@ const Q = {
     SET d.decision_type = r.decision_type, d.stage = r.stage, d.decided_at = datetime(r.decided_at),
         d.recorded_at = coalesce(d.recorded_at, datetime()), d.detection_method = r.detection_method,
         d.detection_confidence = r.detection_confidence, d.source_system = r.source_system,
-        d.scenario_id = r.scenario_id
+        d.scenario_id = r.scenario_id, d.rationale = r.rationale
     WITH d, r MATCH (t:DecisionType {key: r.decision_type}) MERGE (d)-[:INSTANCE_OF]->(t)`,
   contexts: `UNWIND $rows AS r
     MERGE (c:Context {context_id: r.context_id})

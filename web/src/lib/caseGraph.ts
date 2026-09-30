@@ -25,6 +25,7 @@ export async function customerGraph(email: string) {
   const rows = await query<{
     customer: string; name: string;
     decisions: { id: string; type: string; stage: string; at: string; actor: string; option: string | null;
+                 amount: number | null; rationale: string | null;
                  about: string[]; outcomes: { id: string; type: string; value: number | null; charge: string | null }[] }[];
     entities: { id: string; kind: string; key: string; amount: number | null }[];
   }>(
@@ -34,11 +35,11 @@ export async function customerGraph(email: string) {
      OPTIONAL MATCH (d)-[k:CONSIDERED]->(o:Option) WHERE k.status IN ['CHOSEN', 'PROPOSED']
      OPTIONAL MATCH (d)-[:ABOUT]->(e:Entity) WHERE e <> c
      OPTIONAL MATCH (d)-[:LED_TO]->(out:Outcome)
-     WITH c, d, a, head(collect(DISTINCT o.option_key)) AS option,
+     WITH c, d, a, head(collect(DISTINCT o.option_key)) AS option, head(collect(k.amount_usd)) AS amount,
           collect(DISTINCT e) AS ents, collect(DISTINCT out) AS outs
      WITH c, collect(CASE WHEN d IS NULL THEN null ELSE {
             id: d.decision_id, type: d.decision_type, stage: d.stage, at: toString(d.decided_at), actor: a.name,
-            option: option, about: [x IN ents | x.entity_id],
+            option: option, amount: amount, rationale: d.rationale, about: [x IN ents | x.entity_id],
             outcomes: [x IN outs | {id: x.outcome_id, type: x.outcome_type, value: x.value_usd,
                                     charge: [(x)-[:EVIDENCED_BY]->(ev:Event) | ev.charge_id][0]}]} END) AS decisions,
           apoc.coll.toSet(apoc.coll.flatten(collect([x IN ents | {id: x.entity_id, kind: head([l IN labels(x) WHERE l <> 'Entity']),
@@ -66,10 +67,11 @@ export async function customerGraph(email: string) {
     nodes.push(liveNode
       ? { id: d.id, kind: d.stage === "PROPOSAL" ? "proposal" : "final", option: d.option,
           label: d.stage === "PROPOSAL" ? `AI: ${opt}` : opt.replace(/^./, (c) => c.toUpperCase()),
-          detail: d.stage === "PROPOSAL" ? `AI proposal by ${d.actor} (live, via the MCP gateway) · ${d.at.slice(0, 10)}`
-            : `final by ${d.actor} (live, via the Zendesk webhook) · ${d.at.slice(0, 10)}` }
+          detail: (d.stage === "PROPOSAL" ? `AI proposal by ${d.actor} (live, via the MCP gateway) · ${d.at.slice(0, 10)}`
+            : `final by ${d.actor} (live, via the Zendesk webhook) · ${d.at.slice(0, 10)}`)
+            + (d.amount ? ` · $${d.amount}` : "") + (d.rationale ? ` · reason: ${d.rationale}` : "") }
       : { id: d.id, kind: "decision", label: d.type.split(".")[1].replace("_", " "), option: d.option,
-          detail: `${d.stage.toLowerCase()} by ${d.actor} · ${d.at.slice(0, 10)}` });
+          detail: `${d.stage.toLowerCase()} by ${d.actor} · ${d.at.slice(0, 10)}` + (d.rationale ? ` · reason: ${d.rationale}` : "") });
     rels.push({ id: `${d.id}->${r.customer}`, from: d.id, to: r.customer, type: "ABOUT" });
     for (const e of d.about) rels.push({ id: `${d.id}->${e}`, from: d.id, to: e, type: "ABOUT" });
     for (const o of d.outcomes) {

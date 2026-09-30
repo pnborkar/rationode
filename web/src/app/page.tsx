@@ -58,6 +58,8 @@ type FraudPatterns = { facts: string[]; cluster: { accounts: number; unauthorize
 
 const REP = { name: "Maya Chen", team: "Team A" };
 const OPTIONS = ["full_refund", "partial_refund", "voucher", "deny", "pause_subscription"];
+const MONEY_OPTIONS = new Set(["full_refund", "partial_refund", "voucher"]);   // an override of these carries an amount
+const cents = (n: number) => Math.round(n * 100) / 100;
 
 const pct = (v: number | null | undefined) => (v == null ? "—" : `${Math.round(v * 100)}%`);
 const words = (s: string) => s.replaceAll("_", " ");
@@ -265,7 +267,10 @@ export default function StreamlyLive() {
   const [thinking, setThinking] = useState("");
   const [steps, setSteps] = useState<Step[]>([]);
   const [proposal, setProposal] = useState<Proposal | null>(null);
-  const [final, setFinal] = useState<{ option: string; overridden: boolean } | null>(null);
+  const [final, setFinal] = useState<{ option: string; overridden: boolean; amount?: number | null; reason?: string } | null>(null);
+  // Override: the amount the rep gives (null = the suggested default for the option) and why.
+  const [overrideAmount, setOverrideAmount] = useState<string | null>(null);
+  const [overrideReason, setOverrideReason] = useState("");
   const [recorded, setRecorded] = useState<Recorded | null>(null);
   const [liveOfCustomer, setLiveOfCustomer] = useState<{ tickets: string[]; decisions: number }>({ tickets: [], decisions: 0 });
   const proposalVia = useRef<{ via?: string; ms?: number }>({});
@@ -381,6 +386,7 @@ export default function StreamlyLive() {
 
   function reset() {
     setChat([]); setThinking(""); setSteps([]); setProposal(null); setFinal(null); setRecorded(null);
+    setOverrideAmount(null); setOverrideReason("");
     setLive({ nodes: [], rels: [] });
   }
 
@@ -456,15 +462,27 @@ export default function StreamlyLive() {
     setTimeout(refreshLiveOfCustomer, 1500);   // the gateway records after replying
   }
 
-  async function decide(option: string) {
+  // An override's defaults: the charge for a full refund, half for a partial, the AI's voucher or 20% for a voucher.
+  const charge = Number(steps.find((x) => x.kind === "customer")?.data?.charge_amount_usd ?? 0) || null;
+  const overrideChoices = proposal ? OPTIONS.filter((o) => o !== proposal.option) : OPTIONS;
+  const overrideOption = overrideChoices.includes(overrideTo) ? overrideTo : overrideChoices[0];
+  const defaultAmount = (o: string) => !charge || !MONEY_OPTIONS.has(o) ? ""
+    : String(o === "full_refund" ? charge : o === "partial_refund" ? cents(charge / 2)
+      : proposal?.option === "voucher" && proposal.amount_usd ? proposal.amount_usd : cents(charge * 0.2));
+  const amountText = overrideAmount ?? defaultAmount(overrideOption);
+
+  async function decide(option: string, override?: { amount: number | null; reason: string }) {
     if (!proposal) return;
     const overridden = option !== proposal.option;
-    setFinal({ option, overridden });
-    // The rep's macro goes to Zendesk; its webhook brings the human decision into the graph.
+    setFinal({ option, overridden, amount: override ? override.amount : proposal.amount_usd, reason: override?.reason || undefined });
+    // The rep's macro goes to Zendesk; its webhook brings the human decision into the graph. An override also
+    // carries the amount (a ticket custom field) and the reason (a private note), as a Zendesk macro would.
     const res = await fetch("/api/webhooks/zendesk", {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ type: "macro.applied", ticket_id: TICKET, macro: { id: 0, title: MACRO_FOR[option] },
-                             actor: { id: "zd_live_rep", name: REP.name, group: REP.team, role: "agent" } }),
+                             actor: { id: "zd_live_rep", name: REP.name, group: REP.team, role: "agent" },
+                             ...(override?.amount != null ? { custom_fields: [{ id: "refund_amount_usd", value: override.amount }] } : {}),
+                             ...(override?.reason ? { comment: { body: override.reason, public: false } } : {}) }),
     }).catch(() => null);
     if (res?.ok) {
       const rec = await res.json() as Recorded;
@@ -675,11 +693,13 @@ export default function StreamlyLive() {
               </div>
               {final ? (
                 <div className={`space-y-1 rounded-lg p-3 ${final.overridden ? "bg-red-950 text-red-100" : "bg-emerald-950 text-emerald-100"}`}>
-                  <p className="text-lg font-semibold">Decision: {words(final.option).replace(/^./, (c) => c.toUpperCase())}</p>
+                  <p className="text-lg font-semibold">Decision: {words(final.option).replace(/^./, (c) => c.toUpperCase())}
+                    {final.amount ? ` · $${final.amount}` : ""}</p>
                   <p>
                     Approved AI proposal: <b>{final.overridden ? "No" : "Yes"}</b>
                     {final.overridden && <> · the AI proposed {words(proposal.option)}</>} · by {REP.name}
                   </p>
+                  {final.reason && <p>Reason: <i>{final.reason}</i></p>}
                   <p className="text-xs opacity-60">
                     {recorded
                       ? `Recorded in Neo4j (scenario ${DEMO ? "live" : `${process.env.NEXT_PUBLIC_RATIONODE_TENANT}:live`}): the AI proposal via the Rationode gateway, and this decision via ` +
@@ -688,16 +708,30 @@ export default function StreamlyLive() {
                   </p>
                 </div>
               ) : (
-                <div className="flex flex-wrap items-center gap-2">
-                  <button onClick={() => decide(proposal.option)}
-                          className="rounded-lg bg-emerald-600 px-4 py-2 font-semibold text-white">Approve</button>
-                  <span className="text-zinc-500">or</span>
-                  <select value={overrideTo} onChange={(e) => setOverrideTo(e.target.value)}
-                          className="rounded-lg border border-zinc-700 bg-zinc-950 px-2 py-2">
-                    {OPTIONS.filter((o) => o !== proposal.option).map((o) => <option key={o} value={o}>{words(o)}</option>)}
-                  </select>
-                  <button onClick={() => decide(overrideTo)} className="rounded-lg bg-zinc-700 px-4 py-2 font-semibold">
-                    Override</button>
+                <div className="space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button onClick={() => decide(proposal.option)}
+                            className="rounded-lg bg-emerald-600 px-4 py-2 font-semibold text-white">Approve</button>
+                    <span className="text-zinc-500">or</span>
+                    <select value={overrideOption} onChange={(e) => { setOverrideTo(e.target.value); setOverrideAmount(null); }}
+                            className="rounded-lg border border-zinc-700 bg-zinc-950 px-2 py-2">
+                      {overrideChoices.map((o) => <option key={o} value={o}>{words(o)}</option>)}
+                    </select>
+                    {MONEY_OPTIONS.has(overrideOption) && (
+                      <label className="flex items-center gap-1 text-zinc-400">$
+                        <input value={amountText} onChange={(e) => setOverrideAmount(e.target.value)} inputMode="decimal"
+                               className="w-20 rounded-lg border border-zinc-700 bg-zinc-950 px-2 py-2 text-zinc-100" /></label>
+                    )}
+                    <button onClick={() => {
+                              const n = Number(amountText);
+                              decide(overrideOption, { amount: MONEY_OPTIONS.has(overrideOption) && amountText.trim() && Number.isFinite(n) ? cents(n) : null,
+                                                       reason: overrideReason.trim() });
+                            }}
+                            className="rounded-lg bg-zinc-700 px-4 py-2 font-semibold">Override</button>
+                  </div>
+                  <input value={overrideReason} onChange={(e) => setOverrideReason(e.target.value)}
+                         placeholder="Reason for overriding (optional, recorded with the decision)"
+                         className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-sm" />
                 </div>
               )}
             </div>

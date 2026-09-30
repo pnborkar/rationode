@@ -71,6 +71,14 @@ def parse(raw: dict) -> Ev:
             e.ticket_id = str(p["ticket_id"])
             e.data = {"option": MACRO_OPTION.get(p["macro"]["title"]), "macro": p["macro"]["title"],
                       "actor_id": p["actor"]["id"], "actor_name": p["actor"]["name"], "group": p["actor"]["group"]}
+            # An override can carry the amount the rep gave (ticket custom field) and why (a private note).
+            amount = next((f.get("value") for f in p.get("custom_fields") or [] if f.get("id") == "refund_amount_usd"), None)
+            try:
+                e.data["amount_usd"] = float(amount) if amount not in (None, "") else None
+            except (TypeError, ValueError):
+                e.data["amount_usd"] = None
+            comment = p.get("comment") or {}
+            e.data["reason"] = str(comment.get("body", "")).strip() or None if comment.get("public") is False else None
         elif typ == "ticket.updated":
             e.ticket_id = str(p["ticket_id"])
             e.data = {"status": p["changes"].get("status", {}).get("to"), "actor_id": p["actor"]["id"]}

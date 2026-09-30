@@ -122,13 +122,14 @@ export class Detector {
   private decision(src: ContractEvent, decisionType: string, stage: string, o: {
     actor: string; role: string; chosen: [string, number | null][]; context: Data; summary: string; about: string[];
     evidence: ContractEvent[]; suffix?: string; confidence?: number; rejected?: string[]; proposedStatus?: boolean;
-    allOptions?: string[];
+    allOptions?: string[]; rationale?: string | null;
   }): string {
     const at = src.occurred_at, suffix = o.suffix ?? "", rejected = o.rejected ?? [];
     const did = this.pid(`dec:${src.event_id}${suffix}`);
     const r = this.rows;
     r.decisions.push({ decision_id: did, decision_type: decisionType, stage, decided_at: at, detection_method: "RULE",
-                       detection_confidence: o.confidence ?? 1.0, source_system: src.source, scenario_id: this.scenario });
+                       detection_confidence: o.confidence ?? 1.0, source_system: src.source, scenario_id: this.scenario,
+                       ...(o.rationale ? { rationale: o.rationale } : {}) });   // why, when the decider said (a rep's override note)
     r.contexts.push({ context_id: this.pid(`ctx:${src.event_id}${suffix}`), decision_id: did, attrs: o.context,
                       summary_text: o.summary, scenario_id: this.scenario });
     const chosenKeys = new Set(o.chosen.map(([k]) => k));
@@ -327,13 +328,18 @@ export class Detector {
           const option: string = human ? d.option : proposal.option;
           const actor = human ? this.actor(e.actor!) : proposal.actor;
           const overridden = option !== proposal.option;
+          // The rep's own amount and reason when given (an override); otherwise the proposal's amount if approved.
+          const repAmount = human && d.amount_usd != null ? Number(d.amount_usd) : null;
+          const reason = human && d.reason ? String(d.reason) : null;
           complaintFinal = this.decision(e, "support.complaint_resolution", "FINAL", {
-            actor, role: "DECIDER", chosen: [[option, overridden ? null : proposal.amount]],
+            actor, role: "DECIDER", chosen: [[option, repAmount ?? (overridden ? null : proposal.amount)]],
             rejected: overridden ? [proposal.option] : [], context: { ...proposal.ctx },
-            confidence: human ? 1.0 : AI_FINAL_CONFIDENCE,
+            confidence: human ? 1.0 : AI_FINAL_CONFIDENCE, rationale: reason,
             summary: complaintSummary(proposal.ctx,
               (human ? `${e.actor!.team} rep chose ${option}` : `AI executed ${option}`)
-              + (overridden ? `, overriding AI proposal ${proposal.option}` : "")),
+              + (repAmount != null ? ` ($${repAmount})` : "")
+              + (overridden ? `, overriding AI proposal ${proposal.option}` : "")
+              + (reason ? `. Reason: ${reason}` : "")),
             about: [proposal.ticketEntity, charge, customer], evidence: [e],
           });
           finals.set(x.ticket_id!, complaintFinal);

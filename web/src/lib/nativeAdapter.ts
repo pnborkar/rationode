@@ -82,6 +82,10 @@ export function toContract(r: RawEvent): ContractEvent | null {
       type = "rep.decision";
       refs = { ticket_id: String(p.ticket_id) };
       data = { option: MACRO_OPTION[p.macro.title] ?? null, macro: p.macro.title };
+      // An override can carry the amount the rep gave (ticket custom field) and why (a private note).
+      const amount = (p.custom_fields ?? []).find((f: Json) => f.id === "refund_amount_usd")?.value;
+      if (amount != null && amount !== "" && Number.isFinite(Number(amount))) data.amount_usd = Number(amount);
+      if (p.comment?.public === false && String(p.comment.body ?? "").trim()) data.reason = String(p.comment.body).trim();
       actor = { kind: "HUMAN", id: `zendesk:${p.actor.id}`, name: p.actor.name, team: p.actor.group };
     } else if (typ === "ticket.updated" && ["solved", "closed"].includes(p.changes?.status?.to)) {
       type = "ticket.closed";
