@@ -7,7 +7,7 @@ import type { ViewNode, ViewRel } from "./GraphView";
 
 const GraphView = dynamic(() => import("./GraphView"), { ssr: false });
 
-type Subject = { id: string; label: string; key: string; type: string; email?: string | null; parts: number; decisions: number; outcomes: number };
+type Subject = { id: string; label: string; key: string; type: string; email?: string | null; last?: string; parts: number; decisions: number; outcomes: number };
 
 export default function BrowseSubjects({ active }: { active: boolean }) {
   const [scenarios, setScenarios] = useState<{ scenario: string; n: number }[]>([]);
@@ -49,9 +49,9 @@ export default function BrowseSubjects({ active }: { active: boolean }) {
         <select value={scenario} onChange={(e) => { setScenario(e.target.value); setType(""); setQ(""); setPicked(null); setGraph(null); }}
                 className="rounded border border-zinc-700 bg-zinc-950 px-2 py-0.5 text-xs" title="The scenarios this app can see">
           {!scenarios.length && <option value="">nothing loaded</option>}
-          {scenarios.map((x) => <option key={x.scenario} value={x.scenario}>{x.scenario} · {x.n.toLocaleString()} subjects</option>)}
+          {scenarios.map((x) => <option key={x.scenario} value={x.scenario}>{x.scenario} · {x.n.toLocaleString()} decisions</option>)}
         </select>
-        <span className="text-xs text-zinc-500">{types.map((t) => `${t.n.toLocaleString()} ${t.type}${t.n === 1 ? "" : "s"}`).join(" · ")}</span>
+        <span className="text-xs text-zinc-500">most recent decisions first</span>
       </header>
       <div className="grid min-h-0 flex-1 grid-cols-[300px_1fr]">
         <nav className="flex min-h-0 flex-col border-r border-zinc-800">
@@ -64,7 +64,7 @@ export default function BrowseSubjects({ active }: { active: boolean }) {
             )}
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by ID, name or email"
                    className="w-full rounded border border-zinc-700 bg-zinc-950 px-2 py-1 text-xs" />
-            <p className="text-[10px] text-zinc-500">{subjects.length === 200 ? "First 200 shown: search to narrow" : `${subjects.length} shown`}</p>
+            <p className="text-[10px] text-zinc-500">{subjects.length === 500 ? "The 500 with the latest decisions: search to find others" : `${subjects.length} shown`}</p>
           </div>
           <ul className="min-h-0 flex-1 overflow-y-auto py-1 text-xs">
             {subjects.map((s) => (
@@ -73,7 +73,7 @@ export default function BrowseSubjects({ active }: { active: boolean }) {
                         className={`w-full px-3 py-1.5 text-left hover:bg-zinc-800 ${picked === s.id ? "bg-sky-950 text-sky-100" : ""}`}>
                   <span className="block truncate font-mono">{s.key}</span>
                   {s.email && <span className="block truncate text-[10px] text-zinc-400">{s.email}</span>}
-                  <span className="text-[10px] text-zinc-500">{s.parts} part{s.parts === 1 ? "" : "s"} · {s.decisions} decision{s.decisions === 1 ? "" : "s"} · {s.outcomes} outcome{s.outcomes === 1 ? "" : "s"}</span>
+                  <span className="text-[10px] text-zinc-500">{s.last ? `${s.last.slice(0, 10)} · ` : ""}{s.parts ? `${s.parts} part${s.parts === 1 ? "" : "s"} · ` : ""}{s.decisions} decision{s.decisions === 1 ? "" : "s"} · {s.outcomes} outcome{s.outcomes === 1 ? "" : "s"}</span>
                 </button>
               </li>
             ))}
