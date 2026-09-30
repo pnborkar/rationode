@@ -178,7 +178,7 @@ export default function EventsTab({ active, onChanged }: { active: boolean; onCh
             <p className="mt-1 text-xs">{live && live.decisions
               ? <>{live.proposals} AI proposal(s), {live.finals} rep decision(s), {live.overrides} override(s) across {live.tickets} ticket(s).{" "}
                   Rep decisions with outcomes (60 days later): {live.with_outcomes ?? 0}; awaiting outcomes: {live.finals - (live.with_outcomes ?? 0)}.</>
-              : <span className="text-zinc-500">Nothing captured yet: run a case on the Streamly live tab.</span>}</p>
+              : <span className="text-zinc-500">Nothing captured yet: run a case on the Live tab.</span>}</p>
             {live && live.decisions > 0 && (
               <button onClick={showLive} disabled={!!busy || streaming}
                       className="mt-2 rounded-md bg-sky-600 px-3 py-1 text-xs font-semibold text-white disabled:opacity-40">
@@ -283,7 +283,7 @@ export default function EventsTab({ active, onChanged }: { active: boolean; onCh
               <p className="text-xs uppercase tracking-wider text-sky-400">{result.set ? `The story in Set ${result.set}` : "Live · MCP gateway"}</p>
               <p className="text-lg font-semibold">{result.set ? `${result.story.customer.name}: ${result.story.title}` : result.story.title}</p>
               <p className="text-sm text-zinc-400">{result.story.point}</p>
-              <p className="mt-1 text-xs text-zinc-500">{result.set ? "Now selectable on the Streamly live tab."
+              <p className="mt-1 text-xs text-zinc-500">{result.set ? "Now selectable on the Live tab."
                 : `Journey below: ${result.story.customer.email} (latest ticket).`}</p>
             </>
           ) : <p className="text-sm text-zinc-500">{streaming ? "Reading the events…" : "The story appears once a set is loaded."}</p>}
