@@ -591,11 +591,12 @@ export default function StreamlyLive() {
       <header className="flex items-center justify-between rounded-xl bg-gradient-to-r from-[#4c1d95] via-[#5b21b6] to-[#0369a1] px-4 py-2.5 text-white shadow-lg">
         <div className="flex items-center gap-6">
           <div>
-            <h1 className="text-lg font-semibold">Rationode <span className="font-normal text-white/70">· Streamly</span></h1>
+            {/* The product name only; the tenant shown beside it (the demo's data is Streamly's story). */}
+            <h1 className="text-lg font-semibold">Rationode <span className="font-normal text-white/70">· {DEMO ? "demo" : process.env.NEXT_PUBLIC_RATIONODE_TENANT}</span></h1>
             <p className="text-xs text-white/70">Every decision from AI, humans, and systems, in one Neo4j graph</p>
           </div>
           <nav className="flex rounded-full bg-white/10 p-1 text-sm">
-            {([["live", "Streamly live"], ["events", "Events"], ["browse", "Browse"]] as const).map(([k, label]) => (
+            {([["live", "Live"], ["events", "Events"], ["browse", "Browse"]] as const).map(([k, label]) => (
               <button key={k} onClick={() => setTab(k)}
                       className={`rounded-full px-4 py-1 font-semibold ${tab === k ? "bg-white text-[#4c1d95]" : "text-white/80"}`}>
                 {label}
@@ -627,7 +628,7 @@ export default function StreamlyLive() {
       {tab === "browse" && <div className="flex min-h-0 flex-1"><BrowseSubjects active /></div>}
 
       <div className={tab === "live" ? "grid min-h-0 flex-1 grid-cols-2 grid-rows-6 gap-3" : "hidden"}>
-        <Panel title="Streamly help chat" className="col-start-1 row-span-3 row-start-1" badge={
+        <Panel title="Customer help chat" className="col-start-1 row-span-3 row-start-1" badge={
           <select value={isUpload ? `q:${question}` : caseKey} disabled={running}
                   onChange={(e) => (e.target.value.startsWith("q:") ? pickQuestion(e.target.value.slice(2)) : pickCase(e.target.value))}
                   className="max-w-[26rem] rounded-md border border-zinc-700 bg-zinc-950 px-2 py-0.5 text-xs text-zinc-200">
@@ -685,7 +686,7 @@ export default function StreamlyLive() {
                 </div>
               ))}
               {running && !chat.some((m) => m.from === "agent") && (
-                <div className="w-fit rounded-2xl bg-zinc-800 px-4 py-2 text-sm text-zinc-400">Streamly assistant is typing…</div>
+                <div className="w-fit rounded-2xl bg-zinc-800 px-4 py-2 text-sm text-zinc-400">Assistant is typing…</div>
               )}
             </div>
             <div className="mt-3 flex gap-2">

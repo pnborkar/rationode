@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Rationode · Streamly live",
+  title: "Rationode",
   description: "Every decision from AI, humans, and systems, in one Neo4j graph",
 };
 
