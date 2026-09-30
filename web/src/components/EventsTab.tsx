@@ -60,26 +60,30 @@ export default function EventsTab({ active, onChanged }: { active: boolean; onCh
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
-  const [uploads, setUploads] = useState<{ scenario: string; events: number; decisions: number; customers: number }[]>([]);
+  // The demo's upload batches, or a workspace's sources (§23.9: `source` set).
+  const [uploads, setUploads] = useState<{ scenario: string; source?: string; events: number; decisions: number; customers: number }[]>([]);
+  const [analysis, setAnalysis] = useState<{ stale: boolean; noTrees: boolean } | null>(null);
   const [live, setLive] = useState<{ decisions: number; proposals: number; finals: number; overrides: number; tickets: number;
                                      with_outcomes?: number } | null>(null);
 
   const refresh = () => Promise.all([
     fetch("/api/stories").then((r) => r.json()).then(setSets),
     fetch("/api/upload").then((r) => r.json()).then(setUploads),
+    fetch("/api/upload?analysis=1").then((r) => r.json()).then(setAnalysis),
     fetch("/api/live").then((r) => r.json()).then(setLive),
   ]);
   useEffect(() => {
     let alive = true;
     fetch("/api/stories").then((r) => r.json()).then((s) => { if (alive) setSets(s); });
     fetch("/api/upload").then((r) => r.json()).then((u) => { if (alive) setUploads(u); });
+    fetch("/api/upload?analysis=1").then((r) => r.json()).then((a) => { if (alive) setAnalysis(a); });
     fetch("/api/live").then((r) => r.json()).then((l) => { if (alive) setLive(l); });
     return () => { alive = false; };
   }, []);
 
-  async function removeUpload(scenario: string) {
-    setBusy(`remove-${scenario}`);
-    await fetch(`/api/upload?scenario=${encodeURIComponent(scenario)}`, { method: "DELETE" });
+  async function removeUpload(scenario: string, source?: string) {
+    setBusy(`remove-${source ?? scenario}`);
+    await fetch(`/api/upload?scenario=${encodeURIComponent(scenario)}${source ? `&source=${encodeURIComponent(source)}` : ""}`, { method: "DELETE" });
     await refresh();
     onChanged();
     setBusy(null);
@@ -159,14 +163,18 @@ export default function EventsTab({ active, onChanged }: { active: boolean; onCh
                     className="mt-2 rounded-md bg-emerald-600 px-3 py-1 text-xs font-semibold text-white disabled:opacity-40">
               {connect ? "Back to events" : "Open"}</button>
             {uploads.map((u) => (
-              <div key={u.scenario} className="mt-2 flex items-center justify-between gap-2 text-xs">
+              <div key={u.source ?? u.scenario} className="mt-2 flex items-center justify-between gap-2 text-xs">
                 <span className="truncate font-mono text-zinc-300" title={`${u.events} events · ${u.decisions} decisions`}>
-                  {u.scenario} <span className="text-zinc-500">· {u.customers} customers</span></span>
-                <button onClick={() => removeUpload(u.scenario)} disabled={!!busy}
+                  {u.source ?? u.scenario} <span className="text-zinc-500">· {u.source
+                    ? `${u.events.toLocaleString()} records · ${u.decisions.toLocaleString()} decisions` : `${u.customers} customers`}</span></span>
+                <button onClick={() => removeUpload(u.scenario, u.source)} disabled={!!busy}
+                        title={u.source ? "Remove this source; the workspace's other sources stay" : undefined}
                         className="rounded-md bg-zinc-800 px-2 py-0.5 disabled:opacity-40">
-                  {busy === `remove-${u.scenario}` ? "…" : "Remove"}</button>
+                  {busy === `remove-${u.source ?? u.scenario}` ? "…" : "Remove"}</button>
               </div>
             ))}
+            {analysis?.stale && <p className="mt-2 text-xs text-amber-300">Sources changed since the decision trees and similar-case
+              links were built: they describe the earlier data until the pipeline rebuilds them.</p>}
           </div>
           <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-3">
             <div className="flex items-baseline justify-between">

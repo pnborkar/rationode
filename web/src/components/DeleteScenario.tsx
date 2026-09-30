@@ -35,7 +35,8 @@ export default function DeleteScenario({ onDeleted, refreshKey = 0 }: { onDelete
         </select>
         {info && <p className="text-zinc-400">{info.events.toLocaleString()} events · {info.decisions.toLocaleString()} decisions will be
           deleted{info.kind.startsWith("loaded history") ? ", with its decision trees, analytics and load batches (settings stay)"
-            : info.scenario === "everything" ? ": every loaded set, upload batch and live decision; the history and prepared customers stay" : ""}.
+            : info.scenario === "everything" ? ": every loaded set, upload batch and live decision; the history and prepared customers stay"
+            : info.scenario.startsWith("source:") ? ": this source's records and the decisions they make up; decisions are worked out again from the other sources" : ""}.
           Can&apos;t be undone; data from a source can be loaded again.</p>}
         <div className="flex gap-2">
           <input value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder={`type ${picked} to confirm`}

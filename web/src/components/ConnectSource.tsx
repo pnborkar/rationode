@@ -2,7 +2,7 @@
 
 // "Connect a source" (demo spec §16.2): upload exports, Claude proposes a mapping per file, you see
 // and adjust the mapping, the validator checks it and dry-runs the detector, then you approve and
-// it is written to Neo4j under upload:<name>.
+// it is written to Neo4j: in the demo under upload:<name>; in a workspace as a named source (§23.9).
 import dynamic from "next/dynamic";
 import { useEffect, useMemo, useState } from "react";
 import { DATA_FIELDS } from "@/lib/contract";
@@ -26,7 +26,8 @@ type Range = { table: string; from: number; to: number };
 type ChangeCount = Range & { inserted: number; updated: number; deleted: number };
 type Proposal = { status: "mapping" | "done" | "error"; mapping?: FileMapping; seconds?: number; error?: string; edited?: boolean };
 type Stats = { support: number; dispute_rate: number | null; churn_rate: number | null; win_rate: number | null };
-type RunResult = { ok: boolean; error?: string; scenario: string; counts: Record<string, number>;
+type RunResult = { ok: boolean; error?: string; scenario: string; source?: string; counts: Record<string, number>;
+                   analysis?: { stale: boolean; noTrees: boolean } | null;
                    customers: { email: string; name: string | null }[];
                    subjects?: { id: string; label: string; key: string }[];   // any domain (§23.8): top-level subjects loaded
                    branches: { point_id: string; tree: string; branch: string; before: Stats; after: Stats }[] };
@@ -54,7 +55,12 @@ function CheckLine({ c }: { c: Check }) {
 }
 
 export default function ConnectSource({ active, onClose, onChanged }: { active: boolean; onClose: () => void; onChanged: () => void }) {
-  const [name, setName] = useState("streamly-spring");
+  // The demo names a batch; a workspace names the source (the same name updates it, a new name adds one).
+  const [name, setName] = useState(DEMO ? "streamly-spring" : "");
+  const [known, setKnown] = useState<string[]>([]);   // the workspace's sources, offered in the name field
+  const refreshKnown = () => { if (!DEMO) fetch("/api/upload").then((r) => r.json())
+    .then((l: { source?: string }[]) => setKnown(l.map((x) => x.source).filter((x): x is string => !!x))).catch(() => {}); };
+  useEffect(refreshKnown, []);
   const [files, setFiles] = useState<Src[]>([]);
   const [proposals, setProposals] = useState<Record<string, Proposal>>({});
   const [view, setView] = useState<string>("");            // a file name, "validate", or "result"
@@ -65,7 +71,7 @@ export default function ConnectSource({ active, onClose, onChanged }: { active: 
   const [error, setError] = useState<string | null>(null);
   const [dbx, setDbx] = useState<{ configured: boolean; schema?: string } | null>(null);
   // The last Databricks load and the tables changed since (for "Load changes"); set while checking changes.
-  const [pending, setPending] = useState<{ batch: string | null; ranges?: Range[] } | null>(null);
+  const [pending, setPending] = useState<{ batch: string | null; ranges?: Range[] } | null>(null);   // the first load with changes
   const [incremental, setIncremental] = useState<{ ranges: Range[]; changes: ChangeCount[] } | null>(null);
   const refreshPending = () => fetch("/api/databricks/changes").then((r) => r.json()).then(setPending).catch(() => setPending(null));
   useEffect(() => {
@@ -122,7 +128,7 @@ export default function ConnectSource({ active, onClose, onChanged }: { active: 
                                                    body: JSON.stringify({ tables }) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? res.statusText);
-      setName(DEMO ? "databricks" : TENANT);
+      setName(DEMO ? "databricks" : name.trim() || "databricks");
       reset((data as { name: string; version: number; rows: number; preview: ParsedFile }[])
         .map((t) => ({ name: t.name, table: { version: t.version, rows: t.rows, preview: t.preview } })));
     } catch (e) {
@@ -173,7 +179,8 @@ export default function ConnectSource({ active, onClose, onChanged }: { active: 
   // them into the stored rows and validates; the report shows what approving would add, change or remove.
   async function checkChanges() {
     setBusy("changes"); setError(null);
-    const res = await fetch("/api/databricks/changes", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+    const res = await fetch("/api/databricks/changes", { method: "POST", headers: { "content-type": "application/json" },
+                                                         body: JSON.stringify({ batch: pending?.batch ?? undefined }) });
     const data = await res.json();
     setBusy(null);
     if (!res.ok || data.error) { setError(data.error ?? res.statusText); return; }
@@ -191,14 +198,14 @@ export default function ConnectSource({ active, onClose, onChanged }: { active: 
     const edited_files = files.filter((f) => proposals[f.name]?.edited).map((f) => f.name);
     const res = incremental
       ? await fetch("/api/databricks/changes", { method: "POST", headers: { "content-type": "application/json" },
-                                                 body: JSON.stringify({ apply: true, ranges: incremental.ranges }) })
+                                                 body: JSON.stringify({ apply: true, ranges: incremental.ranges, batch: name }) })
       : await fetch("/api/upload/run", { method: "POST", headers: { "content-type": "application/json" },
                                          body: JSON.stringify({ name, ...sources(), mappings, edited_files }) });
     const body = await res.json();
     const data = incremental ? (body.result ?? body) : body;
     if (res.ok && data.ok !== false) {
       if (incremental) { setIncremental(null); refreshPending(); }
-      setResult(data); setView("result"); onChanged();
+      setResult(data); setView("result"); onChanged(); refreshKnown();
       if (data.customers?.length) await showCustomer(data.customers[0].email);
       else if (data.subjects?.length) await showSubject(data.subjects[0].id);
     } else setError(data.error ?? res.statusText);
@@ -209,8 +216,9 @@ export default function ConnectSource({ active, onClose, onChanged }: { active: 
   async function removeBatch() {
     if (!result) return;
     setBusy("remove");
-    await fetch(`/api/upload?scenario=${encodeURIComponent(result.scenario)}`, { method: "DELETE" });
-    setResult(null); setGraph(null); setView("validate"); onChanged();
+    await fetch(`/api/upload?scenario=${encodeURIComponent(result.scenario)}${result.source ? `&source=${encodeURIComponent(result.source)}` : ""}`,
+                { method: "DELETE" });
+    setResult(null); setGraph(null); setView("validate"); onChanged(); refreshKnown();
     setBusy(null);
   }
 
@@ -257,26 +265,32 @@ export default function ConnectSource({ active, onClose, onChanged }: { active: 
                   className="rounded-md border border-orange-700 px-3 py-1 font-semibold text-orange-300 disabled:opacity-40"
                   title="Read only the rows changed in Databricks since the last load (Change Data Feed)">
             {busy === "changes" ? "Reading changes…"
-              : `Load changes from Databricks (${changedTables} table${changedTables > 1 ? "s" : ""} changed)`}</button>
+              : `Load changes from Databricks (${changedTables} table${changedTables > 1 ? "s" : ""} changed${!DEMO && pending?.batch ? ` in "${pending.batch}"` : ""})`}</button>
         )}
         <label className="cursor-pointer rounded-md border border-zinc-700 px-3 py-1">
           Upload files…
           <input type="file" multiple accept=".csv,.jsonl,.ndjson" className="hidden" onChange={(e) => pickFiles(e.target.files)} />
         </label>
-        <span className="text-zinc-500">batch</span>
-        <input value={name} onChange={(e) => { setName(e.target.value); setReport(null); }}
-               className="w-40 rounded border border-zinc-700 bg-zinc-950 px-2 py-0.5 font-mono" />
+        <span className="text-zinc-500">{DEMO ? "batch" : "source"}</span>
+        <input value={name} onChange={(e) => { setName(e.target.value); setReport(null); }} list={DEMO ? undefined : "known-sources"}
+               placeholder={DEMO ? undefined : "e.g. Loan applications"}
+               title={DEMO ? undefined : "The same name updates that source; a new name adds a source beside the others"}
+               className="w-44 rounded border border-zinc-700 bg-zinc-950 px-2 py-0.5 font-mono" />
+        {!DEMO && <datalist id="known-sources">{known.map((k) => <option key={k} value={k} />)}</datalist>}
         <span className="ml-auto flex gap-2">
           <button onClick={proposeAll} disabled={!files.length || !!busy || !!incremental}
                   className="rounded-md bg-sky-600 px-3 py-1 font-semibold text-white disabled:opacity-40">
             {busy === "propose" ? "Claude is mapping…" : allMapped ? "Re-map with Claude" : "Map with Claude"}</button>
-          <button onClick={validateAll} disabled={!allMapped || !!busy}
+          <button onClick={validateAll} disabled={!allMapped || !!busy || !name.trim()}
+                  title={!name.trim() ? (DEMO ? "Name the batch" : "Name the source") : undefined}
                   className="rounded-md bg-amber-600 px-3 py-1 font-semibold text-white disabled:opacity-40">
             {busy === "validate" ? "Checking…" : "Validate + dry run"}</button>
           <button onClick={runAll} disabled={!report?.ok || nothingNew || !!busy}
                   className="rounded-md bg-emerald-600 px-3 py-1 font-semibold text-white disabled:opacity-40">
-            {busy === "run" ? "Loading…" : nothingNew ? "Nothing new to load" : incremental ? `Approve changes to ${report?.target?.scenario ?? name}`
-              : report?.target ? `Approve + update ${report.target.scenario}` : "Approve + load into Neo4j"}</button>
+            {busy === "run" ? "Loading…" : nothingNew ? "Nothing new to load"
+              : incremental ? `Approve changes to ${report?.target?.source ?? report?.target?.scenario ?? name}`
+              : report?.target ? `Approve + update ${report.target.source ? `"${report.target.source}"` : report.target.scenario}`
+              : DEMO ? "Approve + load into Neo4j" : "Approve + add source"}</button>
         </span>
       </div>
       {error && <p className="border-b border-red-900 bg-red-950/50 px-4 py-1.5 text-xs text-red-300">{error}</p>}
@@ -291,8 +305,10 @@ export default function ConnectSource({ active, onClose, onChanged }: { active: 
             <b className="font-mono text-zinc-100">{dbx.schema}</b> (catalog.schema, set in Settings).</p>}
           <p className="mt-2 text-xs text-zinc-500">The sample exports are simulated Streamly data (16 new customers, spring 2026).
             Everything shown after mapping is computed live from the files.</p>
-          {!DEMO && <p className="mt-2 text-xs text-amber-300">Tenant <span className="font-mono">{TENANT}</span>: what you load here
-            becomes this tenant&apos;s history (then build its trees with the pipeline).</p>}
+          {!DEMO && <p className="mt-2 text-xs text-amber-300">Workspace <span className="font-mono">{TENANT}</span>: each load is a named
+            source of its history ({known.length ? <>now: {known.map((k) => `"${k}"`).join(", ")}</> : "none yet"}). The same name updates
+            that source; a new name adds one beside the others. Decisions are worked out over all sources together; build the trees
+            with the pipeline.</p>}
         </div>
       ) : (
         <div className="grid min-h-0 flex-1 grid-cols-[230px_1fr]">
@@ -324,7 +340,7 @@ export default function ConnectSource({ active, onClose, onChanged }: { active: 
             {result && (
               <button onClick={() => setView("result")}
                       className={`w-full rounded-md px-2 py-1.5 text-left ${view === "result" ? "bg-zinc-800" : "hover:bg-zinc-800/50"}`}>
-                <span className="text-sky-400">●</span> Loaded · {result.scenario}
+                <span className="text-sky-400">●</span> Loaded · {result.source ?? result.scenario}
               </button>
             )}
           </nav>
@@ -589,8 +605,12 @@ function ResultView({ result, graph, active, onCustomer, onSubject, onRemove, bu
     <div className="grid h-full min-h-[520px] grid-cols-[1fr_1.3fr] gap-3">
       <div className="min-h-0 space-y-3 overflow-y-auto">
         <p className="rounded-md bg-sky-950 px-3 py-2 text-sm text-sky-100">
-          Written to Neo4j as <span className="font-mono">{result.scenario}</span>: {result.counts.events} events,
+          {result.source ? <>Source <span className="font-mono">{result.source}</span> written to <span className="font-mono">{result.scenario}</span>;
+            the workspace now holds</> : <>Written to Neo4j as <span className="font-mono">{result.scenario}</span>:</>} {result.counts.events} events,
           {" "}{result.counts.decisions} decisions, {result.counts.outcomes} outcomes, {result.counts.led_to} LED_TO links.</p>
+        {result.analysis?.stale && <p className="rounded-md bg-amber-950/50 px-3 py-2 text-xs text-amber-200">The decision trees and
+          similar-case links were built before this change: they describe the earlier data until the pipeline rebuilds them.</p>}
+        {result.analysis?.noTrees && <p className="text-xs text-zinc-500">No decision trees yet for this workspace: build them with the pipeline.</p>}
         <div>
           <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-zinc-400">
             {result.customers.length || !result.subjects?.length ? `Customers (${result.customers.length})` : `Subjects (first ${result.subjects.length})`}</p>
@@ -608,7 +628,7 @@ function ResultView({ result, graph, active, onCustomer, onSubject, onRemove, bu
           ))}</div>
         </div>
         <button onClick={onRemove} disabled={!!busy} className="rounded-md bg-zinc-800 px-3 py-1 text-xs disabled:opacity-40">
-          {busy === "remove" ? "Removing…" : "Remove this batch"}</button>
+          {busy === "remove" ? "Removing…" : result.source ? "Remove this source" : "Remove this batch"}</button>
       </div>
       <div className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-zinc-800">
         <div className="flex items-center justify-between border-b border-zinc-800 bg-zinc-800/70 px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-zinc-400">

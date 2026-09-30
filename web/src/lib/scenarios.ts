@@ -1,12 +1,12 @@
 // "Delete scenario" (demo spec §22): the scenarios this app may delete, and deleting one. The demo can delete
-// its uploads, Events-tab sets and live decisions, never its history; a tenant can delete its own loaded
-// history and its live decisions. Other tenants' data is never listed.
+// its uploads, Events-tab sets and live decisions, never its history; a workspace can delete one of its sources
+// (§23.9), all its loaded data, or its live decisions. Other workspaces' data is never listed.
 import { liveScenario } from "./live";
 import { demoMode, query, baseScenario } from "./neo4j";
 import { recomputePoints, touchedPoints } from "./storyTrees";
 import { resetAll } from "./stories";
 import { removeScenario } from "./storyWriter";
-import { removeTenantData, removeUpload } from "./uploads";
+import { listSources, removeSource, removeTenantData, removeUpload } from "./uploads";
 
 // The scenarios this app may look at (Browse, graphs): never another tenant's.
 export const ownScenario = (s: string) =>
@@ -24,6 +24,9 @@ const kindOf = (s: string) =>
     : demoMode() ? (s.startsWith("upload:") ? "uploaded batch" : s.startsWith("story:") ? "Events-tab set" : null)
     : s === baseScenario() ? "loaded history (all of this tenant's data)" : null;
 
+// A workspace's source, as a Delete scenario entry.
+const SOURCE = "source:";
+
 export async function listScenarios(): Promise<ScenarioInfo[]> {
   const rows = await query<{ scenario: string; events: number; decisions: number }>(
     `MATCH (e:Event) WHERE ($demo AND (e.scenario_id STARTS WITH 'upload:' OR e.scenario_id STARTS WITH 'story:' OR e.scenario_id = $live))
@@ -33,7 +36,12 @@ export async function listScenarios(): Promise<ScenarioInfo[]> {
      RETURN scenario, events, count(d) AS decisions ORDER BY scenario`,
     { demo: demoMode(), base: baseScenario(), live: liveScenario() });
   const list = rows.map((r) => ({ ...r, kind: kindOf(r.scenario)! })).filter((r) => r.kind);
-  if (!demoMode() || !list.length) return list;
+  if (!demoMode()) {
+    const sources = await listSources();
+    return [...(sources.length > 1 ? sources.map((x) => ({ scenario: `${SOURCE}${x.source}`, events: x.events, decisions: x.decisions,
+                                                            kind: "one source (the other sources stay)" })) : []), ...list];
+  }
+  if (!list.length) return list;
   const sets = list.filter((r) => r.scenario.startsWith("story:")).length, uploads = list.filter((r) => r.scenario.startsWith("upload:")).length;
   const everything = { scenario: EVERYTHING, events: list.reduce((n, r) => n + r.events, 0), decisions: list.reduce((n, r) => n + r.decisions, 0),
     kind: `everything loaded: ${sets} set${sets === 1 ? "" : "s"}, ${uploads} upload${uploads === 1 ? "" : "s"}` +
@@ -43,6 +51,7 @@ export async function listScenarios(): Promise<ScenarioInfo[]> {
 
 export async function deleteScenario(scenario: string) {
   if (scenario === EVERYTHING && demoMode()) return { scenario, ...(await resetAll()) };
+  if (scenario.startsWith(SOURCE) && !demoMode()) return { scenario, ...(await removeSource(scenario.slice(SOURCE.length))) };
   const kind = kindOf(scenario);
   if (!kind || scenario === "history") throw new Error(`${scenario} can't be deleted from this app`);
   if (scenario === baseScenario() && !demoMode()) return { scenario, ...(await removeTenantData()) };

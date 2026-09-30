@@ -27,17 +27,24 @@ export async function tablePreview(table: string) {
 }
 
 // ------------------------------------------------------------------ incremental loads
-type Batch = { scenario: string; name: string; sources: TableSource[]; mappings: FileMapping[]; loadedAt: string };
+// A load from Databricks that can be brought up to date: in the demo an upload batch, in a workspace one of its
+// sources (§23.9: each source keeps its own tables, versions and mapping). `source` is the name loads use.
+type Batch = { scenario: string; name: string; source: string | null; sources: TableSource[]; mappings: FileMapping[]; loadedAt: string };
 
-// The latest load from Databricks this app can see (the tenant's history, or the demo's upload batches).
-export async function lastDatabricksLoad(): Promise<Batch | null> {
-  const [r] = await query<{ scenario: string; name: string; sources: string; mapping: string; at: string }>(
+// The latest Databricks load of each batch (demo) or source (workspace) this app can see, newest first.
+export async function databricksLoads(): Promise<Batch[]> {
+  const rows = await query<{ scenario: string; name: string; source: string | null; sources: string; mapping: string; at: string }>(
     `MATCH (b:UploadBatch)-[:USED_MAPPING]->(m:Mapping)
      WHERE b.sources_json IS NOT NULL AND (($demo AND b.scenario_id STARTS WITH 'upload:') OR (NOT $demo AND b.scenario_id = $base))
        AND NOT EXISTS { (:UploadBatch)-[:SUPERSEDES]->(b) }
-     RETURN b.scenario_id AS scenario, b.name AS name, b.sources_json AS sources, m.mapping_json AS mapping,
-            toString(b.loaded_at) AS at ORDER BY b.loaded_at DESC LIMIT 1`, { demo: demoMode(), base: baseScenario() });
-  return r ? { scenario: r.scenario, name: r.name, sources: JSON.parse(r.sources), mappings: JSON.parse(r.mapping), loadedAt: r.at } : null;
+     RETURN b.scenario_id AS scenario, b.name AS name, b.source_name AS source, b.sources_json AS sources, m.mapping_json AS mapping,
+            toString(b.loaded_at) AS at ORDER BY b.loaded_at DESC`, { demo: demoMode(), base: baseScenario() });
+  return rows.map((r) => ({ scenario: r.scenario, name: r.source ?? r.name, source: demoMode() ? null : r.source ?? r.name,
+                            sources: JSON.parse(r.sources), mappings: JSON.parse(r.mapping), loadedAt: r.at }));
+}
+
+export async function lastDatabricksLoad(): Promise<Batch | null> {
+  return (await databricksLoads())[0] ?? null;
 }
 
 export type Range = { table: string; from: number; to: number };
@@ -52,7 +59,7 @@ export async function pendingRanges(batch: Batch): Promise<Range[]> {
 // with the changes applied, matched by the mapping's event ID. Detection then runs over complete history,
 // so decisions that span tables (a ticket, the agent's proposal, the refund) stay whole.
 async function merged(batch: Batch, ranges: Range[]) {
-  const stored = await storedEvents(batch.scenario);
+  const stored = await storedEvents(batch.scenario, batch.source ?? undefined);   // a workspace: this source's rows only
   const byFile = new Map<string, { id: string; row: number; raw: Record_ }[]>();
   for (const [id, e] of stored) {
     if (!e.file) continue;
@@ -84,9 +91,11 @@ async function merged(batch: Batch, ranges: Range[]) {
 }
 
 // Check (nothing written) or apply the changes since the last load, through the same validator and loader.
-export async function incremental(apply: boolean, given?: Range[]) {
-  const batch = await lastDatabricksLoad();
-  if (!batch) return { error: "No earlier load from Databricks with table versions: load the tables once first." };
+export async function incremental(apply: boolean, given?: Range[], name?: string) {
+  const loads = await databricksLoads();
+  if (!loads.length) return { error: "No earlier load from Databricks with table versions: load the tables once first." };
+  const batch = name ? loads.find((l) => l.name === name) : loads[0];
+  if (!batch) return { error: `No Databricks load named "${name}".` };
   const ranges = given ?? await pendingRanges(batch);
   if (!ranges.length) return { batch: batch.name, scenario: batch.scenario, ranges, changes: [], nothing: true };
   const { files, counts } = await merged(batch, ranges);
