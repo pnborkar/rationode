@@ -70,7 +70,10 @@ const Q = {
     MERGE (o:Outcome {outcome_id: r.outcome_id})
     SET o.outcome_type = r.outcome_type, o.occurred_at = datetime(r.occurred_at),
         o.recorded_at = coalesce(o.recorded_at, datetime()), o.value_usd = r.value_usd, o.scenario_id = r.scenario_id,
-        o.polarity = r.polarity`,
+        o.polarity = r.polarity
+    // What the outcome is about, credited to a decision or not (generic outcomes, §23.11).
+    WITH o, r WHERE r.subject_id IS NOT NULL
+    MATCH (x:Entity {entity_id: r.subject_id}) MERGE (o)-[:ABOUT]->(x)`,
   evidenced_by: (label: string, idProp: string) => `UNWIND $rows AS r
     MATCH (n:${label} {${idProp}: r.node_id}), (e:Event {event_id: r.event_id})
     MERGE (n)-[:EVIDENCED_BY]->(e)`,
@@ -99,6 +102,7 @@ const Q = {
     MATCH (d:Decision {decision_id: r.decision_id}), (o:Outcome {outcome_id: r.outcome_id})
     MERGE (d)-[l:LED_TO]->(o)
     SET l.confidence = r.confidence, l.attribution_method = r.attribution_method, l.window_days = r.window_days,
+        l.outside_window = r.outside_window, l.delay_days = r.delay_days,
         l.linked_at = coalesce(l.linked_at, datetime())`,
 };
 

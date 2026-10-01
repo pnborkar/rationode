@@ -22,8 +22,25 @@ export type TableSource = { table: string; version: number };   // a Databricks 
 
 export const MAX_FILE_BYTES = 30_000_000;   // tables from Databricks can be larger than uploads
 
-export async function loadRegistry(): Promise<Registry> {
-  return registryFrom(await query(REGISTRY_CYPHER));
+export async function loadRegistry(windows: Windows = {}): Promise<Registry> {
+  const reg = registryFrom(await query(REGISTRY_CYPHER));
+  return { ...reg, windows: { ...reg.windows, ...windows } };   // windows set in the editor, before they're saved
+}
+
+// Outcome type -> window (days) chosen at validation (§23.11), saved with the outcome type when the load is approved.
+export type Windows = Record<string, number>;
+
+async function saveWindows(windows: Windows) {
+  const rows = Object.entries(windows).map(([type, days]) => ({ type, days }));
+  if (!rows.length) return;
+  // Only outcome types a mapping introduced: Streamly's registry entries are not touched.
+  await query(
+    `UNWIND $rows AS r
+     MERGE (s:SchemaElement {key: 'outcome.' + r.type})
+     ON CREATE SET s.kind = 'OUTCOME_TYPE', s.status = 'APPROVED', s.created_by = 'mapping', s.created_at = datetime(),
+                   s.display_name = replace(r.type, '_', ' '), s.version = 1
+     WITH s, r WHERE s.created_by = 'mapping'
+     SET s.default_window_days = toInteger(r.days), s.window_set_at = datetime()`, { rows });
 }
 
 // In the demo, each load is its own removable batch (upload:<name>). In another workspace, loads are sources of the
@@ -138,7 +155,9 @@ async function validateAll(parsed: ParsedFile[], mappings: FileMapping[], name: 
 // (each record has one owner); the rest of the workspace is not part of the comparison.
 async function validateSource(parsed: ParsedFile[], mappings: FileMapping[], source: string, registry: Registry) {
   const scenario = baseScenario();
-  const report = validate(parsed, mappings, registry, scenario);
+  // The dry run sees the workspace's other sources too, as the load will (outcomes credited across sources, §23.11).
+  const context = source ? await otherSourceEvents(scenario, source).catch(() => null) : null;
+  const report = validate(parsed, mappings, registry, scenario, context && !("error" in context) ? context.events ?? [] : []);
   if (!source) {
     report.checks.unshift({ level: "error", message: "Name the source (e.g. \"Loan applications\"): the same name updates it, a new name adds a source." });
     report.ok = false;
@@ -186,8 +205,8 @@ async function validateSource(parsed: ParsedFile[], mappings: FileMapping[], sou
   return report;
 }
 
-export async function check(parsed: ParsedFile[], mappings: FileMapping[], name: string) {
-  const report: Partial<Validation> = await validateAll(parsed, mappings, name, await loadRegistry());
+export async function check(parsed: ParsedFile[], mappings: FileMapping[], name: string, windows: Windows = {}) {
+  const report: Partial<Validation> = await validateAll(parsed, mappings, name, await loadRegistry(windows));
   delete report.events;   // the client gets the report, not every mapped event
   return report;
 }
@@ -216,8 +235,8 @@ export async function removeBatches(scenario: string) {
 // Validate again server-side (never trust the client's copy), then write and place in the trees. `sources`:
 // the Databricks tables and versions read, kept on the batch so the next load reads only what changed.
 export async function run(parsed: ParsedFile[], mappings: FileMapping[], name: string, editedFiles: string[] = [],
-                          sources: TableSource[] = [], confirmRemoval = false) {
-  if (!demoMode()) return runSource(parsed, mappings, name.trim(), editedFiles, sources, confirmRemoval);
+                          sources: TableSource[] = [], confirmRemoval = false, windows: Windows = {}) {
+  if (!demoMode()) return runSource(parsed, mappings, name.trim(), editedFiles, sources, confirmRemoval, windows);
   const registry = await loadRegistry();
   const report = await validateAll(parsed, mappings, name, registry);
   if (!report.ok) return { ok: false as const, error: "The mapping has validation errors", report: { ...report, events: undefined } };
@@ -393,7 +412,7 @@ async function otherSourceEvents(scenario: string, except: string | null) {
 // (similar-case links, tree placements, embeddings) stays on the decisions that remain.
 const DETECTOR_RELS = {
   Decision: "CONSIDERED|MADE_BY|ABOUT|PRECEDED_BY|OVERRIDES|UNDER_POLICY|EVIDENCED_BY|LED_TO|HAD_CONTEXT|INSTANCE_OF",
-  Outcome: "EVIDENCED_BY",
+  Outcome: "EVIDENCED_BY|ABOUT",
   Entity: "PART_OF|PAID_WITH|FROM_DEVICE|USED|SAME_AS",
 };
 const NODE_IDS: [string, string, string][] = [   // label, id property, rows table
@@ -429,8 +448,9 @@ async function rewriteWorkspace(scenario: string, rows: Rows) {
 }
 
 // Detect over the given events plus every other source's, write, and refresh what depends on the decisions.
-async function rebuild(scenario: string, except: string | null, events: ContractEvent[], annotate: (id: string) => Record<string, unknown>) {
-  const registry = await loadRegistry();
+async function rebuild(scenario: string, except: string | null, events: ContractEvent[], annotate: (id: string) => Record<string, unknown>,
+                       registry?: Registry) {
+  registry ??= await loadRegistry();
   const others = await otherSourceEvents(scenario, except);
   if ("error" in others) return { error: others.error! };
   const all = [...others.events, ...events];
@@ -451,8 +471,8 @@ async function rebuild(scenario: string, except: string | null, events: Contract
 }
 
 async function runSource(parsed: ParsedFile[], mappings: FileMapping[], source: string, editedFiles: string[], sources: TableSource[],
-                         confirmRemoval: boolean) {
-  const registry = await loadRegistry();
+                         confirmRemoval: boolean, windows: Windows = {}) {
+  const registry = await loadRegistry(windows);
   const report = await validateSource(parsed, mappings, source, registry);
   if (!report.ok) return { ok: false as const, error: "The mapping has validation errors", report: { ...report, events: undefined } };
   if (report.removal && !confirmRemoval) {
@@ -471,7 +491,7 @@ async function runSource(parsed: ParsedFile[], mappings: FileMapping[], source: 
     const e = byId.get(id), old = previous.get(id);
     return { source_file: e?.source_ref?.file ?? null, source_row: e?.source_ref?.row ?? null, source_name: source,
              batch_id: old && old.payload === JSON.stringify(e?.raw) && old.batch ? old.batch : batchId };   // unchanged keeps its load
-  });
+  }, registry);
   if ("error" in r) return { ok: false as const, error: r.error };
   const mappingJson = JSON.stringify(mappings);
   await query(PROVENANCE, {
@@ -485,6 +505,7 @@ async function runSource(parsed: ParsedFile[], mappings: FileMapping[], source: 
   const introduced = [...new Set(report.events.filter((e) => isGeneric(e.event_type) && e.data.decision_type)
     .map((e) => r.rows.decisions.find((d) => d.decision_id === `${scenario}|dec:${e.event_id}`)?.decision_type as string).filter(Boolean))];
   if (introduced.length) await approveIntroduced(scenario, introduced);
+  await saveWindows(windows);   // the windows chosen at validation, for every later load and the outcome rates
   // What this source brought: its systems' subjects and customers (the rest of the workspace is unchanged).
   const systems = new Set(mappings.map((m) => m.source));
   const mine = r.rows.entities.filter((e) => systems.has(e.source_system as string));

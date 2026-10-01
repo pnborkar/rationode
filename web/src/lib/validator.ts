@@ -61,7 +61,7 @@ export type Validation = {
   checks: Check[];                   // cross-file checks
   dryRun: {
     events: number; decisions: { decision_type: string; stage: string; count: number }[];
-    outcomes: { outcome_type: string; count: number }[]; overrides: number; identityLinks: number;
+    outcomes: { outcome_type: string; count: number }[]; windows?: Record<string, number>; overrides: number; identityLinks: number;
     customers: number; schemaProposals: string[]; review: { reason: string; count: number }[];
     preview: { decision_id: string; decision_type: string; stage: string; summary: string; outcomes: string[] }[];
   };
@@ -79,7 +79,10 @@ const counted = <T,>(items: T[], key: (x: T) => string) => {
   return [...m].map(([k, count]) => ({ k, count }));
 };
 
-export function validate(files: ParsedFile[], mappings: FileMapping[], registry: Registry, scenario: string): Validation {
+// context: the workspace's other sources' events (§23.9), detected together with these so the dry run sees what a load
+// would see (e.g. an outcome credited to another source's decision, §23.11); the report covers only these files.
+export function validate(files: ParsedFile[], mappings: FileMapping[], registry: Registry, scenario: string,
+                         context: ContractEvent[] = []): Validation {
   const reports: FileReport[] = [];
   const all: MappedEvent[] = [];
   for (const f of files) {
@@ -235,23 +238,51 @@ export function validate(files: ParsedFile[], mappings: FileMapping[], registry:
   }
 
   // ---------------------------------------------------------- dry run through the real detectors
-  const { rows, notes } = detectAll(registry, scenario, evs);
+  const focus = context.length ? new Set(evs.map((e) => e.event_id)) : undefined;
+  const { rows, notes } = detectAll(registry, scenario, focus ? [...context.filter((e) => !focus.has(e.event_id)), ...evs] : evs, focus);
   if (notes) {   // every default the generic detector applied, shown before approval (§23.8)
     if (notes.defaultedActors) checks.push({ level: "warn", message: `Actor defaulted to SYSTEM (the source) for ${notes.defaultedActors} decisions: no actor mapped` });
     const pol = Object.entries(notes.unknownPolarity);
     if (pol.length) checks.push({ level: "warn", message: "Outcome polarity unknown (set good / bad in the mapping)", examples: pol.map(([t, n]) => `${t} ×${n}`) });
     if (notes.laterFactsExcluded) checks.push({ level: "ok", message: `${notes.laterFactsExcluded} facts observed after a decision kept out of its context (no future information)` });
-    if (notes.unlinkedOutcomes) checks.push({ level: "warn", message: `${notes.unlinkedOutcomes} outcomes have no decision about the same subject before them in the window` });
+    // Outcome windows (§23.11): what was credited late, and what wasn't credited and why.
+    for (const [t, c] of Object.entries(notes.creditedOutsideWindow)) {
+      checks.push({ level: "ok", message: `${c.n} ${t} outcome(s) came later than the ${c.window}-day window (up to ${c.maxDays} days after) ` +
+        `and are credited to the only decision about their subject (marked "outside the window").` });
+    }
+    for (const [t, l] of Object.entries(notes.lateOutcomes)) {
+      checks.push({ level: "warn", message: `${l.n} ${t} outcome(s) came after the ${l.window}-day window (the nearest earlier decision ` +
+        `${l.minDays}+ days before) and the choice isn't clear (several decisions about the subject, or decisions only about related ` +
+        `subjects: its parent or the things that belong to it), so they're credited to no decision. Is the window too short for ${t}? Set it under "Outcome windows" and validate again.`, examples: l.examples });
+    }
+    if (notes.noDecisionBefore) checks.push({ level: "warn", message: `${notes.noDecisionBefore} outcome(s) have no decision about ` +
+      `their subject (or its parent or children) before them: kept on the subject, credited to no decision.` });
     for (const [t, n] of Object.entries(notes.conflicting)) {
       checks.push({ level: "warn", message: `${t}: ${n} subjects have final decisions with different options. Is each really a choice, ` +
                                             "or is one of them a state every case passes through?" });
     }
   }
-  const dict = rowsDict(rows);
+  const allRows = rowsDict(rows);
+  // With context, report what these files bring: their decisions and outcomes, and the credit links touching them.
+  const pid = (id: string) => (scenario === "history" ? id : `${scenario}|${id}`);
+  const mine = focus ? new Set([...focus].map(pid)) : null;
+  const evidenced = (kind: string) => new Set(allRows.evidenced_by.filter((x) => x.kind === kind && (!mine || mine.has(x.event_id as string))).map((x) => x.node_id as string));
+  const myDecisions = evidenced("Decision"), myOutcomes = evidenced("Outcome");
+  const dict = !mine ? allRows : {
+    ...allRows,
+    decisions: allRows.decisions.filter((x) => myDecisions.has(x.decision_id as string)),
+    outcomes: allRows.outcomes.filter((x) => myOutcomes.has(x.outcome_id as string)),
+    led_to: allRows.led_to.filter((x) => myDecisions.has(x.decision_id as string) || myOutcomes.has(x.outcome_id as string)),
+    overrides: allRows.overrides.filter((x) => myDecisions.has(x.from as string) || myDecisions.has(x.to as string)),
+    contexts: allRows.contexts, schema_proposals: allRows.schema_proposals,
+  };
   const ctx = new Map(dict.contexts.map((c) => [c.decision_id as string, c.summary_text as string]));
   const outType = new Map(dict.outcomes.map((o) => [o.outcome_id as string, o.outcome_type as string]));
   const outcomesOf = (id: string) => dict.led_to.filter((l) => l.decision_id === id).map((l) => outType.get(l.outcome_id as string) ?? "");
-  const finals = dict.decisions.filter((d) => d.stage === "FINAL" && d.decision_type !== "charge.fraud_screen");
+  // Preview: these files' decisions, and (with context) other sources' decisions their outcomes are credited to.
+  const credited = new Set(dict.led_to.map((l) => l.decision_id as string));
+  const finals = (mine ? allRows.decisions.filter((d) => myDecisions.has(d.decision_id as string) || credited.has(d.decision_id as string)) : dict.decisions)
+    .filter((d) => d.stage === "FINAL" && d.decision_type !== "charge.fraud_screen");
   const preview = [...finals.filter((d) => outcomesOf(d.decision_id as string).length), ...finals]
     .filter((d, i, a) => a.indexOf(d) === i).slice(0, 6)
     .map((d) => ({ decision_id: d.decision_id as string, decision_type: d.decision_type as string, stage: d.stage as string,
@@ -267,6 +298,8 @@ export function validate(files: ParsedFile[], mappings: FileMapping[], registry:
         return { decision_type, stage, count };
       }),
       outcomes: counted(dict.outcomes, (o) => o.outcome_type as string).map(({ k, count }) => ({ outcome_type: k, count })),
+      // Each outcome type's window as used in this dry run (the registry's, or 90 days), for the editor.
+      windows: Object.fromEntries([...new Set(dict.outcomes.map((o) => o.outcome_type as string))].map((t) => [t, registry.windows[t] ?? 90])),
       overrides: dict.overrides.length, identityLinks: dict.same_as.length,
       customers: new Set(dict.entities.filter((e) => e.label === "Customer" && e.source_system === "stripe").map((e) => e.entity_id)).size,
       schemaProposals: dict.schema_proposals.map((s) => s.key as string),

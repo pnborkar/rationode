@@ -11,6 +11,7 @@ const Body = z.object({
   files: z.array(z.object({ name: z.string(), content: z.string() })).default([]),
   tables: z.array(z.object({ table: z.string().regex(/^[A-Za-z0-9_]+$/), version: z.number().int().nonnegative() })).default([]),
   mappings: z.array(FileMappingSchema),
+  windows: z.record(z.string(), z.number().int().min(1).max(3650)).default({}),   // outcome type -> window (days), §23.11
   edited_files: z.array(z.string()).default([]),   // files whose mapping the reviewer changed
   confirm_removal: z.boolean().default(false),       // replace a source even though most of its records would go
 }).refine((b) => b.files.length + b.tables.length > 0, "no files or tables");
@@ -21,8 +22,8 @@ async function POST_(request: Request) {
   const body = Body.safeParse(await request.json());
   if (!body.success) return Response.json({ error: body.error.message }, { status: 400 });
   try {
-    const { files, tables, mappings, name, edited_files, confirm_removal } = body.data;
-    const result = await run(await resolve(files, tables), mappings, name, edited_files, tables, confirm_removal);
+    const { files, tables, mappings, name, edited_files, confirm_removal, windows } = body.data;
+    const result = await run(await resolve(files, tables), mappings, name, edited_files, tables, confirm_removal, windows);
     return Response.json(result, { status: result.ok ? 200 : 422 });
   } catch (err) {
     return Response.json({ ok: false, error: (err as Error).message }, { status: 422 });

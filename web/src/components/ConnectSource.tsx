@@ -68,6 +68,8 @@ export default function ConnectSource({ active, onClose, onChanged }: { active: 
   const [proposals, setProposals] = useState<Record<string, Proposal>>({});
   const [view, setView] = useState<string>("");            // a file name, "validate", or "result"
   const [report, setReport] = useState<ReportView | null>(null);
+  // Outcome type -> window (days) the reviewer set (§23.11): used by Validate and saved with the load.
+  const [windows, setWindows] = useState<Record<string, number>>({});
   const [busy, setBusy] = useState<string | null>(null);
   const [result, setResult] = useState<RunResult | null>(null);
   const [graph, setGraph] = useState<{ email: string; nodes: ViewNode[]; rels: ViewRel[] } | null>(null);
@@ -107,7 +109,7 @@ export default function ConnectSource({ active, onClose, onChanged }: { active: 
   });
 
   function reset(next: Src[]) {
-    setFiles(next); setProposals({}); setReport(null); setResult(null); setGraph(null); setError(null); setIncremental(null);
+    setFiles(next); setProposals({}); setReport(null); setResult(null); setGraph(null); setError(null); setIncremental(null); setWindows({});
     setView(next[0]?.name ?? "");
   }
 
@@ -187,10 +189,10 @@ export default function ConnectSource({ active, onClose, onChanged }: { active: 
   }
 
   const validateAll = () => validateWith(mappings);
-  async function validateWith(mappings: FileMapping[]) {
+  async function validateWith(mappings: FileMapping[], w = windows) {
     setBusy("validate"); setError(null);
     const res = await fetch("/api/upload/validate", { method: "POST", headers: { "content-type": "application/json" },
-                                                      body: JSON.stringify({ name, ...sources(), mappings }) });
+                                                      body: JSON.stringify({ name, ...sources(), mappings, windows: w }) });
     const data = await res.json();
     if (res.ok) { setReport(data); setView("validate"); } else setError(data.error ?? res.statusText);
     setBusy(null);
@@ -226,7 +228,7 @@ export default function ConnectSource({ active, onClose, onChanged }: { active: 
       ? await fetch("/api/databricks/changes", { method: "POST", headers: { "content-type": "application/json" },
                                                  body: JSON.stringify({ apply: true, ranges: incremental.ranges, batch: name }) })
       : await fetch("/api/upload/run", { method: "POST", headers: { "content-type": "application/json" },
-                                         body: JSON.stringify({ name, ...sources(), mappings, edited_files, confirm_removal: !!report?.removal }) });
+                                         body: JSON.stringify({ name, ...sources(), mappings, edited_files, confirm_removal: !!report?.removal, windows }) });
     const body = await res.json();
     const data = incremental ? (body.result ?? body) : body;
     if (res.ok && data.ok !== false) {
@@ -381,7 +383,9 @@ export default function ConnectSource({ active, onClose, onChanged }: { active: 
                 {incremental.changes.map((c) => `${c.table} (v${c.from}–${c.to}: ${c.inserted} new, ${c.updated} changed, ${c.deleted} deleted)`).join("; ")}.
                 Merged into the rows already loaded and re-detected over the full history with the last approved mapping.</p>
             )}
-            {view === "validate" && report && <ValidationView report={report} onFix={incremental ? undefined : applyCheckFix} />}
+            {view === "validate" && report && <ValidationView report={report} onFix={incremental ? undefined : applyCheckFix}
+              onWindows={DEMO || incremental ? undefined : (w) => { const all = { ...windows, ...w }; setWindows(all); validateWith(mappings, all); }}
+              busy={!!busy} />}
             {view === "result" && result && (
               <ResultView result={result} graph={graph} active={active} onCustomer={showCustomer} onSubject={showSubject} onRemove={removeBatch} busy={busy} />
             )}
@@ -645,7 +649,35 @@ function AddField({ rec, onAdd }: { rec: RecordMap; onAdd: (target: string) => v
 }
 
 // ------------------------------------------------------------------ validator + dry run
-function ValidationView({ report, onFix }: { report: ReportView; onFix?: (fix: CheckFix) => void }) {
+// Outcome windows (§23.11): how long after a decision each outcome type is still credited to it when the subject had
+// several decisions. Changing one validates again; approving saves it with the outcome type.
+function OutcomeWindows({ windows, onApply, busy }: { windows: Record<string, number>; onApply: (w: Record<string, number>) => void; busy?: boolean }) {
+  const [draft, setDraft] = useState(windows);
+  const changed = Object.keys(draft).some((t) => draft[t] !== windows[t]);
+  return (
+    <div className="rounded-lg border border-zinc-800 p-3 text-xs">
+      <p className="mb-1 font-semibold uppercase tracking-wider text-zinc-400">Outcome windows</p>
+      <p className="mb-2 text-zinc-500">How long after a decision an outcome is still credited to it when its subject had several decisions
+        (an outcome about a subject with a single decision is credited to it whatever the delay). Saved with the outcome type on approval.</p>
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+        {Object.keys(draft).map((t) => (
+          <label key={t} className="flex items-center gap-1.5">
+            <span className="font-mono text-zinc-300">{t}</span>
+            <input type="number" min={1} max={3650} value={draft[t]} onChange={(e) => setDraft({ ...draft, [t]: Number(e.target.value) })}
+                   className="w-20 rounded border border-zinc-700 bg-zinc-950 px-1.5 py-0.5 font-mono" />
+            <span className="text-zinc-500">days</span>
+          </label>
+        ))}
+        <button disabled={!changed || busy} onClick={() => onApply(Object.fromEntries(Object.entries(draft).filter(([t, v]) => v !== windows[t] && v >= 1)))}
+                className="rounded bg-sky-700 px-2 py-0.5 font-semibold text-white disabled:opacity-40">Validate with these windows</button>
+      </div>
+    </div>
+  );
+}
+
+function ValidationView({ report, onFix, onWindows, busy }: {
+  report: ReportView; onFix?: (fix: CheckFix) => void; onWindows?: (w: Record<string, number>) => void; busy?: boolean;
+}) {
   const d = report.dryRun;
   return (
     <div className="space-y-4">
@@ -678,6 +710,7 @@ function ValidationView({ report, onFix }: { report: ReportView; onFix?: (fix: C
           <ul className="space-y-1">{report.checks.map((c, i) => <CheckLine key={i} c={c} onFix={onFix} />)}</ul>
         </div>
       </div>
+      {onWindows && d.windows && Object.keys(d.windows).length > 0 && <OutcomeWindows windows={d.windows} onApply={onWindows} busy={busy} />}
       <div className="rounded-lg border border-zinc-800 p-3">
         <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-400">Dry run · the detector over the mapped events</p>
         <div className="grid grid-cols-4 gap-2 text-center">

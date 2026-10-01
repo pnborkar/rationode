@@ -33,14 +33,27 @@ export type GenericNotes = {
   defaultedActors: number;                 // decisions with no actor: SYSTEM "<source>"
   unknownPolarity: Record<string, number>; // outcome type -> outcomes with no polarity
   laterFactsExcluded: number;              // facts observed after a decision, kept out of its context
-  unlinkedOutcomes: number;                // outcomes with no decision before them in the window
+  unlinkedOutcomes: number;                // outcomes credited to no decision
+  // Outcome windows (§23.11): credited to the only decision about their subject although later than the window;
+  // not credited because they came after the window and the choice was ambiguous (several decisions, or only the
+  // parent's); not credited because nothing was decided about the subject before them.
+  creditedOutsideWindow: Record<string, { n: number; maxDays: number; window: number }>;
+  lateOutcomes: Record<string, { n: number; minDays: number; window: number; examples: string[] }>;
+  noDecisionBefore: number;
   missingSubject: number;                  // generic events without a subject (not placed)
   conflicting: Record<string, number>;     // decision type -> subjects with FINAL decisions of different options (a real choice?)
 };
 
 export class GenericDetector extends Detector {
-  readonly notes: GenericNotes = { defaultedActors: 0, unknownPolarity: {}, laterFactsExcluded: 0, unlinkedOutcomes: 0, missingSubject: 0,
-                                   conflicting: {} };
+  readonly notes: GenericNotes = GenericDetector.emptyNotes();
+  // focus: the events being validated (a workspace's other sources are detected with them for context, §23.11);
+  // notes are counted only for these. Unset: every event counts.
+  focus: Set<string> | null = null;
+  private n: GenericNotes = this.notes;
+  private static emptyNotes(): GenericNotes {
+    return { defaultedActors: 0, unknownPolarity: {}, laterFactsExcluded: 0, unlinkedOutcomes: 0, missingSubject: 0,
+             conflicting: {}, creditedOutsideWindow: {}, lateOutcomes: {}, noDecisionBefore: 0 };
+  }
 
   runGeneric(events: ContractEvent[]): Rows {
     const evs = [...events].sort((a, b) =>
@@ -68,8 +81,10 @@ export class GenericDetector extends Detector {
       }
     };
 
+    const scratch = GenericDetector.emptyNotes();
     for (const e of evs) {
       if (!isGeneric(e.event_type)) continue;
+      this.n = !this.focus || this.focus.has(e.event_id) ? this.notes : scratch;
       const x = e.entity_refs, d = e.data;
       this.rows.events.push({
         event_id: this.pid(e.event_id), source_system: e.source, event_type: e.source_type, occurred_at: e.occurred_at,
@@ -77,7 +92,7 @@ export class GenericDetector extends Detector {
         scenario_id: this.scenario, canonical_type: e.event_type, data_json: JSON.stringify(d),
       });
       const s = subjectOf(e);
-      if (!s) { this.notes.missingSubject++; this.rows.review.push({ event_id: e.event_id, reason: "generic event without a subject" }); continue; }
+      if (!s) { this.n.missingSubject++; this.rows.review.push({ event_id: e.event_id, reason: "generic event without a subject" }); continue; }
 
       if (e.event_type === "context.observed") { addFacts(s.subject, e.occurred_at, d); continue; }
 
@@ -87,14 +102,14 @@ export class GenericDetector extends Detector {
         if (!type || !option) { this.rows.review.push({ event_id: e.event_id, reason: "decision without type or option" }); continue; }
         const stage = e.event_type === "decision.made" ? "FINAL" : "PROPOSAL";
         let actorDef: Actor | null | undefined = e.actor;
-        if (!actorDef?.id) { actorDef = { kind: "SYSTEM", id: `system:${e.source}`, name: e.source }; this.notes.defaultedActors++; }
+        if (!actorDef?.id) { actorDef = { kind: "SYSTEM", id: `system:${e.source}`, name: e.source }; this.n.defaultedActors++; }
         const actor = this.actor(actorDef);
         // Context: the latest value of each fact about the subject (and its parent) at or before the decision.
         const ctx: Record<string, unknown> = {};
         const family = type.split(".")[0];
         for (const who of [s.parent, s.subject].filter(Boolean) as string[]) {
           for (const f of facts.get(who) ?? []) {
-            if (ms(f.at) > ms(e.occurred_at)) { this.notes.laterFactsExcluded++; continue; }
+            if (ms(f.at) > ms(e.occurred_at)) { this.n.laterFactsExcluded++; continue; }
             ctx[`${family}.${f.key}`] = f.value;
           }
         }
@@ -132,27 +147,53 @@ export class GenericDetector extends Detector {
         if (!type) { this.rows.review.push({ event_id: e.event_id, reason: "outcome without a type" }); continue; }
         const pol = snake(String(d.polarity ?? ""));
         const polarity = ["good", "positive", "success"].includes(pol) ? "good" : ["bad", "negative", "failure"].includes(pol) ? "bad" : null;
-        if (!polarity) this.notes.unknownPolarity[type] = (this.notes.unknownPolarity[type] ?? 0) + 1;
-        const out = this.outcome(e, type, num(d.value), { polarity });
-        // An explicit reference first; else FINAL decisions before it within the outcome window, the most specific first:
-        // about the same subject, else about its children (an application's outcome, its offers), else about its parent.
+        if (!polarity) this.n.unknownPolarity[type] = (this.n.unknownPolarity[type] ?? 0) + 1;
+        // Every outcome is linked to what it's about (Outcome -ABOUT-> subject), credited to a decision or not (§23.11).
+        const out = this.outcome(e, type, num(d.value), { polarity, subject_id: s.subject });
+        // Credit (LED_TO), §23.11 refined rule: the decision the outcome names; else the subject's own FINAL decisions
+        // before it: exactly one -> credit it whatever the delay (nothing to choose between; marked outside_window when
+        // late), several -> those within the outcome window; else, within the window, decisions about its children (an
+        // application's outcome, its offers), then about its parent.
         const named = x.follows_id ? bySource.get(x.follows_id) : undefined;
         if (named && ms(named.at) <= ms(e.occurred_at)) { this.ledTo(named.id, out, type, "EXPLICIT_REF", 1.0); continue; }
-        const window = (this.reg.windows[type] ?? DEFAULT_WINDOW_DAYS) * DAY_MS;
-        const at = ms(e.occurred_at);
-        const before = decisions.filter((c) => c.stage === "FINAL" && ms(c.at) <= at && at - ms(c.at) <= window);
-        const tiers = [before.filter((c) => c.subject === s.subject), before.filter((c) => c.parent === s.subject),
-                       s.parent ? before.filter((c) => c.subject === s.parent) : []];
-        const candidates = tiers.find((t) => t.length) ?? [];
-        if (!candidates.length) { this.notes.unlinkedOutcomes++; continue; }
+        const windowDays = this.reg.windows[type] ?? DEFAULT_WINDOW_DAYS, at = ms(e.occurred_at);
+        const days = (c: Dec) => (at - ms(c.at)) / DAY_MS, inWindow = (c: Dec) => days(c) <= windowDays;
+        const finals = decisions.filter((c) => c.stage === "FINAL" && ms(c.at) <= at);
+        const own = finals.filter((c) => c.subject === s.subject);
+        if (own.length === 1) {
+          const c = own[0], late = !inWindow(c);
+          this.rows.led_to.push({ decision_id: c.id, outcome_id: out, confidence: 1.0, window_days: windowDays,
+                                  attribution_method: late ? "ONLY_DECISION_ON_SUBJECT" : "SAME_ENTITY_WINDOW",
+                                  outside_window: late, delay_days: Math.round(days(c)) });
+          if (late) {
+            const n = this.n.creditedOutsideWindow[type] ??= { n: 0, maxDays: 0, window: windowDays };
+            n.n++; n.maxDays = Math.max(n.maxDays, Math.round(days(c)));
+          }
+          continue;
+        }
+        const children = finals.filter((c) => c.parent === s.subject), parents = s.parent ? finals.filter((c) => c.subject === s.parent) : [];
+        const candidates = [own.filter(inWindow), children.filter(inWindow), parents.filter(inWindow)].find((t) => t.length) ?? [];
+        if (!candidates.length) {
+          this.n.unlinkedOutcomes++;
+          const earlier = [...own, ...children, ...parents];
+          if (!earlier.length) { this.n.noDecisionBefore++; continue; }
+          const nearest = Math.round(Math.min(...earlier.map(days)));
+          const l = this.n.lateOutcomes[type] ??= { n: 0, minDays: Infinity, window: windowDays, examples: [] };
+          l.n++; l.minDays = Math.min(l.minDays, nearest);
+          if (l.examples.length < 3) l.examples.push(`${e.source_ref ? `${e.source_ref.file} row ${e.source_ref.row}` : e.event_id}: ${nearest} days after`);
+          continue;
+        }
         const confidence = candidates.length === 1 ? 1.0 : 0.6;
-        for (const c of candidates) this.ledTo(c.id, out, type, "SAME_ENTITY_WINDOW", confidence);
+        for (const c of candidates) {
+          this.rows.led_to.push({ decision_id: c.id, outcome_id: out, confidence, attribution_method: "SAME_ENTITY_WINDOW",
+                                  window_days: windowDays, outside_window: false, delay_days: Math.round(days(c)) });
+        }
       }
     }
     // A real choice has alternatives taken over time, not two final answers for one subject: flag subjects with FINAL
     // decisions of the same type but different options (e.g. a state every application passes through, then a denial).
     const finals = new Map<string, Set<string>>();
-    for (const d of decisions.filter((x) => x.stage === "FINAL")) {
+    for (const d of decisions.filter((x) => x.stage === "FINAL" && (!this.focus || this.focus.has(x.sourceId)))) {
       const k = `${d.type}\u0000${d.subject}`;
       (finals.get(k) ?? finals.set(k, new Set()).get(k)!).add(d.option);
     }
@@ -165,11 +206,12 @@ export class GenericDetector extends Detector {
 
 // Every door's events -> rows: Streamly's own types through its detector, generic decision events through the
 // generic detector, merged. Streamly-only data produces exactly what the Streamly detector alone did.
-export function detectAll(registry: Registry, scenario: string, events: ContractEvent[]): { rows: Rows; notes: GenericNotes | null } {
+export function detectAll(registry: Registry, scenario: string, events: ContractEvent[], focus?: Set<string>): { rows: Rows; notes: GenericNotes | null } {
   const generic = events.filter((e) => isGeneric(e.event_type)), streamly = events.filter((e) => !isGeneric(e.event_type));
   const a = new Detector(registry, scenario).run(streamly);
   if (!generic.length) return { rows: a, notes: null };
   const g = new GenericDetector(registry, scenario);
+  if (focus) g.focus = focus;
   const b = g.runGeneric(generic);
   const rows = Object.fromEntries(Object.keys(a).map((k) => {
     const x = a[k as keyof Rows], y = b[k as keyof Rows];
