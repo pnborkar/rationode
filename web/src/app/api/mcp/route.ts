@@ -24,7 +24,7 @@ function server() {
     title: "Check before acting",
     description:
       "Before making a decision, see what happened in similar past decisions: options chosen, their dispute, " +
-      "churn, win, and cost outcomes (and, for any domain, the rate of each outcome type and of good / bad outcomes), " +
+      "churn, win, and cost outcomes (and, for any domain, the rate of each outcome type, and the share of decisions that ended good / bad, where any bad outcome makes a decision bad), " +
       "plus a what-if through the learned outcome tree where one exists. Context uses namespaced attributes, e.g. " +
       "support.tenure_months, dispute.category; a loaded domain's use its own prefix (e.g. loan.requested_amount).",
     inputSchema: {

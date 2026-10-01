@@ -27,7 +27,7 @@ export async function* decide(c: Case): AsyncGenerator<DecideEvent> {
   const [{ agentModel }, client] = await Promise.all([aiSettings(), anthropicClient()]);
   const options = c.options.map((o) => o.option);
   const tools: Anthropic.Beta.BetaTool[] = [
-    { name: "similar_cases", description: "The most similar past decisions of this type (by the case's facts): what was chosen, the amounts, and what followed, per option (outcome rates, good/bad rates) and for the nearest cases.",
+    { name: "similar_cases", description: "The most similar past decisions of this type (by the case's facts): what was chosen, the amounts, and what followed, per option (outcome rates; good_rate / bad_rate = share of decisions that ended good / bad for the organisation, where any bad outcome makes a decision bad) and for the nearest cases.",
       input_schema: { type: "object", properties: {} } },
     { name: "outcome_rates", description: "Outcome rates for this decision type's past final decisions, overall or grouped by one fact (numbers in quartile bands; \"option\" for the option chosen), optionally filtered (op =, !=, >=, <=, in).",
       input_schema: { type: "object", properties: { group_by: { type: "string" },

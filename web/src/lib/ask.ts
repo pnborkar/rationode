@@ -11,6 +11,7 @@ import neo4j from "neo4j-driver";
 import { query, baseScenario } from "./neo4j";
 import { checkBeforeAct } from "./precedent";
 import { ownScenario } from "./scenarios";
+import { endedRates } from "./verdict";
 import { aiSettings, anthropicClient } from "./settings";
 
 export type AskEvent =
@@ -76,8 +77,7 @@ export async function outcomeRates(input: z.infer<typeof RatesInput>) {
     const n = rs.length;
     const types = [...new Set(rs.flatMap((r) => r.outcomes))].sort();
     return { n, outcome_rates: Object.fromEntries(types.map((t) => [t, round(rs.filter((r) => r.outcomes.includes(t)).length / (n || 1))])),
-             good_rate: round(rs.filter((r) => r.polarities.includes("good")).length / (n || 1)),
-             bad_rate: round(rs.filter((r) => r.polarities.includes("bad")).length / (n || 1)),
+             ...endedRates(rs),   // share that ended good / bad: a bad outcome decides (§23.11)
              options: Object.fromEntries([...new Set(rs.map((r) => r.option ?? "(none)"))].map((o) => [o, rs.filter((r) => (r.option ?? "(none)") === o).length])) };
   };
   if (!input.group_by) return { decision_type: input.decision_type, filters: input.filters ?? [], all: summarise(kept) };
@@ -155,7 +155,7 @@ async function decisionTrees(decisionType: string) {
 const TOOLS: Anthropic.Beta.BetaTool[] = [
   { name: "describe_decisions", description: "What decisions are recorded in this organisation's graph: each decision type with its count, stages, the options chosen (with counts), the outcomes that followed (with counts and whether each is good or bad for the organisation), and the facts known at decision time (names, kinds, values). Call this first.",
     input_schema: { type: "object", properties: {} } },
-  { name: "outcome_rates", description: "Outcome rates for a decision type's final decisions: the rate of each outcome, good/bad rates and the options chosen, overall or grouped by one fact (numbers are grouped in quartile bands; use \"option\" to group by the option chosen), optionally filtered (op =, !=, >=, <=, in). Use it for 'what leads to what' and comparisons.",
+  { name: "outcome_rates", description: "Outcome rates for a decision type's final decisions: the rate of each outcome, good_rate / bad_rate (share of decisions that ended good / bad for the organisation: any bad outcome makes a decision bad) and the options chosen, overall or grouped by one fact (numbers are grouped in quartile bands; use \"option\" to group by the option chosen), optionally filtered (op =, !=, >=, <=, in). Use it for 'what leads to what' and comparisons.",
     input_schema: { type: "object", properties: { decision_type: { type: "string" }, group_by: { type: "string", description: "a fact name from describe_decisions, or \"option\"" },
       filters: { type: "array", items: { type: "object", properties: { fact: { type: "string" }, op: { type: "string", enum: ["=", "!=", ">=", "<=", "in"] }, value: {} }, required: ["fact", "op", "value"] } } },
       required: ["decision_type"] } },

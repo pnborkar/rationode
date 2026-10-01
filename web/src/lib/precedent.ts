@@ -3,6 +3,7 @@ import liveEmbeddings from "../data/live-embeddings.json";
 import { checkUsage } from "./customer";
 import { contextText, encode, type Context } from "./features";
 import { liveScenario } from "./live";
+import { endedRates } from "./verdict";
 import { demoMode, query, baseScenario } from "./neo4j";
 
 const COST_OUTCOMES = ["refund_cost", "dispute_won", "dispute_lost"];
@@ -207,10 +208,10 @@ export async function checkBeforeAct(decisionType: string, context: Context, k =
       option, n: rows.length, share: Math.round((rows.length / details.length) * 1000) / 1000,
       dispute_rate: rate(rows, "dispute_filed"), churn_rate: rate(rows, "churn"), win_rate: rate(rows, "dispute_won"),
       avg_cost: Math.round((rows.reduce((s, r) => s + r.cost, 0) / rows.length) * 100) / 100,
-      // Any domain (§23.8): the rate of each outcome type that followed, and of good / bad outcomes (polarity).
+      // Any domain (§23.8): the rate of each outcome type that followed, and how the decisions ended: good_rate /
+      // bad_rate = share that ended good / bad, where a bad outcome decides (§23.11; the trees' rule).
       outcome_rates: Object.fromEntries([...new Set(rows.flatMap((r) => r.outcomes))].sort().map((t) => [t, rate(rows, t)])),
-      good_rate: Math.round((rows.filter((r) => r.polarities.includes("good")).length / rows.length) * 1000) / 1000,
-      bad_rate: Math.round((rows.filter((r) => r.polarities.includes("bad")).length / rows.length) * 1000) / 1000,
+      ...endedRates(rows),
     }));
 
   const whatIfs = await whatIf(decisionType, context);
