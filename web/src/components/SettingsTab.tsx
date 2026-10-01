@@ -4,6 +4,7 @@
 // encrypted). Secrets are never shown: only whether they're set.
 import { useEffect, useState } from "react";
 import DecisionModel from "./DecisionModel";
+import WorkspacesAdmin from "./WorkspacesAdmin";
 import DeleteScenario from "./DeleteScenario";
 
 type Status = {
@@ -29,6 +30,13 @@ function Section({ title, children }: { title: string; children: React.ReactNode
       <div className="space-y-3 p-4 text-sm">{children}</div>
     </section>
   );
+}
+
+// Renders its children only for the master access code (checked by the workspaces API).
+function MasterOnly({ children }: { children: React.ReactNode }) {
+  const [ok, setOk] = useState(false);
+  useEffect(() => { fetch("/api/workspaces").then((r) => setOk(r.ok)).catch(() => setOk(false)); }, []);
+  return ok ? <>{children}</> : null;
 }
 
 function Result({ r }: { r?: TestResult | "running" }) {
@@ -106,6 +114,8 @@ export default function SettingsTab() {
     <div className="grid min-h-0 flex-1 grid-cols-2 gap-3 overflow-y-auto">
       {/* The workspace's decision model (§22.1): its business settings, full width. */}
       <div className="col-span-2"><Section title={`Decision model · ${status.tenant}`}><DecisionModel /></Section></div>
+      {/* Operator: the deployment's workspaces (master code only; the section hides itself otherwise). */}
+      <div className="col-span-2"><MasterOnly><Section title="Workspaces"><WorkspacesAdmin /></Section></MasterOnly></div>
       <div className="space-y-3">
         <Section title={`Connections · tenant ${status.tenant}`}>
           <div className="flex items-start justify-between gap-3">

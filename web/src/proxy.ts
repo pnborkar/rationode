@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { refreshWorkspaces } from "@/lib/workspaceRegistry";
 import { accessFor, DEFAULT_TENANT, isWorkspace, opens, workspacePath } from "@/lib/workspaces";
 
 export const ACCESS_COOKIE = "rn_access";
@@ -7,7 +8,8 @@ export const ACCESS_COOKIE = "rn_access";
 // (demo spec §23.9): /<workspace> for the app, /<workspace>/api/… for its API, / for the default workspace. The proxy
 // resolves the workspace from the path, checks the code opens it, and passes it on as a request header (replacing any
 // the client sent), rewriting /<workspace>/… to the app's own routes.
-export function proxy(request: NextRequest) {
+export async function proxy(request: NextRequest) {
+  await refreshWorkspaces();   // workspaces added in Settings (cached 30 s)
   const { pathname, search } = request.nextUrl;
   const first = pathname.split("/")[1] ?? "";
   // /history → / (the default workspace has no prefix).

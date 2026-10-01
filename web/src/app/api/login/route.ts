@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { ACCESS_COOKIE } from "@/proxy";
+import { refreshWorkspaces } from "@/lib/workspaceRegistry";
 import { accessFor, workspacePath } from "@/lib/workspaces";
 
 // The master code opens every workspace; a workspace's own code opens only it (demo spec §23.9). After signing in,
 // go where the person was headed if the code opens it, else to the code's workspace.
 export async function POST(request: Request) {
+  await refreshWorkspaces();   // a workspace code may name a workspace added in Settings
   const form = await request.formData();
   const code = String(form.get("code") ?? "").trim();
   const next = String(form.get("next") ?? "");

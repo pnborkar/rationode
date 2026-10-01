@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { cookies, headers } from "next/headers";
+import { refreshWorkspaces } from "@/lib/workspaceRegistry";
 import { accessFor, DEFAULT_TENANT, isWorkspace, visibleWorkspaces } from "@/lib/workspaces";
 import "./globals.css";
 
@@ -25,6 +26,7 @@ const THEME_SCRIPT = `try{if(localStorage.getItem("rn-theme")==="light")document
 export default async function RootLayout({ children }: LayoutProps<"/">) {
   // The page's workspace (§23.9): resolved from the path by the proxy; the dropdown lists the workspaces this access
   // code opens (all for the master code, one for a workspace's own code).
+  await refreshWorkspaces();
   const chosen = (await headers()).get("x-rationode-tenant");
   const tenant = isWorkspace(chosen) ? chosen : DEFAULT_TENANT;
   const access = accessFor((await cookies()).get("rn_access")?.value);

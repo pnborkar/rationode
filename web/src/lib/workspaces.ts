@@ -12,7 +12,20 @@ const VALID_ID = /^[a-z0-9][a-z0-9_-]{0,39}$/;
 
 export type Workspace = { id: string; name: string };
 
+// Workspaces added in Settings (§23.9; kept in Neo4j, loaded by workspaceRegistry.ts): treated as appended to the
+// configured list. The configured list (RATIONODE_WORKSPACES) always wins for an ID in both.
+let added: Workspace[] = [];
+export const isValidWorkspaceId = (id: string) => VALID_ID.test(id) && !RESERVED.has(id);
+export function setAddedWorkspaces(list: Workspace[]) {
+  const configured = new Set(configuredWorkspaces().map((w) => w.id));
+  added = list.filter((w) => isValidWorkspaceId(w.id) && !configured.has(w.id));
+}
+
 export function workspaces(): Workspace[] {
+  return [...configuredWorkspaces(), ...added];
+}
+
+export function configuredWorkspaces(): Workspace[] {
   const listed = (process.env.RATIONODE_WORKSPACES ?? "").split(",").map((w) => w.trim().replace(/^["']|["']$/g, "")).filter(Boolean)
     .map((w) => { const [id, ...name] = w.split(":"); return { id: id.trim(), name: name.join(":").trim() || id.trim() }; })
     .filter((w) => VALID_ID.test(w.id) && !RESERVED.has(w.id));
