@@ -105,3 +105,40 @@ export function mappingFingerprint(mappings: FileMapping[]): string {
                                      aliases: f.aliases, otherwise: f.otherwise })) })) });
   return JSON.stringify(mappings.map(strip).map((x) => JSON.stringify(x)).sort());
 }
+
+// ------------------------------------------------------------------ mapping files (§23.8 Gap 2: export / import)
+
+export type MappingFile = { rationode_mapping: 1; contract_version: string; workspace: string; source: string | null;
+                            approved_at: string | null; files: string[]; mappings: FileMapping[] };
+
+export function mappingFile(mappings: FileMapping[], meta: { workspace: string; source: string | null; approvedAt: string | null }, contractVersion: string): MappingFile {
+  return { rationode_mapping: 1, contract_version: contractVersion, workspace: meta.workspace, source: meta.source,
+           approved_at: meta.approvedAt, files: mappings.map((m) => m.file), mappings };
+}
+
+// Read an uploaded mapping file (an exported one, or a bare list of file mappings); each mapping is schema-checked.
+export function readMappingFile(text: string, schema: { safeParse: (x: unknown) => { success: boolean; data?: unknown; error?: { message: string } } }):
+    { mappings: FileMapping[]; meta: Partial<MappingFile> } | { error: string } {
+  let raw: unknown;
+  try { raw = JSON.parse(text); } catch { return { error: "not a JSON file" }; }
+  const list = Array.isArray(raw) ? raw : (raw as { mappings?: unknown })?.mappings;
+  if (!Array.isArray(list) || !list.length) return { error: "no mappings in this file" };
+  const mappings: FileMapping[] = [];
+  for (const [i, m] of list.entries()) {
+    const r = schema.safeParse(m);
+    if (!r.success) return { error: `mapping ${i + 1} isn't a valid mapping: ${r.error?.message.slice(0, 200)}` };
+    mappings.push(r.data as FileMapping);
+  }
+  return { mappings, meta: Array.isArray(raw) ? {} : (raw as Partial<MappingFile>) };
+}
+
+// Save JSON as a file in the browser.
+export function downloadJson(name: string, value: unknown) {
+  const url = URL.createObjectURL(new Blob([JSON.stringify(value, null, 2)], { type: "application/json" }));
+  const a = Object.assign(document.createElement("a"), { href: url, download: name });
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+export const mappingFileName = (workspace: string, source: string | null, date = new Date().toISOString().slice(0, 10)) =>
+  `${[workspace, source ?? "mapping"].map((x) => x.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")).join("-")}-mapping-${date}.json`;

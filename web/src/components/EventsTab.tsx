@@ -6,6 +6,9 @@ import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import ConnectSource from "./ConnectSource";
 import DeleteScenario from "./DeleteScenario";
+import { CONTRACT_VERSION } from "@/lib/contract";
+import { downloadJson, mappingFile, mappingFileName } from "@/lib/mappingEdits";
+import { WORKSPACE } from "@/lib/workspace";
 import type { ViewNode, ViewRel } from "./GraphView";
 
 const GraphView = dynamic(() => import("./GraphView"), { ssr: false });
@@ -80,6 +83,15 @@ export default function EventsTab({ active, onChanged }: { active: boolean; onCh
     fetch("/api/live").then((r) => r.json()).then((l) => { if (alive) setLive(l); });
     return () => { alive = false; };
   }, []);
+
+  // A source's approved mapping as a file (§23.8 Gap 2).
+  async function downloadSourceMapping(source: string) {
+    const res = await fetch(`/api/upload/mapping?source=${encodeURIComponent(source)}`);
+    const m = await res.json();
+    if (!res.ok) { window.alert(m.error ?? res.statusText); return; }
+    downloadJson(mappingFileName(WORKSPACE, source, m.approvedAt.slice(0, 10)),
+                 mappingFile(m.mappings, { workspace: WORKSPACE, source, approvedAt: m.approvedAt }, CONTRACT_VERSION));
+  }
 
   async function removeUpload(scenario: string, source?: string) {
     const u = uploads.find((x) => (x.source ?? x.scenario) === (source ?? scenario));
@@ -172,6 +184,8 @@ export default function EventsTab({ active, onChanged }: { active: boolean; onCh
                 <span className="truncate font-mono text-zinc-300" title={`${u.events} events · ${u.decisions} decisions`}>
                   {u.source ?? u.scenario} <span className="text-zinc-500">· {u.source
                     ? `${u.events.toLocaleString()} records · ${u.decisions.toLocaleString()} decisions` : `${u.customers} customers`}</span></span>
+                {u.source && <button onClick={() => downloadSourceMapping(u.source!)} title={`The mapping approved for "${u.source}", as a JSON file`}
+                                     className="rounded-md bg-zinc-800 px-2 py-0.5">Mapping ⤓</button>}
                 <button onClick={() => removeUpload(u.scenario, u.source)} disabled={!!busy}
                         title={u.source ? "Remove this source; the workspace's other sources stay" : undefined}
                         className="rounded-md bg-zinc-800 px-2 py-0.5 disabled:opacity-40">

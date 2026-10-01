@@ -5,9 +5,10 @@
 // it is written to Neo4j: in the demo under upload:<name>; in a workspace as a named source (§23.9).
 import dynamic from "next/dynamic";
 import { useEffect, useMemo, useState } from "react";
-import { DATA_FIELDS } from "@/lib/contract";
-import { mapFile, matches, parseFile, TRANSFORMS, type FieldMap, type FileMapping, type ParsedFile, type RecordMap } from "@/lib/mapping";
-import { applyFix, CHOICES, matchMapping, modeOf, newField, targetsFor, withMode, type SourceMode } from "@/lib/mappingEdits";
+import { CONTRACT_VERSION, DATA_FIELDS } from "@/lib/contract";
+import { FileMappingSchema, mapFile, matches, parseFile, TRANSFORMS, type FieldMap, type FileMapping, type ParsedFile, type RecordMap } from "@/lib/mapping";
+import { applyFix, CHOICES, downloadJson, mappingFile, mappingFileName, matchMapping, modeOf, newField, readMappingFile, targetsFor,
+         withMode, type SourceMode } from "@/lib/mappingEdits";
 import type { Check, CheckFix, Validation } from "@/lib/validator";
 import type { ViewNode, ViewRel } from "./GraphView";
 import { WORKSPACE } from "@/lib/workspace";
@@ -72,6 +73,7 @@ export default function ConnectSource({ active, onClose, onChanged }: { active: 
   const [report, setReport] = useState<ReportView | null>(null);
   // Outcome type -> window (days) the reviewer set (§23.11): used by Validate and saved with the load.
   const [windows, setWindows] = useState<Record<string, number>>({});
+  const [loadedMappings, setLoadedMappings] = useState<FileMapping[]>([]);   // what the last approved load used (to download)
   const [busy, setBusy] = useState<string | null>(null);
   const [result, setResult] = useState<RunResult | null>(null);
   const [graph, setGraph] = useState<{ email: string; nodes: ViewNode[]; rels: ViewRel[] } | null>(null);
@@ -167,21 +169,44 @@ export default function ConnectSource({ active, onClose, onChanged }: { active: 
   // Reuse the approved mapping of the source being loaded again (§23.8 Gap 1): each file gets the mapping made for a
   // file of the same name, else one whose columns it has (next month's export); no Claude call. Files that fit none
   // stay unmapped (map them with Claude).
+  // Apply the given mappings to the loaded files (by file name, else by columns); shared by reuse and mapping files.
+  function applyMappings(list: FileMapping[], origin: (m: { how: string; was: string }) => Proposal["reused"]) {
+    const next: Record<string, Proposal> = {};
+    const unmatched: string[] = [];
+    for (const f of files) {
+      const pf = parsed[f.name];
+      const m = typeof pf === "object" ? matchMapping(pf, list) : null;
+      if (m) next[f.name] = { status: "done", mapping: m.mapping, reused: origin(m) };
+      else unmatched.push(f.name);
+    }
+    setProposals(next); setReport(null); setResult(null);
+    return unmatched;
+  }
+
+  // A mapping file (exported from Rationode, §23.8 Gap 2): schema-checked here, matched to the files, validated as usual.
+  async function importMappingFile(list: FileList | null) {
+    const file = list?.[0];
+    if (!file) return;
+    setError(null);
+    const r = readMappingFile(await file.text(), FileMappingSchema);
+    if ("error" in r) { setError(`${file.name}: ${r.error}`); return; }
+    const unmatched = applyMappings(r.mappings, (m) => ({ how: "mapping file", was: `${file.name}${m.how === "same columns" ? ` (made for ${m.was})` : ""}`,
+                                                          approvedAt: r.meta.approved_at ?? "" }));
+    const notes = [
+      unmatched.length ? `No mapping in ${file.name} fits ${unmatched.join(", ")}: map ${unmatched.length > 1 ? "them" : "it"} with Claude.` : "",
+      r.meta.contract_version && r.meta.contract_version !== CONTRACT_VERSION
+        ? `${file.name} was written for contract ${r.meta.contract_version} (this is ${CONTRACT_VERSION}): check it at validation.` : "",
+    ].filter(Boolean);
+    if (notes.length) setError(notes.join(" "));
+  }
+
   async function reuseMapping() {
     setBusy("reuse"); setError(null); setReport(null); setResult(null);
     const res = await fetch(`/api/upload/mapping?source=${encodeURIComponent(name.trim())}`);
     const data = await res.json();
     setBusy(null);
     if (!res.ok) { setError(data.error ?? res.statusText); return; }
-    const next: Record<string, Proposal> = {};
-    const unmatched: string[] = [];
-    for (const f of files) {
-      const pf = parsed[f.name];
-      const m = typeof pf === "object" ? matchMapping(pf, data.mappings) : null;
-      if (m) next[f.name] = { status: "done", mapping: m.mapping, reused: { how: m.how, was: m.was, approvedAt: data.approvedAt } };
-      else unmatched.push(f.name);
-    }
-    setProposals(next);
+    const unmatched = applyMappings(data.mappings, (m) => ({ how: m.how, was: m.was, approvedAt: data.approvedAt }));
     if (unmatched.length) setError(`No approved mapping of "${name.trim()}" fits ${unmatched.join(", ")}: map ${unmatched.length > 1 ? "them" : "it"} with Claude.`);
   }
 
@@ -256,7 +281,7 @@ export default function ConnectSource({ active, onClose, onChanged }: { active: 
     const data = incremental ? (body.result ?? body) : body;
     if (res.ok && data.ok !== false) {
       if (incremental) { setIncremental(null); refreshPending(); }
-      setResult(data); setView("result"); onChanged(); refreshKnown();
+      setResult(data); setView("result"); onChanged(); refreshKnown(); setLoadedMappings(mappings);
       if (data.customers?.length) await showCustomer(data.customers[0].email);
       else if (data.subjects?.length) await showSubject(data.subjects[0].id);
     } else setError(data.error ?? res.statusText);
@@ -335,6 +360,14 @@ export default function ConnectSource({ active, onClose, onChanged }: { active: 
                     className="rounded-md bg-violet-600 px-3 py-1 font-semibold text-white disabled:opacity-40">
               {busy === "reuse" ? "Applying…" : `Use the approved mapping of "${name.trim()}"`}</button>
           )}
+          {files.length > 0 && !incremental && (
+            <label className={`cursor-pointer rounded-md border border-violet-700 px-3 py-1 font-semibold text-violet-200 ${busy ? "pointer-events-none opacity-40" : ""}`}
+                   title="A mapping exported from Rationode (Download this mapping), checked and validated before use">
+              Use a mapping file…
+              <input type="file" accept=".json,application/json" className="hidden"
+                     onChange={(e) => { importMappingFile(e.target.files); e.target.value = ""; }} />
+            </label>
+          )}
           <button onClick={proposeAll} disabled={!files.length || !!busy || !!incremental}
                   className="rounded-md bg-sky-600 px-3 py-1 font-semibold text-white disabled:opacity-40">
             {busy === "propose" ? "Claude is mapping…" : allMapped ? "Re-map with Claude" : "Map with Claude"}</button>
@@ -383,7 +416,7 @@ export default function ConnectSource({ active, onClose, onChanged }: { active: 
                       return c ? `v${c.from}–${c.to}: +${c.inserted} · ~${c.updated} · −${c.deleted}` : "unchanged"; })()
                       : x === undefined ? "" : typeof x === "string" ? "unreadable" : `${rowCount(f).toLocaleString()} rows${f.table ? ` · v${f.table.version}` : ""}`}
                     {" · "}{!p ? "not mapped" : p.status === "mapping" ? "Claude is mapping…" : p.status === "error" ? "mapping failed"
-                      : `${p.mapping!.records.length} record types${p.reused ? " · approved mapping reused" : ""}${p.edited ? " · edited" : ""}`}
+                      : `${p.mapping!.records.length} record types${p.reused ? (p.reused.how === "mapping file" ? " · from a mapping file" : " · approved mapping reused") : ""}${p.edited ? " · edited" : ""}`}
                   </span>
                   {p?.status === "mapping" && <span className="mt-1 block h-0.5 animate-pulse bg-sky-600" />}
                 </button>
@@ -415,7 +448,9 @@ export default function ConnectSource({ active, onClose, onChanged }: { active: 
               onWindows={DEMO || incremental ? undefined : (w) => { const all = { ...windows, ...w }; setWindows(all); validateWith(mappings, all); }}
               busy={!!busy} />}
             {view === "result" && result && (
-              <ResultView result={result} graph={graph} active={active} onCustomer={showCustomer} onSubject={showSubject} onRemove={removeBatch} busy={busy} />
+              <ResultView result={result} graph={graph} active={active} onCustomer={showCustomer} onSubject={showSubject} onRemove={removeBatch} busy={busy}
+                          onDownload={loadedMappings.length ? () => downloadJson(mappingFileName(TENANT, result.source ?? name),
+                            mappingFile(loadedMappings, { workspace: TENANT, source: result.source ?? name, approvedAt: new Date().toISOString() }, CONTRACT_VERSION)) : undefined} />
             )}
             {view !== "validate" && view !== "result" && pf && (typeof pf === "string"
               ? <p className="text-sm text-red-400">Could not read {view}: {pf}</p>
@@ -463,7 +498,9 @@ function MappingView({ file, mapping, proposal, total, onChange }: {
     <div className="space-y-4">
       <div>
         <p className="font-mono text-sm">{file.name} <span className="text-xs text-zinc-500">· {file.format} · {(total ?? file.rows.length).toLocaleString()} rows ·
-          source <span className="text-zinc-300">{mapping.source}</span> · {proposal.reused
+          source <span className="text-zinc-300">{mapping.source}</span> · {proposal.reused?.how === "mapping file"
+            ? `from the mapping file ${proposal.reused.was}${proposal.reused.approvedAt ? `, approved ${proposal.reused.approvedAt.slice(0, 10)}` : ""}`
+            : proposal.reused
             ? `the mapping approved on ${proposal.reused.approvedAt.slice(0, 10)}, reused (${proposal.reused.how}${proposal.reused.how === "same columns" ? `: made for ${proposal.reused.was}` : ""})`
             : `mapped by Claude in ${proposal.seconds}s`}{proposal.edited ? " · edited by you" : ""}</span></p>
         <p className="mt-1 text-sm text-zinc-300">{mapping.reason}</p>
@@ -774,9 +811,10 @@ function ValidationView({ report, onFix, onWindows, busy }: {
 }
 
 // ------------------------------------------------------------------ after loading
-function ResultView({ result, graph, active, onCustomer, onSubject, onRemove, busy }: {
+function ResultView({ result, graph, active, onCustomer, onSubject, onRemove, busy, onDownload }: {
   result: RunResult; graph: { email: string; nodes: ViewNode[]; rels: ViewRel[] } | null; active: boolean;
   onCustomer: (email: string) => void; onSubject: (id: string) => void; onRemove: () => void; busy: string | null;
+  onDownload?: () => void;   // the approved mapping as a file (§23.8 Gap 2)
 }) {
   const [expanded, setExpanded] = useState(false);
   useEffect(() => {   // Esc closes the expanded graph
@@ -830,6 +868,8 @@ function ResultView({ result, graph, active, onCustomer, onSubject, onRemove, bu
             </div>
           ))}</div>
         </div>
+        {onDownload && <button onClick={onDownload} title="The mapping you just approved, as a JSON file: keep it, review it, or use it for another load"
+                               className="mr-2 rounded-md bg-violet-700 px-3 py-1 text-xs font-semibold text-white">Download this mapping</button>}
         <button onClick={onRemove} disabled={!!busy} className="rounded-md bg-zinc-800 px-3 py-1 text-xs disabled:opacity-40">
           {busy === "remove" ? "Removing…" : result.source ? "Remove this source" : "Remove this batch"}</button>
       </div>

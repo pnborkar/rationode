@@ -12,6 +12,10 @@ export const CANONICAL_TYPES = [
   "decision.proposed", "decision.made", "context.observed", "outcome.observed",
 ] as const;
 
+// The contract's version, written into exported mapping files (§23.8 Gap 2): a mapping written against another version
+// is flagged on import. Bump when contract fields or event types change.
+export const CONTRACT_VERSION = "2026-10-01";
+
 export const GENERIC_TYPES = ["decision.proposed", "decision.made", "context.observed", "outcome.observed"] as const;
 export const isGeneric = (t: string) => (GENERIC_TYPES as readonly string[]).includes(t);
 
