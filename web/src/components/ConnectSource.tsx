@@ -7,7 +7,7 @@ import dynamic from "next/dynamic";
 import { useEffect, useMemo, useState } from "react";
 import { DATA_FIELDS } from "@/lib/contract";
 import { mapFile, matches, parseFile, TRANSFORMS, type FieldMap, type FileMapping, type ParsedFile, type RecordMap } from "@/lib/mapping";
-import { applyFix, CHOICES, modeOf, newField, targetsFor, withMode, type SourceMode } from "@/lib/mappingEdits";
+import { applyFix, CHOICES, matchMapping, modeOf, newField, targetsFor, withMode, type SourceMode } from "@/lib/mappingEdits";
 import type { Check, CheckFix, Validation } from "@/lib/validator";
 import type { ViewNode, ViewRel } from "./GraphView";
 import { WORKSPACE } from "@/lib/workspace";
@@ -25,7 +25,9 @@ const SAMPLE_FILES = ["zendesk_ticket_events.csv", "stripe_activity.csv", "suppo
 type Src = { name: string; content?: string; table?: { version: number; rows: number; preview: ParsedFile } };
 type Range = { table: string; from: number; to: number };
 type ChangeCount = Range & { inserted: number; updated: number; deleted: number };
-type Proposal = { status: "mapping" | "done" | "error"; mapping?: FileMapping; seconds?: number; error?: string; edited?: boolean };
+// reused: the source's approved mapping was applied (§23.8 Gap 1), matched by file name or by columns.
+type Proposal = { status: "mapping" | "done" | "error"; mapping?: FileMapping; seconds?: number; error?: string; edited?: boolean;
+                  reused?: { how: string; was: string; approvedAt: string } };
 type Stats = { support: number; dispute_rate: number | null; churn_rate: number | null; win_rate: number | null };
 type RunResult = { ok: boolean; error?: string; scenario: string; source?: string; counts: Record<string, number>;
                    analysis?: { stale: boolean; noTrees: boolean } | null;
@@ -162,6 +164,27 @@ export default function ConnectSource({ active, onClose, onChanged }: { active: 
     setBusy(null);
   }
 
+  // Reuse the approved mapping of the source being loaded again (§23.8 Gap 1): each file gets the mapping made for a
+  // file of the same name, else one whose columns it has (next month's export); no Claude call. Files that fit none
+  // stay unmapped (map them with Claude).
+  async function reuseMapping() {
+    setBusy("reuse"); setError(null); setReport(null); setResult(null);
+    const res = await fetch(`/api/upload/mapping?source=${encodeURIComponent(name.trim())}`);
+    const data = await res.json();
+    setBusy(null);
+    if (!res.ok) { setError(data.error ?? res.statusText); return; }
+    const next: Record<string, Proposal> = {};
+    const unmatched: string[] = [];
+    for (const f of files) {
+      const pf = parsed[f.name];
+      const m = typeof pf === "object" ? matchMapping(pf, data.mappings) : null;
+      if (m) next[f.name] = { status: "done", mapping: m.mapping, reused: { how: m.how, was: m.was, approvedAt: data.approvedAt } };
+      else unmatched.push(f.name);
+    }
+    setProposals(next);
+    if (unmatched.length) setError(`No approved mapping of "${name.trim()}" fits ${unmatched.join(", ")}: map ${unmatched.length > 1 ? "them" : "it"} with Claude.`);
+  }
+
   // The mapping editor (§23.8): every change goes through here, on a copy; the file is marked edited (kept on the
   // load's provenance) and has to be validated again.
   function editMapping(file: string, change: (m: FileMapping) => void) {
@@ -264,7 +287,7 @@ export default function ConnectSource({ active, onClose, onChanged }: { active: 
   const step = result ? 4 : report ? 3 : allMapped ? 2 : files.length ? 1 : 0;
   const changedTables = pending?.ranges?.length ?? 0;
   const t = report?.target;
-  const nothingNew = !!t && t.new === 0 && t.changed === 0 && t.removed === 0;
+  const nothingNew = !!t && t.new === 0 && t.changed === 0 && t.removed === 0 && !t.remapped;
 
   return (
     <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/60">
@@ -307,6 +330,11 @@ export default function ConnectSource({ active, onClose, onChanged }: { active: 
                className="w-44 rounded border border-zinc-700 bg-zinc-950 px-2 py-0.5 font-mono" />
         {!DEMO && <datalist id="known-sources">{known.map((k) => <option key={k} value={k} />)}</datalist>}
         <span className="ml-auto flex gap-2">
+          {!DEMO && known.includes(name.trim()) && files.length > 0 && !incremental && (
+            <button onClick={reuseMapping} disabled={!!busy} title={`Apply the mapping approved for "${name.trim()}" (no Claude call)`}
+                    className="rounded-md bg-violet-600 px-3 py-1 font-semibold text-white disabled:opacity-40">
+              {busy === "reuse" ? "Applying…" : `Use the approved mapping of "${name.trim()}"`}</button>
+          )}
           <button onClick={proposeAll} disabled={!files.length || !!busy || !!incremental}
                   className="rounded-md bg-sky-600 px-3 py-1 font-semibold text-white disabled:opacity-40">
             {busy === "propose" ? "Claude is mapping…" : allMapped ? "Re-map with Claude" : "Map with Claude"}</button>
@@ -355,7 +383,7 @@ export default function ConnectSource({ active, onClose, onChanged }: { active: 
                       return c ? `v${c.from}–${c.to}: +${c.inserted} · ~${c.updated} · −${c.deleted}` : "unchanged"; })()
                       : x === undefined ? "" : typeof x === "string" ? "unreadable" : `${rowCount(f).toLocaleString()} rows${f.table ? ` · v${f.table.version}` : ""}`}
                     {" · "}{!p ? "not mapped" : p.status === "mapping" ? "Claude is mapping…" : p.status === "error" ? "mapping failed"
-                      : `${p.mapping!.records.length} record types${p.edited ? " · edited" : ""}`}
+                      : `${p.mapping!.records.length} record types${p.reused ? " · approved mapping reused" : ""}${p.edited ? " · edited" : ""}`}
                   </span>
                   {p?.status === "mapping" && <span className="mt-1 block h-0.5 animate-pulse bg-sky-600" />}
                 </button>
@@ -435,7 +463,9 @@ function MappingView({ file, mapping, proposal, total, onChange }: {
     <div className="space-y-4">
       <div>
         <p className="font-mono text-sm">{file.name} <span className="text-xs text-zinc-500">· {file.format} · {(total ?? file.rows.length).toLocaleString()} rows ·
-          source <span className="text-zinc-300">{mapping.source}</span> · mapped by Claude in {proposal.seconds}s{proposal.edited ? " · edited by you" : ""}</span></p>
+          source <span className="text-zinc-300">{mapping.source}</span> · {proposal.reused
+            ? `the mapping approved on ${proposal.reused.approvedAt.slice(0, 10)}, reused (${proposal.reused.how}${proposal.reused.how === "same columns" ? `: made for ${proposal.reused.was}` : ""})`
+            : `mapped by Claude in ${proposal.seconds}s`}{proposal.edited ? " · edited by you" : ""}</span></p>
         <p className="mt-1 text-sm text-zinc-300">{mapping.reason}</p>
         <p className="mt-1 text-xs text-zinc-500">
           {total !== undefined && <span>In the {file.rows.length} example rows (the table stays in Databricks; Validate checks all {total.toLocaleString()}): </span>}
@@ -688,9 +718,11 @@ function ValidationView({ report, onFix, onWindows, busy }: {
               `${report.removal.files.length ? ` (from ${report.removal.files.join(", ")})` : ""}. If this is different data, ` +
               `even data related to "${report.removal.source}", change the source name to a new one and validate again: it's added ` +
               `beside "${report.removal.source}", and records that refer to its subjects (the same IDs) are linked to them.`
+          : report.target && !report.target.new && !report.target.changed && !report.target.removed && report.target.remapped
+            ? `All checks passed. The records are already loaded, but the mapping changed: approving re-interprets them with it.`
           : report.target && !report.target.new && !report.target.changed && !report.target.removed
-            ? `Nothing new: these files are already loaded as ${report.target.scenario}. Nothing to write.`
-          : report.target ? `All checks passed. These files update ${report.target.scenario}: ${report.target.new} new, ` +
+            ? `Nothing new: these files are already loaded as ${report.target.source ? `"${report.target.source}"` : report.target.scenario} with the same mapping. Nothing to write.`
+          : report.target ? `All checks passed. These files update ${report.target.source ? `the source "${report.target.source}"` : report.target.scenario}: ${report.target.new} new, ` +
               `${report.target.changed} changed${report.target.removed ? `, ${report.target.removed} removed` : ""} ` +
               `(${report.target.unchanged} unchanged). Nothing has been written yet: approve to update.`
           : "All checks passed. Nothing has been written yet: approve to load."}

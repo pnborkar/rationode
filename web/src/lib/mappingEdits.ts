@@ -68,3 +68,40 @@ export function applyFix(mapping: FileMapping, fix: CheckFix): { mapping: FileMa
   }
   return { mapping: m, changed };
 }
+
+// ------------------------------------------------------------------ reusing an approved mapping (§23.8 Gap 1)
+
+// The columns a file mapping reads: field columns, columns named in templates, and the row-type filters.
+export function columnsUsed(m: FileMapping): string[] {
+  const cols = new Set<string>();
+  for (const r of m.records) {
+    if (r.when) cols.add(r.when.column);
+    for (const f of r.fields) {
+      if (f.column) cols.add(f.column);
+      for (const [, c] of (f.template ?? "").matchAll(/\{([^}]+)\}/g)) cols.add(c);
+    }
+  }
+  for (const s of m.skipped) cols.add(s.when.column);
+  return [...cols];
+}
+
+// The approved mapping for a file: the one made for a file of the same name, else one whose columns are all in this
+// file (next month's export under a new name); null when none fits. The mapping is re-pointed at this file's name.
+export function matchMapping(file: { name: string; columns: string[] }, approved: FileMapping[]):
+    { mapping: FileMapping; how: "same file name" | "same columns"; was: string } | null {
+  const exact = approved.find((m) => m.file === file.name);
+  if (exact && columnsUsed(exact).every((c) => file.columns.includes(c))) return { mapping: exact, how: "same file name", was: exact.file };
+  const fits = approved.filter((m) => columnsUsed(m).every((c) => file.columns.includes(c)))
+    .sort((a, b) => columnsUsed(b).length - columnsUsed(a).length);
+  return fits[0] ? { mapping: { ...structuredClone(fits[0]), file: file.name }, how: "same columns", was: fits[0].file } : null;
+}
+
+// A mapping's content without what doesn't change its output (reasons, the file's name), to tell whether a mapping
+// differs from the approved one.
+export function mappingFingerprint(mappings: FileMapping[]): string {
+  const strip = (m: FileMapping) => ({ source: m.source, skipped: m.skipped.map((x) => x.when),
+    records: m.records.map((r) => ({ when: r.when, event_type: r.event_type,
+      fields: r.fields.map((f) => ({ target: f.target, column: f.column, template: f.template, value: f.value, transform: f.transform,
+                                     aliases: f.aliases, otherwise: f.otherwise })) })) });
+  return JSON.stringify(mappings.map(strip).map((x) => JSON.stringify(x)).sort());
+}

@@ -70,7 +70,9 @@ export type Validation = {
   // A workspace update that would remove most of a source's records (probably the wrong source name): approving needs
   // an explicit confirmation (§23.9).
   removal?: { source: string; removed: number; total: number; files: string[] };
-  target?: { scenario: string; source?: string; new: number; changed: number; unchanged: number; removed: number; examples: string[] };
+  // remapped: the records are unchanged but the mapping differs from the source's approved one (§23.11 gap): approving
+  // re-interprets them. reused: the mapping is the source's approved one, unchanged.
+  target?: { scenario: string; source?: string; remapped?: boolean; reused?: boolean; approvedAt?: string | null; new: number; changed: number; unchanged: number; removed: number; examples: string[] };
 };
 
 const counted = <T,>(items: T[], key: (x: T) => string) => {

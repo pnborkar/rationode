@@ -13,6 +13,7 @@ import { isGeneric } from "./contract";
 import { mapFile, parseFile, type FileMapping, type ParsedFile, type Record_ } from "./mapping";
 import type { ContractEvent } from "./contract";
 import type { KnownSubjects } from "./mappingAgent";
+import { mappingFingerprint } from "./mappingEdits";
 import { demoMode, query, baseScenario } from "./neo4j";
 import { placeScenario, recomputePoints, touchedPoints } from "./storyTrees";
 import { removeScenario, writeRows, type Rows } from "./storyWriter";
@@ -211,8 +212,11 @@ async function validateSource(parsed: ParsedFile[], mappings: FileMapping[], sou
   const exists = (await query(`MATCH (e:Event {scenario_id: $scenario, source_name: $source}) RETURN e LIMIT 1`, { scenario, source })).length > 0;
   if (exists) {
     const t = await diffAgainst(scenario, report.events, source);
-    report.target = t;
-    const nothing = t.new === 0 && t.changed === 0 && t.removed === 0;
+    // Same records, different mapping: approving re-interprets them (instead of "Nothing new", §23.11 gap).
+    const approved = await sourceMapping(source);
+    const same = !!approved && mappingFingerprint(approved.mappings) === mappingFingerprint(mappings);
+    report.target = { ...t, remapped: !!approved && !same, reused: same, approvedAt: approved?.approvedAt ?? null };
+    const nothing = t.new === 0 && t.changed === 0 && t.removed === 0 && same;
     // Picking an existing source for different files would replace it: say so loudly and require a confirmation.
     const total = t.unchanged + t.changed + t.removed;
     if (t.removed > 0 && (t.unchanged + t.changed === 0 || t.removed / total >= 0.5)) {
@@ -225,8 +229,13 @@ async function validateSource(parsed: ParsedFile[], mappings: FileMapping[], sou
         `(e.g. collections on these loans), give it a new source name: it's added beside "${source}", and records that refer to ` +
         `"${source}"'s subjects are linked to them (the join is shown here after validating). To replace the source anyway, approve and confirm.` });
     }
+    if (approved && !same) report.checks.unshift({ level: "warn", message: `The mapping differs from the one approved for "${source}" ` +
+      `(${approved.approvedAt.slice(0, 10)}): approving re-interprets all of its ${(t.unchanged + t.changed + t.new).toLocaleString()} records with ` +
+      `the new mapping.` });
+    else if (same && !nothing) report.checks.unshift({ level: "ok", message: `Using the mapping approved for "${source}" on ${approved!.approvedAt.slice(0, 10)}, unchanged.` });
     report.checks.unshift(nothing
-      ? { level: "ok", message: `Nothing new: all ${t.unchanged} records are already loaded in the source "${source}".` }
+      ? { level: "ok", message: `Nothing new: all ${t.unchanged} records are already loaded in the source "${source}" with the same mapping.` }
+      : t.new + t.changed + t.removed === 0 ? { level: "ok", message: `The records of "${source}" are unchanged (${t.unchanged.toLocaleString()}); only the mapping differs.` }
       : { level: "ok", message: `Updates the source "${source}" with ${t.new} new and ${t.changed} changed records` +
           (t.removed ? `; ${t.removed} of its records not in these files will be removed` : "") +
           (others.length ? `. Other sources stay as they are (${others.map((x) => `"${x.source}"`).join(", ")}).` : "."),
@@ -378,6 +387,16 @@ async function subjectJoins(scenario: string, events: ContractEvent[]) {
         fix: { kind: "subject_system" as const, type: f.type, system: f.existing } });
 }
 
+// The mapping a source's latest load approved (§23.8 Gap 1: reused when the same source is loaded again).
+export async function sourceMapping(source: string): Promise<{ mappings: FileMapping[]; approvedAt: string } | null> {
+  if (demoMode()) return null;
+  const [r] = await query<{ json: string; at: string }>(
+    `MATCH (b:UploadBatch {scenario_id: $scenario, source_name: $source})-[:USED_MAPPING]->(m:Mapping)
+     WHERE NOT EXISTS { (:UploadBatch)-[:SUPERSEDES]->(b) }
+     RETURN m.mapping_json AS json, toString(b.loaded_at) AS at`, { scenario: baseScenario(), source });
+  return r ? { mappings: JSON.parse(r.json), approvedAt: r.at } : null;
+}
+
 export type SourceInfo = { source: string; events: number; decisions: number; files: string[]; loaded_at: string | null };
 
 // The workspace's sources, with what each holds (decisions are counted by the source of the event they came from).
@@ -513,8 +532,8 @@ async function runSource(parsed: ParsedFile[], mappings: FileMapping[], source: 
       `source "${source}". Use a new source name for different data, or confirm the replacement.` };
   }
   const t = report.target;
-  if (t && t.new === 0 && t.changed === 0 && t.removed === 0) {
-    return { ok: false as const, error: `Nothing new: all records are already loaded in the source "${source}".` };
+  if (t && t.new === 0 && t.changed === 0 && t.removed === 0 && !t.remapped) {
+    return { ok: false as const, error: `Nothing new: all records are already loaded in the source "${source}" with the same mapping.` };
   }
   const scenario = baseScenario();
   const loadedAt = new Date().toISOString(), batchId = `${scenario}@${loadedAt}`;
@@ -529,7 +548,9 @@ async function runSource(parsed: ParsedFile[], mappings: FileMapping[], source: 
   const mappingJson = JSON.stringify(mappings);
   await query(PROVENANCE, {
     mappingId: createHash("sha256").update(mappingJson).digest("hex").slice(0, 16), mappingJson,
-    files: parsed.map((f) => f.name), proposedBy: `Claude mapping agent (${(await aiSettings()).mappingModel}), reviewed and approved in the app`,
+    files: parsed.map((f) => f.name),
+    proposedBy: t?.reused ? `reused the mapping approved for "${source}" on ${t.approvedAt?.slice(0, 10)}`
+      : `Claude mapping agent (${(await aiSettings()).mappingModel}), reviewed and approved in the app`,
     batchId, scenario, name: source, loadedAt, records: report.events.length,
     new: t ? t.new : report.events.length, changed: t?.changed ?? 0, unchanged: t?.unchanged ?? 0, removed: t?.removed ?? 0,
     editedFiles, sourcesJson: sources.length ? JSON.stringify(sources) : null, perSource: true,
