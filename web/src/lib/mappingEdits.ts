@@ -117,7 +117,8 @@ export function mappingFile(mappings: FileMapping[], meta: { workspace: string; 
 }
 
 // Read an uploaded mapping file (an exported one, or a bare list of file mappings); each mapping is schema-checked.
-export function readMappingFile(text: string, schema: { safeParse: (x: unknown) => { success: boolean; data?: unknown; error?: { message: string } } }):
+export function readMappingFile(text: string, schema: { safeParse: (x: unknown) => { success: boolean; data?: unknown;
+                                                       error?: { message: string; issues?: { path: PropertyKey[]; message: string }[] } } }):
     { mappings: FileMapping[]; meta: Partial<MappingFile> } | { error: string } {
   let raw: unknown;
   try { raw = JSON.parse(text); } catch { return { error: "not a JSON file" }; }
@@ -126,7 +127,10 @@ export function readMappingFile(text: string, schema: { safeParse: (x: unknown) 
   const mappings: FileMapping[] = [];
   for (const [i, m] of list.entries()) {
     const r = schema.safeParse(m);
-    if (!r.success) return { error: `mapping ${i + 1} isn't a valid mapping: ${r.error?.message.slice(0, 200)}` };
+    if (!r.success) {
+      const issue = r.error?.issues?.[0];
+      return { error: `mapping ${i + 1} isn't a valid mapping: ${issue ? `${issue.path.map(String).join(".") || "(top)"}: ${issue.message}` : r.error?.message.slice(0, 200)}` };
+    }
     mappings.push(r.data as FileMapping);
   }
   return { mappings, meta: Array.isArray(raw) ? {} : (raw as Partial<MappingFile>) };
