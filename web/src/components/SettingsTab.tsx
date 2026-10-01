@@ -3,6 +3,7 @@
 // customer points their agent and Zendesk at, and the tenant's Databricks connection (saved in Neo4j, token
 // encrypted). Secrets are never shown: only whether they're set.
 import { useEffect, useState } from "react";
+import DecisionModel from "./DecisionModel";
 import DeleteScenario from "./DeleteScenario";
 
 type Status = {
@@ -103,6 +104,8 @@ export default function SettingsTab() {
   const dbxOn = d.source !== null && d.token === "set";
   return (
     <div className="grid min-h-0 flex-1 grid-cols-2 gap-3 overflow-y-auto">
+      {/* The workspace's decision model (§22.1): its business settings, full width. */}
+      <div className="col-span-2"><Section title={`Decision model · ${status.tenant}`}><DecisionModel /></Section></div>
       <div className="space-y-3">
         <Section title={`Connections · tenant ${status.tenant}`}>
           <div className="flex items-start justify-between gap-3">

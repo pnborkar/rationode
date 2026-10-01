@@ -22,6 +22,10 @@ const DAY_MS = 86_400_000;
 export type Registry = {
   options: Record<string, Record<string, string>>;   // decision type -> option -> APPROVED | PROPOSED
   windows: Record<string, number>;                   // outcome type -> attribution window (days)
+  // A workspace's decision model (§22.1; generic outcomes only): the window for outcome types without one, and
+  // good / bad set in Settings over what the data says.
+  defaultWindow?: number;
+  polarities?: Record<string, "good" | "bad">;
 };
 
 // Same query as pipeline/src/rationode/pipeline/write.py load_registry.
@@ -77,7 +81,8 @@ export class Detector {
 
   constructor(registry: Registry, scenario = "history") {
     // The detector marks unseen options PROPOSED as it goes, so it works on its own copy.
-    this.reg = { options: Object.fromEntries(Object.entries(registry.options).map(([k, v]) => [k, { ...v }])), windows: { ...registry.windows } };
+    this.reg = { options: Object.fromEntries(Object.entries(registry.options).map(([k, v]) => [k, { ...v }])), windows: { ...registry.windows },
+                 defaultWindow: registry.defaultWindow, polarities: registry.polarities };
     this.scenario = scenario;
   }
 

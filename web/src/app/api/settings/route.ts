@@ -3,7 +3,7 @@ import { listTables } from "@/lib/databricks";
 import { query, baseScenario } from "@/lib/neo4j";
 import { aiStatus, candidateDatabricks, databricksStatus, settingsKeySet, testAi } from "@/lib/settings";
 import { listUploads } from "@/lib/uploads";
-import { withTenant } from "@/lib/tenant";
+import { apiPath, withTenant } from "@/lib/tenant";
 
 export const maxDuration = 120;
 
@@ -19,7 +19,8 @@ async function GET_(request: Request) {
     databricks: await databricksStatus(),
     settingsKey: settingsKeySet(),
     accessCode: env("DEMO_ACCESS_CODE"),
-    endpoints: { gateway: `${origin}/api/gateway`, zendesk: `${origin}/api/webhooks/zendesk`, mcp: `${origin}/api/mcp` },
+    // This workspace's own endpoints (/<workspace>/api/…, §23.9).
+    endpoints: { gateway: `${origin}${apiPath("/api/gateway")}`, zendesk: `${origin}${apiPath("/api/webhooks/zendesk")}`, mcp: `${origin}${apiPath("/api/mcp")}` },
     loads: await listUploads(),
   });
 }

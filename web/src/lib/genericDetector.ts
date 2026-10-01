@@ -146,7 +146,8 @@ export class GenericDetector extends Detector {
         const type = snake(String(d.outcome_type ?? ""));
         if (!type) { this.rows.review.push({ event_id: e.event_id, reason: "outcome without a type" }); continue; }
         const pol = snake(String(d.polarity ?? ""));
-        const polarity = ["good", "positive", "success"].includes(pol) ? "good" : ["bad", "negative", "failure"].includes(pol) ? "bad" : null;
+        const polarity = this.reg.polarities?.[type]   // set in Settings (§22.1) over what the data says
+          ?? (["good", "positive", "success"].includes(pol) ? "good" : ["bad", "negative", "failure"].includes(pol) ? "bad" : null);
         if (!polarity) this.n.unknownPolarity[type] = (this.n.unknownPolarity[type] ?? 0) + 1;
         // Every outcome is linked to what it's about (Outcome -ABOUT-> subject), credited to a decision or not (§23.11).
         const out = this.outcome(e, type, num(d.value), { polarity, subject_id: s.subject });
@@ -156,7 +157,7 @@ export class GenericDetector extends Detector {
         // application's outcome, its offers), then about its parent.
         const named = x.follows_id ? bySource.get(x.follows_id) : undefined;
         if (named && ms(named.at) <= ms(e.occurred_at)) { this.ledTo(named.id, out, type, "EXPLICIT_REF", 1.0); continue; }
-        const windowDays = this.reg.windows[type] ?? DEFAULT_WINDOW_DAYS, at = ms(e.occurred_at);
+        const windowDays = this.reg.windows[type] ?? this.reg.defaultWindow ?? DEFAULT_WINDOW_DAYS, at = ms(e.occurred_at);
         const days = (c: Dec) => (at - ms(c.at)) / DAY_MS, inWindow = (c: Dec) => days(c) <= windowDays;
         const finals = decisions.filter((c) => c.stage === "FINAL" && ms(c.at) <= at);
         const own = finals.filter((c) => c.subject === s.subject);

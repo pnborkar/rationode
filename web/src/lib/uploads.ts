@@ -8,6 +8,7 @@ import { aiSettings } from "./settings";
 import { REGISTRY_CYPHER, registryFrom, rowsDict, type Registry } from "./detector";
 import { detectAll, snake } from "./genericDetector";
 import { approveIntroduced, deriveAttributes } from "./genericFeatures";
+import { getModel, saveModel, type DecisionModel } from "./decisionModel";
 import { isGeneric } from "./contract";
 import { mapFile, parseFile, type FileMapping, type ParsedFile, type Record_ } from "./mapping";
 import type { ContractEvent } from "./contract";
@@ -22,25 +23,57 @@ export type TableSource = { table: string; version: number };   // a Databricks 
 
 export const MAX_FILE_BYTES = 30_000_000;   // tables from Databricks can be larger than uploads
 
-export async function loadRegistry(windows: Windows = {}): Promise<Registry> {
+// The schema registry, with (in a workspace) its decision model on top (§22.1): outcome windows and good / bad set in
+// Settings, then windows set at validation (before they're saved). The 90 days a mapping's outcome type was registered
+// with is only a placeholder, so the workspace default applies to those types.
+export async function loadRegistry(windows: Windows = {}, model?: DecisionModel): Promise<Registry> {
   const reg = registryFrom(await query(REGISTRY_CYPHER));
-  return { ...reg, windows: { ...reg.windows, ...windows } };   // windows set in the editor, before they're saved
+  if (demoMode()) return { ...reg, windows: { ...reg.windows, ...windows } };
+  const m = model ?? await getModel();
+  const placeholders = (await query<{ key: string }>(
+    `MATCH (s:SchemaElement {kind: 'OUTCOME_TYPE', created_by: 'mapping'}) RETURN s.key AS key`)).map((r) => r.key.replace(/^outcome\./, ""));
+  const base = Object.fromEntries(Object.entries(reg.windows).filter(([t]) => !placeholders.includes(t)));
+  return { ...reg, windows: { ...base, ...m.windows, ...windows }, defaultWindow: m.defaultWindow, polarities: m.polarities };
 }
 
 // Outcome type -> window (days) chosen at validation (§23.11), saved with the outcome type when the load is approved.
 export type Windows = Record<string, number>;
 
+// Windows chosen at validation go into this workspace's decision model (never the shared registry), recorded.
 async function saveWindows(windows: Windows) {
-  const rows = Object.entries(windows).map(([type, days]) => ({ type, days }));
-  if (!rows.length) return;
-  // Only outcome types a mapping introduced: Streamly's registry entries are not touched.
-  await query(
-    `UNWIND $rows AS r
-     MERGE (s:SchemaElement {key: 'outcome.' + r.type})
-     ON CREATE SET s.kind = 'OUTCOME_TYPE', s.status = 'APPROVED', s.created_by = 'mapping', s.created_at = datetime(),
-                   s.display_name = replace(r.type, '_', ' '), s.version = 1
-     WITH s, r WHERE s.created_by = 'mapping'
-     SET s.default_window_days = toInteger(r.days), s.window_set_at = datetime()`, { rows });
+  if (!Object.keys(windows).length) return;
+  const m = await getModel();
+  await saveModel({ ...m, windows: { ...m.windows, ...windows } }, "load approval");
+}
+
+// Settings (§22.1): what a changed decision model would credit differently, without writing anything.
+export async function previewModel(next: DecisionModel) {
+  const scenario = baseScenario();
+  const all = await otherSourceEvents(scenario, null);
+  if ("error" in all) return { error: all.error };
+  const summarise = (registry: Registry) => {
+    const rows = rowsDict(detectAll(registry, scenario, all.events!).rows);
+    const credited = new Set(rows.led_to.map((l) => l.outcome_id as string));
+    const outside = new Set(rows.led_to.filter((l) => l.outside_window).map((l) => l.outcome_id as string));
+    const out: Record<string, { n: number; credited: number; outside: number; bad: number }> = {};
+    for (const o of rows.outcomes) {
+      const t = (out[o.outcome_type as string] ??= { n: 0, credited: 0, outside: 0, bad: 0 });
+      t.n++; if (credited.has(o.outcome_id as string)) t.credited++; if (outside.has(o.outcome_id as string)) t.outside++;
+      if (o.polarity === "bad") t.bad++;
+    }
+    return out;
+  };
+  const [now, after] = [summarise(await loadRegistry()), summarise(await loadRegistry({}, next))];
+  return { types: Object.keys({ ...now, ...after }).sort().map((type) => ({ type, now: now[type], after: after[type] })) };
+}
+
+// Settings (§22.1): save the model and re-process the workspace with it (every source re-detected).
+export async function applyModel(next: DecisionModel) {
+  const changes = await saveModel(next);
+  if (!changes.length) return { changes, reprocessed: false };
+  const r = await rebuild(baseScenario(), null, [], () => ({}), await loadRegistry({}, next));
+  if ("error" in r) return { changes, reprocessed: false, error: r.error };
+  return { changes, reprocessed: true, analysis: await analysisStatus() };
 }
 
 // In the demo, each load is its own removable batch (upload:<name>). In another workspace, loads are sources of the
@@ -505,6 +538,16 @@ async function runSource(parsed: ParsedFile[], mappings: FileMapping[], source: 
   const introduced = [...new Set(report.events.filter((e) => isGeneric(e.event_type) && e.data.decision_type)
     .map((e) => r.rows.decisions.find((d) => d.decision_id === `${scenario}|dec:${e.event_id}`)?.decision_type as string).filter(Boolean))];
   if (introduced.length) await approveIntroduced(scenario, introduced);
+  // Outcome types this load brings are registered too, even from a source with outcomes only (e.g. collections on
+  // another source's loans): trees use registered outcome types. No window here: the workspace's model holds those.
+  const outcomeTypes = [...new Map(report.events.filter((e) => e.event_type === "outcome.observed" && e.data.outcome_type)
+    .map((e) => [snake(String(e.data.outcome_type)), String(e.data.polarity ?? "").toLowerCase() || null])).entries()].map(([type, polarity]) => ({ type, polarity }));
+  if (outcomeTypes.length) await query(
+    `UNWIND $rows AS r
+     MERGE (s:SchemaElement {key: 'outcome.' + r.type})
+     ON CREATE SET s.kind = 'OUTCOME_TYPE', s.status = 'APPROVED', s.created_by = 'mapping', s.created_at = datetime(),
+                   s.default_window_days = 90, s.polarity = r.polarity, s.display_name = replace(r.type, '_', ' '), s.version = 1`,
+    { rows: outcomeTypes });
   await saveWindows(windows);   // the windows chosen at validation, for every later load and the outcome rates
   // What this source brought: its systems' subjects and customers (the rest of the workspace is unchanged).
   const systems = new Set(mappings.map((m) => m.source));

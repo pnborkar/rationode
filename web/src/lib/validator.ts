@@ -299,7 +299,7 @@ export function validate(files: ParsedFile[], mappings: FileMapping[], registry:
       }),
       outcomes: counted(dict.outcomes, (o) => o.outcome_type as string).map(({ k, count }) => ({ outcome_type: k, count })),
       // Each outcome type's window as used in this dry run (the registry's, or 90 days), for the editor.
-      windows: Object.fromEntries([...new Set(dict.outcomes.map((o) => o.outcome_type as string))].map((t) => [t, registry.windows[t] ?? 90])),
+      windows: Object.fromEntries([...new Set(dict.outcomes.map((o) => o.outcome_type as string))].map((t) => [t, registry.windows[t] ?? registry.defaultWindow ?? 90])),
       overrides: dict.overrides.length, identityLinks: dict.same_as.length,
       customers: new Set(dict.entities.filter((e) => e.label === "Customer" && e.source_system === "stripe").map((e) => e.entity_id)).size,
       schemaProposals: dict.schema_proposals.map((s) => s.key as string),
