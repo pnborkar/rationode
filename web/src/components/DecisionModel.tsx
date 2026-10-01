@@ -86,7 +86,7 @@ export default function DecisionModel() {
         </table>
       )}
       <div className="flex flex-wrap items-center gap-2">
-        <button disabled={!changed || !!busy} onClick={() => post("preview")} className="rounded bg-sky-700 px-3 py-0.5 font-semibold text-white disabled:opacity-40">
+        <button disabled={!changed || !!busy} onClick={() => post("preview")} className="rounded bg-sky-600 px-3 py-0.5 font-semibold text-white disabled:opacity-40">
           {busy === "preview" ? "Working it out…" : "Preview the effect"}</button>
         <button disabled={!changed || !preview || "error" in (preview ?? {}) || !!busy}
                 onClick={() => { if (window.confirm("Save these settings and re-process the workspace with them?")) post("apply"); }}

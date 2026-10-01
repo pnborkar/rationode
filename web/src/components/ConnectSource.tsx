@@ -54,7 +54,7 @@ function CheckLine({ c, onFix }: { c: Check; onFix?: (fix: CheckFix) => void }) 
       <span className={`w-3 font-bold ${cls}`}>{icon}</span>
       <span className="text-zinc-300">{c.message}
         {c.examples?.length ? <span className="text-zinc-500"> · {c.examples.join(", ")}</span> : null}
-        {c.fix && onFix && <button onClick={() => onFix(c.fix!)} className="ml-2 rounded bg-sky-700 px-2 py-0.5 text-[11px] font-semibold text-white hover:bg-sky-600">
+        {c.fix && onFix && <button onClick={() => onFix(c.fix!)} className="ml-2 rounded bg-sky-600 px-2 py-0.5 text-[11px] font-semibold text-white hover:bg-sky-500">
           Link to {c.fix.system}&apos;s {c.fix.type}s</button>}</span>
     </li>
   );
@@ -710,7 +710,7 @@ function AddField({ rec, onAdd }: { rec: RecordMap; onAdd: (target: string) => v
       {isOpen && <input value={name} onChange={(e) => setName(e.target.value)} placeholder="name, e.g. credit_score"
                         className="w-40 rounded border border-zinc-700 bg-zinc-950 px-1.5 py-0.5 font-mono" />}
       <button disabled={!target || (isOpen && !name.trim()) || used.has(full)} onClick={() => { onAdd(full); setTarget(""); setName(""); }}
-              className="rounded bg-zinc-700 px-2 py-0.5 font-semibold disabled:opacity-40">Add</button>
+              className="rounded bg-sky-600 px-2 py-0.5 font-semibold text-white disabled:opacity-40">Add</button>
     </div>
   );
 }
@@ -736,7 +736,7 @@ function OutcomeWindows({ windows, onApply, busy }: { windows: Record<string, nu
           </label>
         ))}
         <button disabled={!changed || busy} onClick={() => onApply(Object.fromEntries(Object.entries(draft).filter(([t, v]) => v !== windows[t] && v >= 1)))}
-                className="rounded bg-sky-700 px-2 py-0.5 font-semibold text-white disabled:opacity-40">Validate with these windows</button>
+                className="rounded bg-sky-600 px-2 py-0.5 font-semibold text-white disabled:opacity-40">Validate with these windows</button>
       </div>
     </div>
   );
@@ -869,7 +869,7 @@ function ResultView({ result, graph, active, onCustomer, onSubject, onRemove, bu
           ))}</div>
         </div>
         {onDownload && <button onClick={onDownload} title="The mapping you just approved, as a JSON file: keep it, review it, or use it for another load"
-                               className="mr-2 rounded-md bg-violet-700 px-3 py-1 text-xs font-semibold text-white">Download this mapping</button>}
+                               className="mr-2 rounded-md bg-violet-600 px-3 py-1 text-xs font-semibold text-white">Download this mapping</button>}
         <button onClick={onRemove} disabled={!!busy} className="rounded-md bg-zinc-800 px-3 py-1 text-xs disabled:opacity-40">
           {busy === "remove" ? "Removing…" : result.source ? "Remove this source" : "Remove this batch"}</button>
       </div>
