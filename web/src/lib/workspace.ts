@@ -1,33 +1,35 @@
-// The browser's workspace (demo spec §23.9). The layout puts the workspace this page was loaded for on window (from
-// the rn_tenant cookie the dropdown sets); every API call from this page is tagged with it (one fetch wrapper), so
-// two tabs on different workspaces never mix. Switching sets the cookie and reloads.
+// The browser's workspace (demo spec §23.9). The page is served at /<workspace> (the default workspace at /); the
+// layout puts that workspace on window, and every API call from this page goes to /<workspace>/api/… (one fetch
+// wrapper), so two tabs on different workspaces never mix. Switching workspace is a navigation.
 declare global {
-  interface Window { __RN_TENANT__?: string; __RN_WORKSPACES__?: { id: string; name: string }[]; __rnFetchTagged?: boolean }
+  interface Window { __RN_TENANT__?: string; __RN_DEFAULT__?: string; __RN_WORKSPACES__?: { id: string; name: string }[]; __rnFetchTagged?: boolean }
 }
 
 const fallback = process.env.NEXT_PUBLIC_RATIONODE_TENANT ?? "history";
-export const WORKSPACE: string = typeof window !== "undefined" ? window.__RN_TENANT__ ?? fallback : fallback;
+const browser = typeof window !== "undefined";
+export const WORKSPACE: string = browser ? window.__RN_TENANT__ ?? fallback : fallback;
+const DEFAULT_WORKSPACE: string = browser ? window.__RN_DEFAULT__ ?? fallback : fallback;
 export const WORKSPACE_IS_DEMO = WORKSPACE === "history";
-export const WORKSPACES: { id: string; name: string }[] =
-  (typeof window !== "undefined" && window.__RN_WORKSPACES__) || [{ id: WORKSPACE, name: WORKSPACE }];
+export const WORKSPACES: { id: string; name: string }[] = (browser && window.__RN_WORKSPACES__) || [{ id: WORKSPACE, name: WORKSPACE }];
 export const workspaceName = (id = WORKSPACE) => WORKSPACES.find((w) => w.id === id)?.name ?? (id === "history" ? "Streamly demo" : id);
 
-if (typeof window !== "undefined" && !window.__rnFetchTagged) {
+// Where a workspace's page lives.
+export const workspaceHref = (id: string) => (id === DEFAULT_WORKSPACE ? "/" : `/${id}`);
+
+if (browser && !window.__rnFetchTagged && WORKSPACE !== DEFAULT_WORKSPACE) {
   window.__rnFetchTagged = true;
   const original = window.fetch.bind(window);
   window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
     const path = url.startsWith("/") ? url : url.startsWith(window.location.origin) ? url.slice(window.location.origin.length) : null;
     if (path?.startsWith("/api/")) {
-      const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
-      headers.set("x-rationode-tenant", WORKSPACE);
-      return original(input, { ...init, headers });
+      const target = `/${WORKSPACE}${path}`;
+      return original(input instanceof Request ? new Request(target, input) : target, init);
     }
     return original(input, init);
   };
 }
 
 export function switchWorkspace(id: string) {
-  document.cookie = `rn_tenant=${encodeURIComponent(id)}; path=/; max-age=31536000; samesite=lax`;
-  window.location.reload();
+  window.location.href = workspaceHref(id);
 }

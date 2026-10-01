@@ -8,7 +8,7 @@ import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprot
 import { after } from "next/server";
 import { demoClock, ingestLive, newId } from "@/lib/live";
 import { appAuth, jsonResult, withMcp } from "@/lib/mcpClient";
-import { withTenant } from "@/lib/tenant";
+import { apiPath, withTenant } from "@/lib/tenant";
 
 export const maxDuration = 60;
 
@@ -38,7 +38,7 @@ function server(upstream: string, agent: { id: string; version: string; session:
 
 async function handle(request: Request): Promise<Response> {
   const h = request.headers;
-  const upstream = new URL("/api/streamly/mcp", request.url).toString();
+  const upstream = new URL(apiPath("/api/streamly/mcp"), request.url).toString();   // the same workspace's tool server
   const agent = { id: h.get("x-agent-id") ?? "unknown-agent", version: h.get("x-agent-version") ?? "unknown",
                   session: h.get("x-agent-session") ?? newId("sess") };
   const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });

@@ -598,11 +598,14 @@ export default function StreamlyLive() {
           <div>
             {/* The product name only; the tenant shown beside it (the demo's data is Streamly's story). */}
             <h1 className="flex items-center gap-2 text-lg font-semibold">Rationode
-              {/* The workspace (tenant, §23.9): switching reloads the app for the chosen one. */}
-              <select value={WORKSPACE} onChange={(e) => switchWorkspace(e.target.value)} disabled={running} title="Workspace"
-                      className="rounded-md border border-white/20 bg-white/10 px-2 py-0.5 text-sm font-normal text-white">
-                {WORKSPACES.map((w) => <option key={w.id} value={w.id} className="text-zinc-900">{w.name}</option>)}
-              </select></h1>
+              {/* The workspace (§23.9): each lives at /<workspace>; switching goes there. A workspace's own access code
+                  sees only that workspace, so just its name. */}
+              {WORKSPACES.length > 1 ? (
+                <select value={WORKSPACE} onChange={(e) => switchWorkspace(e.target.value)} disabled={running} title="Workspace"
+                        className="rounded-md border border-white/20 bg-white/10 px-2 py-0.5 text-sm font-normal text-white">
+                  {WORKSPACES.map((w) => <option key={w.id} value={w.id} className="text-zinc-900">{w.name}</option>)}
+                </select>
+              ) : <span className="rounded-md bg-white/10 px-2 py-0.5 text-sm font-normal">{WORKSPACES[0]?.name ?? WORKSPACE}</span>}</h1>
             <p className="text-xs text-white/70">Every decision from AI, humans, and systems, in one Neo4j graph</p>
           </div>
           <nav className="flex rounded-full bg-white/10 p-1 text-sm">

@@ -7,6 +7,7 @@ import { checkFraudPatterns } from "./fraud";
 import { appAuth, jsonResult, withMcp } from "./mcpClient";
 import { checkBeforeAct } from "./precedent";
 import { aiSettings, anthropicClient } from "./settings";
+import { apiPath } from "./tenant";
 
 export const AGENT_VERSION = "v2";
 
@@ -155,11 +156,11 @@ async function streamlyTool(ctx: RunContext, name: string, args: Record<string, 
   let via = "Rationode gateway";
   let r: Record<string, unknown>;
   try {
-    r = await call(`${ctx.origin}/api/gateway`, { ...appAuth(), "x-agent-id": "streamly-support-agent",
+    r = await call(`${ctx.origin}${apiPath("/api/gateway")}`, { ...appAuth(), "x-agent-id": "streamly-support-agent",
                                                    "x-agent-version": AGENT_VERSION, "x-agent-session": ctx.session });
   } catch {
     via = "direct (gateway unreachable)";
-    r = await call(`${ctx.origin}/api/streamly/mcp`, appAuth());
+    r = await call(`${ctx.origin}${apiPath("/api/streamly/mcp")}`, appAuth());
   }
   return { result: jsonResult(r), is_error: r.isError === true, via, ms: Date.now() - started };
 }
