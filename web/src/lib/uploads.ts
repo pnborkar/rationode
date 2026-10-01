@@ -322,7 +322,8 @@ async function subjectJoins(scenario: string, events: ContractEvent[]) {
     ? { level: "ok" as const, message: `${f.n} ${f.type} subject(s) in these files are existing ones from "${f.existing}": they join that source's ${f.type}s.` }
     : { level: "warn" as const, message: `${f.n} ${f.type} ID(s) in these files match ${f.type}s already in the workspace from "${f.existing}", ` +
         `but are mapped as "${f.mapped}" ${f.type}s, so they'll be separate. If they're the same ${f.type}s, set refs.subject_system ` +
-        `(or refs.parent_system for the parent) to "${f.existing}".` });
+        `(or refs.parent_system for the parent) to "${f.existing}".`,
+        fix: { kind: "subject_system" as const, type: f.type, system: f.existing } });
 }
 
 export type SourceInfo = { source: string; events: number; decisions: number; files: string[]; loaded_at: string | null };

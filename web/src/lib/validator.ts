@@ -44,7 +44,10 @@ const OPTION_FIELDS: { type: CanonicalType; field: string; decisionType: string 
   { type: "agent.dispute_lookup", field: "available_evidence", decisionType: "dispute.evidence" },
 ];
 
-export type Check = { level: "ok" | "warn" | "error"; file?: string; message: string; examples?: string[] };
+// fix: a mapping change the reviewer can apply with one click (the mapping editor, §23.8): link a subject type to
+// another system's subjects (refs.subject_system / refs.parent_system).
+export type CheckFix = { kind: "subject_system"; type: string; system: string };
+export type Check = { level: "ok" | "warn" | "error"; file?: string; message: string; examples?: string[]; fix?: CheckFix };
 
 export type FileReport = {
   file: string; rows: number; events: number; skipped: number; unmatched: number;

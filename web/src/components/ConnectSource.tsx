@@ -6,8 +6,9 @@
 import dynamic from "next/dynamic";
 import { useEffect, useMemo, useState } from "react";
 import { DATA_FIELDS } from "@/lib/contract";
-import { mapFile, matches, parseFile, type FieldMap, type FileMapping, type ParsedFile, type RecordMap } from "@/lib/mapping";
-import type { Check, Validation } from "@/lib/validator";
+import { mapFile, matches, parseFile, TRANSFORMS, type FieldMap, type FileMapping, type ParsedFile, type RecordMap } from "@/lib/mapping";
+import { applyFix, CHOICES, modeOf, newField, targetsFor, withMode, type SourceMode } from "@/lib/mappingEdits";
+import type { Check, CheckFix, Validation } from "@/lib/validator";
 import type { ViewNode, ViewRel } from "./GraphView";
 import { WORKSPACE } from "@/lib/workspace";
 
@@ -42,14 +43,16 @@ function targetClass(t: string): string {
   return "text-zinc-200";
 }
 
-function CheckLine({ c }: { c: Check }) {
+function CheckLine({ c, onFix }: { c: Check; onFix?: (fix: CheckFix) => void }) {
   const icon = c.level === "ok" ? "✓" : c.level === "warn" ? "!" : "✕";
   const cls = c.level === "ok" ? "text-emerald-400" : c.level === "warn" ? "text-amber-400" : "text-red-400";
   return (
     <li className="flex gap-2 text-xs">
       <span className={`w-3 font-bold ${cls}`}>{icon}</span>
       <span className="text-zinc-300">{c.message}
-        {c.examples?.length ? <span className="text-zinc-500"> · {c.examples.join(", ")}</span> : null}</span>
+        {c.examples?.length ? <span className="text-zinc-500"> · {c.examples.join(", ")}</span> : null}
+        {c.fix && onFix && <button onClick={() => onFix(c.fix!)} className="ml-2 rounded bg-sky-700 px-2 py-0.5 text-[11px] font-semibold text-white hover:bg-sky-600">
+          Link to {c.fix.system}&apos;s {c.fix.type}s</button>}</span>
     </li>
   );
 }
@@ -157,16 +160,34 @@ export default function ConnectSource({ active, onClose, onChanged }: { active: 
     setBusy(null);
   }
 
-  function editField(file: string, recIdx: number, fieldIdx: number, change: Partial<FieldMap>) {
+  // The mapping editor (§23.8): every change goes through here, on a copy; the file is marked edited (kept on the
+  // load's provenance) and has to be validated again.
+  function editMapping(file: string, change: (m: FileMapping) => void) {
     setProposals((p) => {
       const m = structuredClone(p[file].mapping!);
-      Object.assign(m.records[recIdx].fields[fieldIdx], change);
+      change(m);
       return { ...p, [file]: { ...p[file], mapping: m, edited: true } };
     });
     setReport(null); setResult(null);
   }
 
-  async function validateAll() {
+  // A validator suggestion applied to every file's mapping, then validated again.
+  async function applyCheckFix(fix: CheckFix) {
+    let changed = 0;
+    const next = { ...proposals };
+    for (const f of files) {
+      const p = next[f.name];
+      if (!p?.mapping) continue;
+      const r = applyFix(p.mapping, fix);
+      if (r.changed) { next[f.name] = { ...p, mapping: r.mapping, edited: true }; changed += r.changed; }
+    }
+    if (!changed) { setError(`No record type names its ${fix.type} with a fixed subject type: add refs.subject_system in the mapping by hand.`); return; }
+    setProposals(next);
+    await validateWith(Object.values(next).map((p) => p.mapping).filter((m): m is FileMapping => !!m));
+  }
+
+  const validateAll = () => validateWith(mappings);
+  async function validateWith(mappings: FileMapping[]) {
     setBusy("validate"); setError(null);
     const res = await fetch("/api/upload/validate", { method: "POST", headers: { "content-type": "application/json" },
                                                       body: JSON.stringify({ name, ...sources(), mappings }) });
@@ -360,7 +381,7 @@ export default function ConnectSource({ active, onClose, onChanged }: { active: 
                 {incremental.changes.map((c) => `${c.table} (v${c.from}–${c.to}: ${c.inserted} new, ${c.updated} changed, ${c.deleted} deleted)`).join("; ")}.
                 Merged into the rows already loaded and re-detected over the full history with the last approved mapping.</p>
             )}
-            {view === "validate" && report && <ValidationView report={report} />}
+            {view === "validate" && report && <ValidationView report={report} onFix={incremental ? undefined : applyCheckFix} />}
             {view === "result" && result && (
               <ResultView result={result} graph={graph} active={active} onCustomer={showCustomer} onSubject={showSubject} onRemove={removeBatch} busy={busy} />
             )}
@@ -368,7 +389,7 @@ export default function ConnectSource({ active, onClose, onChanged }: { active: 
               ? <p className="text-sm text-red-400">Could not read {view}: {pf}</p>
               : mapping ? <MappingView file={pf} mapping={mapping} proposal={proposals[view]}
                                        total={files.find((f) => f.name === view)?.table?.rows}
-                                       onEdit={(r, i, c) => editField(view, r, i, c)} />
+                                       onChange={(change) => editMapping(view, change)} />
               : <FilePreview file={pf} status={proposals[view]} />)}
           </div>
         </div>
@@ -399,9 +420,9 @@ function FilePreview({ file, status }: { file: ParsedFile; status?: Proposal }) 
 const fmt = (v: unknown) => (v === null || v === undefined ? "" : typeof v === "object" ? JSON.stringify(v) : String(v));
 
 // ------------------------------------------------------------------ the mapping
-function MappingView({ file, mapping, proposal, total, onEdit }: {
+function MappingView({ file, mapping, proposal, total, onChange }: {
   file: ParsedFile; mapping: FileMapping; proposal: Proposal; total?: number;   // total: a table's rows (file holds a preview)
-  onEdit: (record: number, field: number, change: Partial<FieldMap>) => void;
+  onChange: (change: (m: FileMapping) => void) => void;
 }) {
   const { events, problems } = useMemo(() => mapFile(file, mapping), [file, mapping]);
   const skipped = file.rows.filter((r) => !mapping.records.some((x) => matches(r, x.when)) && mapping.skipped.some((s) => matches(r, s.when))).length;
@@ -421,7 +442,8 @@ function MappingView({ file, mapping, proposal, total, onEdit }: {
       </div>
       {mapping.records.map((rec, ri) => (
         <RecordCard key={ri} file={file} rec={rec} count={events.filter((e) => e.record === rec.name).length}
-                    example={events.find((e) => e.record === rec.name)} onEdit={(fi, c) => onEdit(ri, fi, c)} />
+                    example={events.find((e) => e.record === rec.name)}
+                    onChange={(change) => onChange((m) => change(m.records[ri]))} />
       ))}
       {mapping.skipped.length > 0 && (
         <div className="rounded-lg border border-zinc-800 p-3 text-xs">
@@ -436,14 +458,16 @@ function MappingView({ file, mapping, proposal, total, onEdit }: {
   );
 }
 
-function RecordCard({ file, rec, count, example, onEdit }: {
+function RecordCard({ file, rec, count, example, onChange }: {
   file: ParsedFile; rec: RecordMap; count: number; example?: ReturnType<typeof mapFile>["events"][number];
-  onEdit: (field: number, change: Partial<FieldMap>) => void;
+  onChange: (change: (r: RecordMap) => void) => void;
 }) {
   const [showExample, setShowExample] = useState(false);
+  const [open, setOpen] = useState<number | null>(null);   // the field being edited
   const spec = DATA_FIELDS[rec.event_type];
   const mappedData = new Set(rec.fields.map((f) => f.target));
   const missingRequired = spec.required.filter((d) => !mappedData.has(`data.${d}`));
+  const setField = (fi: number, f: FieldMap) => onChange((r) => { r.fields[fi] = { ...f, reason: f.reason.endsWith("(edited)") || f.reason.startsWith("added") ? f.reason : `${f.reason} (edited)` }; });
   return (
     <div className="rounded-lg border border-zinc-800 bg-zinc-950">
       <div className="flex flex-wrap items-center gap-2 border-b border-zinc-800 px-3 py-2 text-sm">
@@ -456,32 +480,32 @@ function RecordCard({ file, rec, count, example, onEdit }: {
       <table className="w-full text-xs">
         <thead>
           <tr className="text-left text-[10px] uppercase tracking-wide text-zinc-500">
-            <th className="px-3 py-1">Source column</th><th className="px-1 py-1" /><th className="px-2 py-1">Contract field</th>
-            <th className="px-2 py-1">As</th><th className="px-2 py-1">Value translations</th><th className="px-2 py-1">Why</th>
+            <th className="px-3 py-1">Source</th><th className="px-1 py-1" /><th className="px-2 py-1">Contract field</th>
+            <th className="px-2 py-1">As</th><th className="px-2 py-1">Value translations</th><th className="px-2 py-1">Why</th><th />
           </tr>
         </thead>
         <tbody>
           {rec.fields.map((f, fi) => {
             const required = f.target.startsWith("data.") && spec.required.includes(f.target.slice(5));
-            return (
-              <tr key={fi} className="border-t border-zinc-900 align-top">
+            return [
+              <tr key={fi} className={`border-t border-zinc-900 align-top ${open === fi ? "bg-zinc-900/60" : ""}`}>
                 <td className="px-3 py-1.5">
                   {f.column !== null ? (
-                    <select value={f.column} onChange={(e) => onEdit(fi, { column: e.target.value })}
+                    <select value={f.column} onChange={(e) => setField(fi, { ...f, column: e.target.value })}
                             className={`max-w-52 rounded border bg-zinc-900 px-1 py-0.5 font-mono ${file.columns.includes(f.column) ? "border-zinc-700" : "border-red-600"}`}>
                       {!file.columns.includes(f.column) && <option value={f.column}>{f.column} (missing)</option>}
                       {file.columns.map((c) => <option key={c} value={c}>{c}</option>)}
                     </select>
-                  ) : f.template ? <span className="font-mono text-zinc-300">{f.template}</span>
-                    : <span className="font-mono text-zinc-400">&quot;{f.value}&quot; <span className="text-zinc-600">constant</span></span>}
+                  ) : f.template !== null ? <span className="font-mono text-zinc-300">{f.template}</span>
+                    : <span className="font-mono text-zinc-400">&quot;{f.value}&quot; <span className="text-zinc-600">fixed</span></span>}
                 </td>
                 <td className="px-1 py-1.5 text-zinc-600">→</td>
                 <td className={`whitespace-nowrap px-2 py-1.5 font-mono ${targetClass(f.target)}`}>{f.target}{required && <span className="text-amber-400" title="required"> *</span>}</td>
                 <td className="px-2 py-1.5 text-zinc-500">{f.transform === "string" ? "" : f.transform}</td>
                 <td className="px-2 py-1.5">
                   <div className="flex flex-wrap gap-1">
-                    {f.aliases.map((a) => (
-                      <span key={a.from} className="rounded border border-zinc-700 px-1.5 py-0.5 text-[10px]">
+                    {f.aliases.map((a, ai) => (
+                      <span key={ai} className="rounded border border-zinc-700 px-1.5 py-0.5 text-[10px]">
                         {a.from} <span className="text-zinc-500">→</span> <span className="text-emerald-300">{a.to}</span></span>
                     ))}
                     {f.otherwise && <span className="rounded border border-dashed border-zinc-700 px-1.5 py-0.5 text-[10px]">
@@ -489,17 +513,34 @@ function RecordCard({ file, rec, count, example, onEdit }: {
                   </div>
                 </td>
                 <td className="px-2 py-1.5 text-zinc-400">{f.reason}</td>
-              </tr>
-            );
+                <td className="px-2 py-1.5 text-right">
+                  <button onClick={() => setOpen(open === fi ? null : fi)} title="Edit this field"
+                          className="rounded px-1.5 py-0.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100">{open === fi ? "Done" : "✎"}</button>
+                </td>
+              </tr>,
+              open === fi && (
+                <tr key={`${fi}-edit`} className="bg-zinc-900/60">
+                  <td colSpan={7} className="px-3 pb-3">
+                    <FieldEditor field={f} columns={file.columns} onChange={(next) => setField(fi, next)}
+                                 onRemove={() => { setOpen(null); onChange((r) => { r.fields.splice(fi, 1); }); }} />
+                  </td>
+                </tr>
+              ),
+            ];
           })}
           {missingRequired.map((d) => (
             <tr key={d} className="border-t border-zinc-900">
               <td className="px-3 py-1.5 text-red-400">no column</td><td className="px-1 text-zinc-600">→</td>
-              <td className="px-2 py-1.5 font-mono text-red-300">data.{d} *</td><td colSpan={3} className="px-2 text-red-400">required for {rec.event_type}</td>
+              <td className="px-2 py-1.5 font-mono text-red-300">data.{d} *</td>
+              <td colSpan={3} className="px-2 text-red-400">required for {rec.event_type}</td>
+              <td className="px-2 text-right">
+                <button onClick={() => { onChange((r) => { r.fields.push(newField(`data.${d}`, file.columns)); }); setOpen(rec.fields.length); }}
+                        className="rounded bg-zinc-800 px-2 py-0.5 text-zinc-200">Add</button></td>
             </tr>
           ))}
         </tbody>
       </table>
+      <AddField rec={rec} onAdd={(target) => { onChange((r) => { r.fields.push(newField(target, file.columns)); }); setOpen(rec.fields.length); }} />
       {example && (
         <div className="border-t border-zinc-800 px-3 py-2">
           <button onClick={() => setShowExample(!showExample)} className="text-xs text-sky-400">
@@ -518,8 +559,93 @@ function RecordCard({ file, rec, count, example, onEdit }: {
   );
 }
 
+// One field: where its value comes from (a column, a fixed value, or a template of columns), how it's read, and
+// value translations with an "otherwise" value. Any change is checked again by Validate.
+function FieldEditor({ field: f, columns, onChange, onRemove }: {
+  field: FieldMap; columns: string[]; onChange: (f: FieldMap) => void; onRemove: () => void;
+}) {
+  const mode = modeOf(f);
+  const choices = CHOICES[f.target];
+  const input = "rounded border border-zinc-700 bg-zinc-950 px-1.5 py-0.5 font-mono";
+  return (
+    <div className="flex flex-wrap items-start gap-x-6 gap-y-2 pt-2">
+      <label className="flex items-center gap-2">
+        <span className="text-zinc-500">From</span>
+        <select value={mode} onChange={(e) => onChange(withMode(f, e.target.value as SourceMode, columns))} className={input}>
+          <option value="column">a column</option><option value="value">a fixed value</option><option value="template">a template</option>
+        </select>
+        {mode === "column" && (
+          <select value={f.column ?? ""} onChange={(e) => onChange({ ...f, column: e.target.value })} className={`${input} max-w-52`}>
+            {columns.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+        )}
+        {mode === "value" && (choices
+          ? <select value={f.value ?? ""} onChange={(e) => onChange({ ...f, value: e.target.value })} className={input}>
+              {choices.map((c) => <option key={c} value={c}>{c}</option>)}</select>
+          : <input value={f.value ?? ""} onChange={(e) => onChange({ ...f, value: e.target.value })} placeholder="value" className={`${input} w-44`} />)}
+        {mode === "template" && (
+          <input value={f.template ?? ""} onChange={(e) => onChange({ ...f, template: e.target.value })} placeholder="e.g. system:{Column}"
+                 title="Column names in braces are replaced by the row's values" className={`${input} w-56`} />
+        )}
+      </label>
+      <label className="flex items-center gap-2">
+        <span className="text-zinc-500">Read as</span>
+        <select value={f.transform} onChange={(e) => onChange({ ...f, transform: e.target.value as FieldMap["transform"] })} className={input}>
+          {TRANSFORMS.map((t) => <option key={t} value={t}>{t}</option>)}
+        </select>
+      </label>
+      <div className="space-y-1">
+        <span className="text-zinc-500">Value translations</span>
+        {f.aliases.map((a, ai) => (
+          <div key={ai} className="flex items-center gap-1">
+            <input value={a.from} onChange={(e) => onChange({ ...f, aliases: f.aliases.map((x, i) => (i === ai ? { ...x, from: e.target.value } : x)) })}
+                   placeholder="source value" className={`${input} w-36`} />
+            <span className="text-zinc-500">→</span>
+            <input value={a.to} onChange={(e) => onChange({ ...f, aliases: f.aliases.map((x, i) => (i === ai ? { ...x, to: e.target.value } : x)) })}
+                   placeholder="becomes" className={`${input} w-32`} />
+            <button onClick={() => onChange({ ...f, aliases: f.aliases.filter((_, i) => i !== ai) })} className="px-1 text-zinc-500 hover:text-red-400">✕</button>
+          </div>
+        ))}
+        <div className="flex items-center gap-2">
+          <button onClick={() => onChange({ ...f, aliases: [...f.aliases, { from: "", to: "" }] })} className="rounded bg-zinc-800 px-2 py-0.5">+ translation</button>
+          {f.aliases.length > 0 && <label className="flex items-center gap-1"><span className="text-zinc-500">otherwise</span>
+            <input value={f.otherwise ?? ""} onChange={(e) => onChange({ ...f, otherwise: e.target.value || null })} placeholder="(keep the value)"
+                   className={`${input} w-32`} /></label>}
+        </div>
+      </div>
+      <button onClick={onRemove} className="ml-auto self-end rounded border border-red-900 px-2 py-0.5 text-red-300 hover:bg-red-950">Remove field</button>
+    </div>
+  );
+}
+
+// Add a contract field this record type doesn't map yet (open families, e.g. data.context.<name>, take a name).
+function AddField({ rec, onAdd }: { rec: RecordMap; onAdd: (target: string) => void }) {
+  const { fixed, open } = targetsFor(rec.event_type);
+  const used = new Set(rec.fields.map((f) => f.target));
+  const available = fixed.filter((t) => !used.has(t));
+  const [target, setTarget] = useState("");
+  const [name, setName] = useState("");
+  const isOpen = open.includes(target);
+  const full = isOpen ? `${target}${name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "")}` : target;
+  return (
+    <div className="flex flex-wrap items-center gap-2 border-t border-zinc-800 px-3 py-2 text-xs">
+      <span className="text-zinc-500">Add a field</span>
+      <select value={target} onChange={(e) => { setTarget(e.target.value); setName(""); }}
+              className="rounded border border-zinc-700 bg-zinc-950 px-1.5 py-0.5 font-mono">
+        <option value="">choose…</option>
+        {open.map((t) => <option key={t} value={t}>{t}&lt;name&gt;</option>)}
+        {available.map((t) => <option key={t} value={t}>{t}</option>)}
+      </select>
+      {isOpen && <input value={name} onChange={(e) => setName(e.target.value)} placeholder="name, e.g. credit_score"
+                        className="w-40 rounded border border-zinc-700 bg-zinc-950 px-1.5 py-0.5 font-mono" />}
+      <button disabled={!target || (isOpen && !name.trim()) || used.has(full)} onClick={() => { onAdd(full); setTarget(""); setName(""); }}
+              className="rounded bg-zinc-700 px-2 py-0.5 font-semibold disabled:opacity-40">Add</button>
+    </div>
+  );
+}
+
 // ------------------------------------------------------------------ validator + dry run
-function ValidationView({ report }: { report: ReportView }) {
+function ValidationView({ report, onFix }: { report: ReportView; onFix?: (fix: CheckFix) => void }) {
   const d = report.dryRun;
   return (
     <div className="space-y-4">
@@ -549,7 +675,7 @@ function ValidationView({ report }: { report: ReportView }) {
         </div>
         <div className="rounded-lg border border-zinc-800 p-3">
           <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-400">Across files</p>
-          <ul className="space-y-1">{report.checks.map((c, i) => <CheckLine key={i} c={c} />)}</ul>
+          <ul className="space-y-1">{report.checks.map((c, i) => <CheckLine key={i} c={c} onFix={onFix} />)}</ul>
         </div>
       </div>
       <div className="rounded-lg border border-zinc-800 p-3">
