@@ -51,8 +51,12 @@ outcomes, good or bad). Look at similar cases first; check a fact's effect with 
 you cite must come from a tool. If the evidence is thin or a fact looks like it was recorded after the outcome, say so. Then
 call propose_decision once.`;
   const messages: Anthropic.Beta.BetaMessageParam[] = [{ role: "user", content:
-    `The case: ${c.subject.label} ${c.subject.key}${c.parent ? ` (part of ${c.parent.label} ${c.parent.key})` : ""}.\nFacts known now:\n` +
-    Object.entries(c.facts).map(([k, v]) => `- ${words(k.split(".").slice(1).join("."))}: ${v}`).join("\n") }];
+    `The case: ${c.subject.label} ${c.subject.key}${c.parent ? ` (part of ${c.parent.label} ${c.parent.key})` : ""}.` +
+    (c.decider ? ` This decision is made by: ${c.decider}.` : "") + `\nFacts known now:\n` +
+    (Object.entries(c.facts).map(([k, v]) => `- ${words(k.split(".").slice(1).join("."))}: ${v}`).join("\n") || "- none recorded") +
+    (c.history?.length ? `\nWhat happened so far (before this decision):\n` + c.history.map((h) =>
+      `- ${h.at.slice(0, 16).replace("T", " ")}: ${h.kind === "decision" ? `${words(h.label)}: ${words(h.option ?? "?")}${h.by ? ` by ${h.by}` : ""}` : `outcome ${words(h.label)}`}` +
+      (h.amount != null ? ` (${h.amount})` : "")).join("\n") : "") }];
   const exclude = [c.id, ...c.related];
 
   for (let turn = 0; turn < 8; turn++) {

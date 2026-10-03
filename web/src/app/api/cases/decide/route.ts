@@ -10,6 +10,9 @@ const Case = z.object({
   parent: z.object({ id: z.string(), label: z.string(), key: z.string(), parts: z.number().default(0) }).nullable(),
   facts: z.record(z.string(), z.unknown()), options: z.array(z.object({ option: z.string(), n: z.number() })),
   details: z.array(z.string()), related: z.array(z.string()),
+  history: z.array(z.object({ at: z.string(), kind: z.enum(["decision", "outcome"]), label: z.string(), option: z.string().nullable(),
+                              amount: z.number().nullable(), by: z.string().nullable() })).default([]),
+  decider: z.string().nullable().default(null),
 });
 
 // POST {case}: the generic decision agent's steps and proposal, streamed as server-sent events.

@@ -15,6 +15,10 @@ export type Case = {
   options: { option: string; n: number }[];             // what was chosen for this decision type in the data
   details: string[];                                    // detail names recorded with such decisions (e.g. terms)
   related: string[];                                    // decisions about the same subject or parent (kept out of precedent)
+  // What happened before this decision (§23.10: an anonymised log has no description; its steps tell the story):
+  // earlier decisions and outcomes about the subject (and its container), oldest first; nothing after the decision.
+  history: { at: string; kind: "decision" | "outcome"; label: string; option: string | null; amount: number | null; by: string | null }[];
+  decider: string | null;                               // who makes this decision (role / team, else kind): the situation, not the answer
 };
 
 // A random past FINAL decision of a type a mapping introduced (any domain), with at least one outcome.
@@ -37,7 +41,8 @@ export async function replayCase(decisionType?: string): Promise<Case | null> {
     { s: baseScenario(), type: decisionType ?? null });
   if (!c) return null;
   const prefix = prefixOf(c.type);
-  const [options, details, related] = await Promise.all([
+  const scope = [c.s.id, ...(c.p && c.p.parts <= CONTAINER_MAX ? [c.p.id] : [])];
+  const [options, details, related, history, decider] = await Promise.all([
     query<{ option: string; n: number }>(
       `MATCH (d:Decision {scenario_id: $s, decision_type: $t, stage: 'FINAL'})-[:CONSIDERED {status: 'CHOSEN'}]->(o:Option)
        RETURN o.option_key AS option, count(*) AS n ORDER BY n DESC`, { s: baseScenario(), t: c.type }),
@@ -48,12 +53,29 @@ export async function replayCase(decisionType?: string): Promise<Case | null> {
       // Kept out of precedent (they'd give the answer away): decisions about the case's subject, and about its parent
       // when the parent is a small container. Under a large grouping, the others are other cases: fair precedent.
       `MATCH (d:Decision {scenario_id: $s})-[:ABOUT]->(e:Entity) WHERE e.entity_id IN $ids RETURN DISTINCT d.decision_id AS id`,
-      { s: baseScenario(), ids: [c.s.id, ...(c.p && c.p.parts <= CONTAINER_MAX ? [c.p.id] : [])] }),
+      { s: baseScenario(), ids: scope }),
+    query<Case["history"][number]>(
+      `CALL {
+         MATCH (d:Decision {scenario_id: $s})-[:ABOUT]->(e:Entity) WHERE e.entity_id IN $ids AND d.decided_at < datetime($at) AND d.decision_id <> $id
+         WITH DISTINCT d
+         OPTIONAL MATCH (d)-[k:CONSIDERED]->(o:Option) WHERE k.status IN ['CHOSEN', 'PROPOSED']
+         OPTIONAL MATCH (d)-[:MADE_BY]->(a:Actor)
+         RETURN toString(d.decided_at) AS at, 'decision' AS kind, d.decision_type AS label, head(collect(o.option_key)) AS option,
+                head(collect(k.amount_usd)) AS amount, head(collect(coalesce(a.team, toLower(a.kind)))) AS by
+         UNION
+         MATCH (o:Outcome)-[:ABOUT]->(e:Entity) WHERE e.entity_id IN $ids AND o.occurred_at < datetime($at)
+         RETURN DISTINCT toString(o.occurred_at) AS at, 'outcome' AS kind, o.outcome_type AS label, null AS option,
+                o.value_usd AS amount, null AS by
+       }
+       RETURN at, kind, label, option, amount, by ORDER BY at LIMIT 30`, { s: baseScenario(), ids: scope, at: c.at, id: c.id }),
+    query<{ by: string | null }>(
+      `MATCH (d:Decision {decision_id: $id}) OPTIONAL MATCH (d)-[:MADE_BY]->(a:Actor) RETURN coalesce(a.team, toLower(a.kind)) AS by`, { id: c.id }),
   ]);
   return {
     id: c.id, decision_type: c.type, decided_at: c.at, subject: c.s, parent: c.p,
     facts: Object.fromEntries(Object.entries(c.ctx).filter(([k, v]) => k.startsWith(prefix) && !META.has(k) && v !== null && v !== "")),
     options, details: [...new Set((details[0]?.keys ?? []).flat())].sort(), related: related.map((r) => r.id),
+    history, decider: decider[0]?.by ?? null,
   };
 }
 

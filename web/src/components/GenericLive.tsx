@@ -10,7 +10,9 @@ const GraphView = dynamic(() => import("./GraphView"), { ssr: false });
 
 type Case = { id: string; decision_type: string; decided_at: string; subject: { id: string; label: string; key: string };
               parent: { id: string; label: string; key: string; parts?: number } | null; facts: Record<string, unknown>;
-              options: { option: string; n: number }[]; details: string[]; related: string[] };
+              options: { option: string; n: number }[]; details: string[]; related: string[];
+              history?: { at: string; kind: "decision" | "outcome"; label: string; option: string | null; amount: number | null; by: string | null }[];
+              decider?: string | null };
 type Proposal = { option: string; amount: number | null; details: Record<string, unknown>; rationale: string };
 type Reveal = { option: string | null; amount: number | null; details: Record<string, unknown> | null; actor: string | null; kind: string | null;
                 at: string; outcomes: { type: string; polarity: string | null; value: number | null }[] };
@@ -115,8 +117,22 @@ export default function GenericLive({ workspace }: { workspace: string }) {
           </div>
         ) : (
           <div className="space-y-3 text-sm">
-            <p className="text-xs text-zinc-500">Replayed from the loaded data · decision needed: <b className="text-zinc-300">{words(c.decision_type)}</b></p>
+            <p className="text-xs text-zinc-500">Replayed from the loaded data · decision needed: <b className="text-zinc-300">{words(c.decision_type)}</b>
+              {c.decider && <> · by <b className="text-zinc-300">{words(c.decider.toLowerCase())}</b></>} · {c.decided_at.slice(0, 16).replace("T", " ")}</p>
             <p className="font-semibold">{c.subject.label} {c.subject.key}{c.parent && <span className="font-normal text-zinc-400"> · part of {c.parent.label} {c.parent.key}</span>}</p>
+            {/* What happened before this decision (only earlier steps; the outcome stays hidden until the reveal). */}
+            {!!c.history?.length && (
+              <div className="text-sm">
+                <p className="text-xs uppercase tracking-wide text-zinc-500">So far</p>
+                <ul className="mt-1 space-y-0.5">{c.history.map((h, i) => (
+                  <li key={i} className="text-zinc-300"><span className="font-mono text-xs text-zinc-500">{h.at.slice(0, 16).replace("T", " ")}</span>{" "}
+                    {h.kind === "decision"
+                      ? <>{words(h.label.split(".").slice(1).join(".") || h.label)}: <b>{words(h.option ?? "?")}</b>{h.by && <span className="text-zinc-500"> by {words(h.by.toLowerCase())}</span>}</>
+                      : <span className="text-zinc-400">{words(h.label)}</span>}
+                    {h.amount != null && <span className="text-zinc-500"> · {Math.round(h.amount * 100) / 100}</span>}</li>
+                ))}</ul>
+              </div>
+            )}
             <table className="text-sm"><tbody>{Object.entries(c.facts).map(([k, v]) => (
               <tr key={k}><td className="pr-4 text-zinc-500">{factName(k)}</td><td className="font-mono">{String(v)}</td></tr>
             ))}</tbody></table>
