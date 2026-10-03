@@ -20,6 +20,7 @@ research/
 research\ /
 Research/
 Research*.pdf
+tmp/
 
 # Internal planning docs
 rationode-demo-spec.md
