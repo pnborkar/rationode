@@ -248,7 +248,9 @@ async function addPolicyGap(email: string, nodes: GraphNode[], rels: GraphRel[])
 // Caps for a subject's graph (any domain): enough to read, never thousands of nodes in the browser.
 const GRAPH_MAX_PARTS = 25, GRAPH_MAX_DECISIONS = 200;
 
-export async function subjectGraph(entityId: string) {
+// before: only what happened before that moment (a replayed case's graph "so far": nothing that would give the ending
+// away); unset: everything.
+export async function subjectGraph(entityId: string, before: string | null = null) {
   const [r] = await query<{
     subject: { id: string; label: string; key: string; type: string | null };
     parent: { id: string; label: string; key: string } | null;
@@ -260,19 +262,20 @@ export async function subjectGraph(entityId: string) {
     `MATCH (s:Entity {entity_id: $id})
      OPTIONAL MATCH (s)-[:PART_OF]->(p:Entity)
      OPTIONAL MATCH (c:Entity)-[:PART_OF]->(s)
+     WHERE $before IS NULL OR EXISTS { MATCH (d0:Decision)-[:ABOUT]->(c) WHERE d0.decided_at < datetime($before) }
      // Capped, so a subject with thousands of parts (a budget) draws a readable graph instead of freezing the browser.
      WITH s, p, collect(DISTINCT c) AS allParts
      WITH s, p, allParts[..$maxParts] AS parts, size(allParts) AS partCount
      CALL (s, parts) {
        UNWIND [s] + parts AS x
-       MATCH (d:Decision)-[:ABOUT]->(x)
+       MATCH (d:Decision)-[:ABOUT]->(x) WHERE $before IS NULL OR d.decided_at < datetime($before)
        // A decision about a part is also about the subject: once, drawn on its most specific subject (the part).
        WITH d, collect(x) AS xs
        WITH d, coalesce(head([y IN xs WHERE y <> s]), s) AS x
        OPTIONAL MATCH (d)-[k:CONSIDERED]->(o:Option) WHERE k.status IN ['CHOSEN', 'PROPOSED']
        OPTIONAL MATCH (d)-[:MADE_BY]->(a:Actor)
        WITH d, x, head(collect(o.option_key)) AS option, head(collect(k.amount_usd)) AS amount, head(collect(a)) AS a
-       OPTIONAL MATCH (d)-[:LED_TO]->(out:Outcome)
+       OPTIONAL MATCH (d)-[:LED_TO]->(out:Outcome) WHERE $before IS NULL OR out.occurred_at < datetime($before)
        WITH d, x, option, amount, a,
             collect(CASE WHEN out IS NULL THEN null ELSE {id: out.outcome_id, type: out.outcome_type, value: out.value_usd, polarity: out.polarity} END) AS outcomes
        ORDER BY d.decided_at
@@ -285,7 +288,7 @@ export async function subjectGraph(entityId: string) {
             CASE WHEN p IS NULL THEN null ELSE {id: p.entity_id, label: head([l IN labels(p) WHERE l <> 'Entity']), key: p.source_key} END AS parent,
             [c IN parts | {id: c.entity_id, label: head([l IN labels(c) WHERE l <> 'Entity']), key: c.source_key}] AS parts,
             partCount, decisions`,
-    { id: entityId, maxParts: neo4j.int(GRAPH_MAX_PARTS), maxDecisions: neo4j.int(GRAPH_MAX_DECISIONS) },
+    { id: entityId, before, maxParts: neo4j.int(GRAPH_MAX_PARTS), maxDecisions: neo4j.int(GRAPH_MAX_DECISIONS) },
   );
   if (!r) return null;
   const short = (key: string) => key.split(":").slice(1).join(":") || key;

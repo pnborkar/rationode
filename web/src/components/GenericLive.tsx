@@ -50,12 +50,34 @@ export default function GenericLive({ workspace }: { workspace: string }) {
   const [decision, setDecision] = useState<{ option: string; amount: number | null; reason: string; overridden: boolean } | null>(null);
   const [reveal, setReveal] = useState<Reveal | null>(null);
   const [graph, setGraph] = useState<{ nodes: ViewNode[]; rels: ViewRel[] } | null>(null);
+  const [graphSoFar, setGraphSoFar] = useState(false);   // the graph shows only what happened before the decision
+
+  // Earlier cases, each as it was left (the AI's reasoning, the decision, the reveal), for "← Back".
+  type Snapshot = { c: Case; thinking: string; steps: string[]; proposal: Proposal | null; overrideTo: string; amount: string; reason: string;
+                    decision: typeof decision; reveal: Reveal | null; graph: typeof graph; graphSoFar: boolean };
+  const [past, setPast] = useState<Snapshot[]>([]);
+  function back() {
+    const s = past.at(-1);
+    if (!s) return;
+    setPast((p) => p.slice(0, -1));
+    setCase(s.c); setThinking(s.thinking); setSteps(s.steps); setProposal(s.proposal); setOverrideTo(s.overrideTo); setAmount(s.amount);
+    setReason(s.reason); setDecision(s.decision); setReveal(s.reveal); setGraph(s.graph); setGraphSoFar(s.graphSoFar); setError(null);
+  }
 
   function clear() {
-    setThinking(""); setSteps([]); setProposal(null); setDecision(null); setReveal(null); setGraph(null); setReason(""); setError(null);
+    setThinking(""); setSteps([]); setProposal(null); setDecision(null); setReveal(null); setGraph(null); setGraphSoFar(false); setReason(""); setError(null);
+  }
+
+  // The case's graph up to the decision: the subject, earlier decisions and outcomes; nothing that would give the ending away.
+  async function showGraphSoFar() {
+    if (!c) return;
+    const root = c.parent && (c.parent.parts ?? 0) <= 20 ? c.parent.id : c.subject.id;
+    const g = await fetch(`/api/graph/subject?id=${encodeURIComponent(root)}&before=${encodeURIComponent(c.decided_at)}`);
+    if (g.ok) { setGraph(await g.json()); setGraphSoFar(true); }
   }
 
   async function nextCase() {
+    if (c) setPast((p) => [...p, { c, thinking, steps, proposal, overrideTo, amount, reason, decision, reveal, graph, graphSoFar }].slice(-20));
     clear(); setCase(null);
     const res = await fetch("/api/cases");
     const data = await res.json();
@@ -104,7 +126,7 @@ export default function GenericLive({ workspace }: { workspace: string }) {
     // The whole case when the parent is its container (a permit and its declarations); just the subject when the
     // parent is a large grouping (a budget with thousands of declarations).
     const g = await fetch(`/api/graph/subject?id=${encodeURIComponent(c.parent && (c.parent.parts ?? 0) <= 20 ? c.parent.id : c.subject.id)}`);
-    if (g.ok) setGraph(await g.json());
+    if (g.ok) { setGraph(await g.json()); setGraphSoFar(false); }
   }
 
   const tone = (p: string | null) => (p === "good" ? "text-emerald-400" : p === "bad" ? "text-red-400" : "text-zinc-300");
@@ -113,8 +135,12 @@ export default function GenericLive({ workspace }: { workspace: string }) {
   return (
     <div className="grid min-h-0 flex-1 grid-cols-2 grid-rows-2 gap-3">
       <Panel title="Case" badge={
-        <button onClick={nextCase} disabled={running} className="rounded-md bg-zinc-700 px-3 py-1 text-xs font-semibold disabled:opacity-40">
-          {c ? "Next case" : "Replay a past case"}</button>}>
+        <span className="flex gap-2">
+          {past.length > 0 && <button onClick={back} disabled={running} title="The previous case, as you left it"
+                                      className="rounded-md border border-zinc-700 px-3 py-1 text-xs font-semibold disabled:opacity-40">← Back</button>}
+          <button onClick={nextCase} disabled={running} className="rounded-md bg-zinc-700 px-3 py-1 text-xs font-semibold disabled:opacity-40">
+            {c ? "Next case" : "Replay a past case"}</button>
+        </span>}>
         {!c ? (
           <div className="space-y-2 text-sm text-zinc-400">
             <p>Live for <b className="text-zinc-200">{workspace}</b>: a real past case from the loaded data, shown as if it were new: only the facts known then. Its real decision and outcome stay hidden until you reveal them.</p>
@@ -145,6 +171,8 @@ export default function GenericLive({ workspace }: { workspace: string }) {
             <p className="text-xs text-zinc-500">Options chosen for this decision in the past: {c.options.map((o) => `${words(o.option)} (${o.n})`).join(", ")}</p>
             <button onClick={askAI} disabled={running} className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
               {running ? "The AI is looking at similar cases…" : proposal ? "Ask the AI again" : "Ask the AI for a decision"}</button>
+            {!reveal && <button onClick={showGraphSoFar} className="ml-3 text-sm text-sky-400 hover:underline"
+                                title="The case's graph up to this decision (nothing after it)">Show the graph so far</button>}
           </div>
         )}
       </Panel>
@@ -209,11 +237,12 @@ export default function GenericLive({ workspace }: { workspace: string }) {
         )}
       </Panel>
 
-      <Panel title="Decision graph · live from Neo4j" badge={
+      <Panel title={`Decision graph · live from Neo4j${graphSoFar ? " · so far (before the decision)" : ""}`} badge={
         <button onClick={() => setExpanded(true)} disabled={!graph?.nodes.length} title="Expand"
                 className="rounded-md border border-zinc-700 px-2 py-0.5 text-xs text-zinc-300 hover:bg-zinc-800 disabled:opacity-40">⤢ Expand</button>}>
         {graph && graph.nodes.length ? (!expanded && <div className="-m-4 h-[calc(100%+2rem)]"><GraphView nodes={graph.nodes} rels={graph.rels} /></div>)
-          : <p className="text-sm text-zinc-500">{reveal ? "Loading…" : "Hidden until you reveal what happened (it would show the ending)."}</p>}
+          : <p className="text-sm text-zinc-500">{reveal ? "Loading…" : graphSoFar ? "Nothing about this case before the decision."
+              : "The full graph shows after you reveal what happened (it would show the ending); \"Show the graph so far\" draws what came before."}</p>}
       </Panel>
       {expanded && graph && (
         <div className="fixed inset-0 z-50 flex flex-col bg-zinc-950/95 p-4 backdrop-blur">
