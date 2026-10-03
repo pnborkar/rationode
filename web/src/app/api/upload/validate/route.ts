@@ -4,7 +4,7 @@ import { resolve } from "@/lib/sources";
 import { check } from "@/lib/uploads";
 import { withTenant } from "@/lib/tenant";
 
-export const maxDuration = 120;
+export const maxDuration = 300;   // a large event log takes minutes to check
 
 // Uploaded files come with their contents; Databricks tables as references the server reads itself (§21.2).
 const Body = z.object({

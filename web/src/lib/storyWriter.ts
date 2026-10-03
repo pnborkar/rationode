@@ -110,9 +110,10 @@ const hasEnds = (r: Record<string, unknown>) =>
   ["from", "to", "decision_id"].every((k) => !(k in r) || r[k] !== null);
 
 export async function writeRows(rows: Rows): Promise<void> {
+  // In chunks: a large event log is hundreds of thousands of rows (with their original payloads), too much for one query.
   const run = async (cypher: string, data: Record<string, unknown>[] = []) => {
     const clean = data.filter(hasEnds);
-    if (clean.length) await query(cypher, { rows: clean });
+    for (let i = 0; i < clean.length; i += 5000) await query(cypher, { rows: clean.slice(i, i + 5000) });
   };
   // Context feature vectors (same encoding as the Python analytics), so loaded decisions can be precedent.
   const decisionType = new Map((rows.decisions ?? []).map((d) => [d.decision_id, d.decision_type as string]));

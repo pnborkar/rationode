@@ -310,15 +310,16 @@ export async function run(parsed: ParsedFile[], mappings: FileMapping[], name: s
     new: t ? t.new : report.events.length, changed: t?.changed ?? 0, unchanged: t?.unchanged ?? 0, removed: t?.removed ?? 0,
     editedFiles, sourcesJson: sources.length ? JSON.stringify(sources) : null, perSource: false,
   });
+  const decisionTypeOf = new Map(rows.decisions.map((d) => [d.decision_id as string, d.decision_type as string]));
   // Generic decision types (§23.8): derive their attributes from the data and encode their contexts, so they can be
   // precedent; and list the loaded subjects (there are no Stripe customers in another domain).
   const genericTypes = [...new Set(report.events.filter((e) => isGeneric(e.event_type) && e.data.decision_type)
-    .map((e) => rows.decisions.find((d) => d.decision_id === `${scenario === "history" ? "" : `${scenario}|`}dec:${e.event_id}`)?.decision_type as string)
-    .filter(Boolean))];
+    .map((e) => decisionTypeOf.get(`${scenario === "history" ? "" : `${scenario}|`}dec:${e.event_id}`))
+    .filter((t): t is string => !!t))];
   const features = genericTypes.length ? await deriveAttributes(scenario, genericTypes) : null;
   if (genericTypes.length) await approveIntroduced(scenario, genericTypes);   // what the approved mapping introduced
-  const subjects = rows.entities.filter((e) => (e.props as { subject_type?: string })?.subject_type
-      && !(rows.links ?? []).some((l) => l.type === "PART_OF" && l.from === e.entity_id))
+  const nestedIds = new Set((rows.links ?? []).filter((l) => l.type === "PART_OF").map((l) => l.from as string));
+  const subjects = rows.entities.filter((e) => (e.props as { subject_type?: string })?.subject_type && !nestedIds.has(e.entity_id as string))
     .slice(0, 30).map((e) => ({ id: e.entity_id as string, label: e.label as string, key: String(e.source_key).split(":").slice(1).join(":") }));
   // A tenant's own history isn't placed into trees: its trees are built from it (pipeline, per tenant).
   const branches = scenario === baseScenario() && !demoMode() ? [] : await placeScenario(scenario);
@@ -556,8 +557,9 @@ async function runSource(parsed: ParsedFile[], mappings: FileMapping[], source: 
     editedFiles, sourcesJson: sources.length ? JSON.stringify(sources) : null, perSource: true,
   });
   // What this load's mapping introduced is approved with it (§23.8).
+  const typeOf = new Map(r.rows.decisions.map((d) => [d.decision_id as string, d.decision_type as string]));
   const introduced = [...new Set(report.events.filter((e) => isGeneric(e.event_type) && e.data.decision_type)
-    .map((e) => r.rows.decisions.find((d) => d.decision_id === `${scenario}|dec:${e.event_id}`)?.decision_type as string).filter(Boolean))];
+    .map((e) => typeOf.get(`${scenario}|dec:${e.event_id}`)).filter((t): t is string => !!t))];
   if (introduced.length) await approveIntroduced(scenario, introduced);
   // Outcome types this load brings are registered too, even from a source with outcomes only (e.g. collections on
   // another source's loans): trees use registered outcome types. No window here: the workspace's model holds those.
@@ -573,8 +575,8 @@ async function runSource(parsed: ParsedFile[], mappings: FileMapping[], source: 
   // What this source brought: its systems' subjects and customers (the rest of the workspace is unchanged).
   const systems = new Set(mappings.map((m) => m.source));
   const mine = r.rows.entities.filter((e) => systems.has(e.source_system as string));
-  const subjects = mine.filter((e) => (e.props as { subject_type?: string })?.subject_type
-      && !(r.rows.links ?? []).some((l) => l.type === "PART_OF" && l.from === e.entity_id))
+  const nested = new Set((r.rows.links ?? []).filter((l) => l.type === "PART_OF").map((l) => l.from as string));
+  const subjects = mine.filter((e) => (e.props as { subject_type?: string })?.subject_type && !nested.has(e.entity_id as string))
     .slice(0, 30).map((e) => ({ id: e.entity_id as string, label: e.label as string, key: String(e.source_key).split(":").slice(1).join(":") }));
   const customers = mine.filter((e) => e.label === "Customer" && e.source_system === "stripe")
     .map((e) => (e.props as { email: string; name: string | null })).map((p) => ({ email: p.email, name: p.name }));

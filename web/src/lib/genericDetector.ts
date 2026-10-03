@@ -61,6 +61,12 @@ export class GenericDetector extends Detector {
     const facts = new Map<string, Fact[]>();          // subject entity -> facts over time
     const decisions: Dec[] = [];
     const bySource = new Map<string, Dec>();          // source record ID -> decision (for follows_id)
+    // Indexes, so each lookup is about one subject, not every decision (event logs run to hundreds of thousands of rows).
+    const push = <K, V>(m: Map<K, V[]>, k: K, v: V) => { (m.get(k) ?? m.set(k, []).get(k)!).push(v); };
+    const proposalsOf = new Map<string, Dec[]>();      // type + subject -> proposals, in time order
+    const finalsBySubject = new Map<string, Dec[]>();  // subject -> FINAL decisions, in time order
+    const finalsByParent = new Map<string, Dec[]>();   // parent -> FINAL decisions about its children
+    const linked = new Set<string>();                  // subjects with their PART_OF link already written
     const subjectOf = (e: ContractEvent) => {
       const x = e.entity_refs;
       if (!x.subject_type || !x.subject_id) return null;
@@ -70,7 +76,7 @@ export class GenericDetector extends Detector {
       let parent: string | null = null;
       if (x.parent_type && x.parent_id) {
         parent = this.entity(safeLabel(x.parent_type), system(x.parent_system ?? x.subject_system), `${snake(x.parent_type)}:${x.parent_id}`, { subject_type: x.parent_type });
-        if (!this.rows.links.some((l) => l.type === "PART_OF" && l.from === subject)) this.rows.links.push({ type: "PART_OF", from: subject, to: parent });
+        if (!linked.has(subject)) { linked.add(subject); this.rows.links.push({ type: "PART_OF", from: subject, to: parent }); }
       }
       return { subject, parent };
     };
@@ -119,7 +125,8 @@ export class GenericDetector extends Detector {
         let proposal: Dec | undefined;
         if (stage === "FINAL") {
           proposal = (x.follows_id && bySource.get(x.follows_id)) || undefined;
-          proposal ??= [...decisions].reverse().find((p) => p.stage === "PROPOSAL" && p.type === type && p.subject === s.subject && ms(p.at) <= ms(e.occurred_at));
+          const earlier = proposalsOf.get(`${type}\u0000${s.subject}`) ?? [];
+          for (let i = earlier.length - 1; i >= 0 && !proposal; i--) if (ms(earlier[i].at) <= ms(e.occurred_at)) proposal = earlier[i];
         }
         const overridden = !!proposal && proposal.option !== option;
         const facts8 = Object.entries(ctx).slice(0, 8).map(([k, v]) => `${k.slice(family.length + 1).replaceAll("_", " ")} ${v}`).join(", ");
@@ -139,6 +146,8 @@ export class GenericDetector extends Detector {
         const dec: Dec = { id, at: e.occurred_at, type, stage, option, subject: s.subject, parent: s.parent, sourceId: e.event_id };
         decisions.push(dec);
         bySource.set(e.event_id, dec);
+        if (stage === "PROPOSAL") push(proposalsOf, `${type}\u0000${s.subject}`, dec);
+        else { push(finalsBySubject, s.subject, dec); if (s.parent) push(finalsByParent, s.parent, dec); }
         continue;
       }
 
@@ -159,8 +168,8 @@ export class GenericDetector extends Detector {
         if (named && ms(named.at) <= ms(e.occurred_at)) { this.ledTo(named.id, out, type, "EXPLICIT_REF", 1.0); continue; }
         const windowDays = this.reg.windows[type] ?? this.reg.defaultWindow ?? DEFAULT_WINDOW_DAYS, at = ms(e.occurred_at);
         const days = (c: Dec) => (at - ms(c.at)) / DAY_MS, inWindow = (c: Dec) => days(c) <= windowDays;
-        const finals = decisions.filter((c) => c.stage === "FINAL" && ms(c.at) <= at);
-        const own = finals.filter((c) => c.subject === s.subject);
+        const before = (list: Dec[] | undefined) => (list ?? []).filter((c) => ms(c.at) <= at);
+        const own = before(finalsBySubject.get(s.subject));
         if (own.length === 1) {
           const c = own[0], late = !inWindow(c);
           this.rows.led_to.push({ decision_id: c.id, outcome_id: out, confidence: 1.0, window_days: windowDays,
@@ -172,7 +181,7 @@ export class GenericDetector extends Detector {
           }
           continue;
         }
-        const children = finals.filter((c) => c.parent === s.subject), parents = s.parent ? finals.filter((c) => c.subject === s.parent) : [];
+        const children = before(finalsByParent.get(s.subject)), parents = s.parent ? before(finalsBySubject.get(s.parent)) : [];
         const candidates = [own.filter(inWindow), children.filter(inWindow), parents.filter(inWindow)].find((t) => t.length) ?? [];
         if (!candidates.length) {
           this.n.unlinkedOutcomes++;

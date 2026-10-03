@@ -280,13 +280,16 @@ export function validate(files: ParsedFile[], mappings: FileMapping[], registry:
   };
   const ctx = new Map(dict.contexts.map((c) => [c.decision_id as string, c.summary_text as string]));
   const outType = new Map(dict.outcomes.map((o) => [o.outcome_id as string, o.outcome_type as string]));
-  const outcomesOf = (id: string) => dict.led_to.filter((l) => l.decision_id === id).map((l) => outType.get(l.outcome_id as string) ?? "");
+  const outcomesBy = new Map<string, string[]>();
+  for (const l of dict.led_to) (outcomesBy.get(l.decision_id as string) ?? outcomesBy.set(l.decision_id as string, []).get(l.decision_id as string)!).push(outType.get(l.outcome_id as string) ?? "");
+  const outcomesOf = (id: string) => outcomesBy.get(id) ?? [];
   // Preview: these files' decisions, and (with context) other sources' decisions their outcomes are credited to.
   const credited = new Set(dict.led_to.map((l) => l.decision_id as string));
   const finals = (mine ? allRows.decisions.filter((d) => myDecisions.has(d.decision_id as string) || credited.has(d.decision_id as string)) : dict.decisions)
     .filter((d) => d.stage === "FINAL" && d.decision_type !== "charge.fraud_screen");
-  const preview = [...finals.filter((d) => outcomesOf(d.decision_id as string).length), ...finals]
-    .filter((d, i, a) => a.indexOf(d) === i).slice(0, 6)
+  // Six examples, those with outcomes first (picked without scanning everything twice: event logs are large).
+  const withOutcomes = finals.filter((d) => outcomesBy.has(d.decision_id as string)).slice(0, 6);
+  const preview = [...withOutcomes, ...finals.filter((d) => !withOutcomes.includes(d)).slice(0, 6 - withOutcomes.length)]
     .map((d) => ({ decision_id: d.decision_id as string, decision_type: d.decision_type as string, stage: d.stage as string,
                    summary: ctx.get(d.decision_id as string) ?? "", outcomes: outcomesOf(d.decision_id as string) }));
 
