@@ -19,7 +19,7 @@ type Attr = {
   display_name: string;
 };
 
-let attrsCache: Attr[] | null = null;
+let attrsCache: Promise<Attr[]> | null = null;
 export const resetAttributes = () => { attrsCache = null; };   // after a load derives new attributes (§23.8)
 
 // Streamly's decision types have fixed attribute families; a generic type (§23.8) uses its domain, the part before
@@ -27,14 +27,14 @@ export const resetAttributes = () => { attrsCache = null; };   // after a load d
 export const prefixOf = (decisionType: string) => TYPE_PREFIX[decisionType] ?? `${decisionType.split(".")[0]}.`;
 
 export async function attributes(): Promise<Attr[]> {
-  if (!attrsCache) {
-    attrsCache = await query<Attr>(
-      `MATCH (s:SchemaElement {kind: 'ATTRIBUTE', status: 'APPROVED'})
-       RETURN s.key AS key, s.datatype AS datatype, s.encoding AS encoding, s.values AS values,
-              s.scale_max AS scale_max, s.display_name AS display_name
-       ORDER BY key`,
-    );
-  }
+  // The pending query is cached (not just its result), so thousands of contexts encoded at once share one query
+  // instead of each opening a connection (a 156,000-event load exhausted the driver's pool, §23.10).
+  attrsCache ??= query<Attr>(
+    `MATCH (s:SchemaElement {kind: 'ATTRIBUTE', status: 'APPROVED'})
+     RETURN s.key AS key, s.datatype AS datatype, s.encoding AS encoding, s.values AS values,
+            s.scale_max AS scale_max, s.display_name AS display_name
+     ORDER BY key`,
+  ).catch((err) => { attrsCache = null; throw err; });
   return attrsCache;
 }
 
