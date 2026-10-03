@@ -3,7 +3,7 @@
 // replayed from the loaded data (only what was known then) -> the AI proposes from similar past cases -> a person
 // approves or overrides -> "reveal what really happened": the real decision and its outcome, beside the AI's and yours.
 import dynamic from "next/dynamic";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ViewNode, ViewRel } from "./GraphView";
 
 const GraphView = dynamic(() => import("./GraphView"), { ssr: false });
@@ -33,6 +33,12 @@ function Panel({ title, badge, children }: { title: string; badge?: React.ReactN
 
 export default function GenericLive({ workspace }: { workspace: string }) {
   const [c, setCase] = useState<Case | null>(null);
+  const [expanded, setExpanded] = useState(false);   // the decision graph full screen (Esc closes)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setExpanded(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
   const [error, setError] = useState<string | null>(null);
   const [thinking, setThinking] = useState("");
   const [steps, setSteps] = useState<string[]>([]);
@@ -203,10 +209,25 @@ export default function GenericLive({ workspace }: { workspace: string }) {
         )}
       </Panel>
 
-      <Panel title="Decision graph · live from Neo4j">
-        {graph && graph.nodes.length ? <div className="-m-4 h-[calc(100%+2rem)]"><GraphView nodes={graph.nodes} rels={graph.rels} /></div>
+      <Panel title="Decision graph · live from Neo4j" badge={
+        <button onClick={() => setExpanded(true)} disabled={!graph?.nodes.length} title="Expand"
+                className="rounded-md border border-zinc-700 px-2 py-0.5 text-xs text-zinc-300 hover:bg-zinc-800 disabled:opacity-40">⤢ Expand</button>}>
+        {graph && graph.nodes.length ? (!expanded && <div className="-m-4 h-[calc(100%+2rem)]"><GraphView nodes={graph.nodes} rels={graph.rels} /></div>)
           : <p className="text-sm text-zinc-500">{reveal ? "Loading…" : "Hidden until you reveal what happened (it would show the ending)."}</p>}
       </Panel>
+      {expanded && graph && (
+        <div className="fixed inset-0 z-50 flex flex-col bg-zinc-950/95 p-4 backdrop-blur">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-300">Decision graph · live from Neo4j
+              {c && <span className="font-normal normal-case text-zinc-500"> · {c.subject.label} {c.subject.key}</span>}</h2>
+            <button onClick={() => setExpanded(false)} title="Close (Esc)"
+                    className="rounded-md border border-zinc-700 px-2 py-0.5 text-xs text-zinc-300 hover:bg-zinc-800">✕ Close</button>
+          </div>
+          <div className="min-h-0 flex-1 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900/60">
+            <GraphView nodes={graph.nodes} rels={graph.rels} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
