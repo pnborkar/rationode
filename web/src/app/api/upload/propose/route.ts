@@ -5,7 +5,7 @@ import { readParsed } from "@/lib/sources";
 import { knownSubjects, loadRegistry, parseAll } from "@/lib/uploads";
 import { withTenant } from "@/lib/tenant";
 
-export const maxDuration = 120;
+export const maxDuration = 300;   // a long event log can take a few minutes to map
 
 // An uploaded file (with its contents) or a Databricks table (a reference the server reads itself).
 const Body = z.object({

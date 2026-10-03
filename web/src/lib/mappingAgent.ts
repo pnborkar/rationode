@@ -97,9 +97,11 @@ export type KnownSubjects = { type: string; system: string; count: number; examp
 export async function proposeMapping(file: ParsedFile, registry: Registry, known: KnownSubjects = []): Promise<FileMapping> {
   const p = profile(file);
   const [{ mappingModel }, client] = await Promise.all([aiSettings(), anthropicClient()]);
-  const response = await client.messages.parse({
+  // Streamed with a large output budget: an event log with many activity values (e.g. a permit log: permit,
+  // declaration and payment steps, each "by <role>") needs one record type per value, which outgrew 16k tokens.
+  const stream = client.messages.stream({
     model: mappingModel,
-    max_tokens: 16000,
+    max_tokens: 64000,
     thinking: { type: "adaptive" },
     output_config: { effort: "medium", format: zodOutputFormat(FileMappingSchema) },
     system: system(registry),
@@ -110,6 +112,20 @@ export async function proposeMapping(file: ParsedFile, registry: Registry, known
             `- ${k.type} from system "${k.system}": ${k.count} (e.g. ${k.examples.join(", ")})`).join("\n")}` : ""),
     }],
   });
+  let response;
+  try {
+    response = await stream.finalMessage();
+  } catch (err) {
+    const stop = (stream as { currentMessage?: { stop_reason?: string | null } }).currentMessage?.stop_reason;
+    if (/parse structured output/i.test(String((err as Error).message)) || stop === "max_tokens") {
+      throw new Error(`The mapping agent's answer for ${file.name} was cut off (${p.columns.length} columns, many kinds of rows): ` +
+        "try again, or split the file by kind of row (e.g. permit steps and declaration steps).");
+    }
+    throw err;
+  }
+  if (response.stop_reason === "max_tokens") {
+    throw new Error(`The mapping agent's answer for ${file.name} was cut off: try again, or split the file by kind of row.`);
+  }
   const mapping = response.parsed_output;
   if (!mapping) throw new Error(`The mapping agent returned no valid mapping (stop reason: ${response.stop_reason})`);
   return { ...mapping, file: file.name };
