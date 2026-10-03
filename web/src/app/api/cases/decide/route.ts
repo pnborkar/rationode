@@ -7,7 +7,7 @@ export const maxDuration = 120;
 const Case = z.object({
   id: z.string(), decision_type: z.string(), decided_at: z.string(),
   subject: z.object({ id: z.string(), label: z.string(), key: z.string() }),
-  parent: z.object({ id: z.string(), label: z.string(), key: z.string() }).nullable(),
+  parent: z.object({ id: z.string(), label: z.string(), key: z.string(), parts: z.number().default(0) }).nullable(),
   facts: z.record(z.string(), z.unknown()), options: z.array(z.object({ option: z.string(), n: z.number() })),
   details: z.array(z.string()), related: z.array(z.string()),
 });

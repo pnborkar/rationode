@@ -8,7 +8,9 @@ const META = new Set(["context_id", "scenario_id", "summary_text", "features", "
 
 export type Case = {
   id: string; decision_type: string; decided_at: string;
-  subject: { id: string; label: string; key: string }; parent: { id: string; label: string; key: string } | null;
+  // parent.parts: how many subjects belong to it. A small parent is a container (a permit and its declarations); a
+  // large one is a grouping (a budget with thousands of declarations): §23.10 "BPIC 2020 loaded".
+  subject: { id: string; label: string; key: string }; parent: { id: string; label: string; key: string; parts: number } | null;
   facts: Record<string, unknown>;                       // known at decision time
   options: { option: string; n: number }[];             // what was chosen for this decision type in the data
   details: string[];                                    // detail names recorded with such decisions (e.g. terms)
@@ -16,6 +18,9 @@ export type Case = {
 };
 
 // A random past FINAL decision of a type a mapping introduced (any domain), with at least one outcome.
+// A parent with at most this many parts is the case's container; with more, a grouping.
+export const CONTAINER_MAX = 20;
+
 export async function replayCase(decisionType?: string): Promise<Case | null> {
   const [c] = await query<{ id: string; type: string; at: string; ctx: Record<string, unknown>; s: Case["subject"]; p: Case["parent"] }>(
     `MATCH (t:DecisionType {created_by: 'mapping'})
@@ -27,7 +32,8 @@ export async function replayCase(decisionType?: string): Promise<Case | null> {
      OPTIONAL MATCH (x)-[:PART_OF]->(p:Entity)
      RETURN d.decision_id AS id, d.decision_type AS type, toString(d.decided_at) AS at, properties(c) AS ctx,
             {id: x.entity_id, label: head([l IN labels(x) WHERE l <> 'Entity']), key: split(x.source_key, ':')[1]} AS s,
-            CASE WHEN p IS NULL THEN null ELSE {id: p.entity_id, label: head([l IN labels(p) WHERE l <> 'Entity']), key: split(p.source_key, ':')[1]} END AS p`,
+            CASE WHEN p IS NULL THEN null ELSE {id: p.entity_id, label: head([l IN labels(p) WHERE l <> 'Entity']), key: split(p.source_key, ':')[1],
+                                               parts: COUNT { (:Entity)-[:PART_OF]->(p) }} END AS p`,
     { s: baseScenario(), type: decisionType ?? null });
   if (!c) return null;
   const prefix = prefixOf(c.type);
@@ -39,8 +45,10 @@ export async function replayCase(decisionType?: string): Promise<Case | null> {
       `MATCH (d:Decision {scenario_id: $s, decision_type: $t}) WHERE d.details_json IS NOT NULL
        WITH d LIMIT 50 RETURN collect(DISTINCT keys(apoc.convert.fromJsonMap(d.details_json))) AS keys`, { s: baseScenario(), t: c.type }),
     query<{ id: string }>(
+      // Kept out of precedent (they'd give the answer away): decisions about the case's subject, and about its parent
+      // when the parent is a small container. Under a large grouping, the others are other cases: fair precedent.
       `MATCH (d:Decision {scenario_id: $s})-[:ABOUT]->(e:Entity) WHERE e.entity_id IN $ids RETURN DISTINCT d.decision_id AS id`,
-      { s: baseScenario(), ids: [c.s.id, ...(c.p ? [c.p.id] : [])] }),
+      { s: baseScenario(), ids: [c.s.id, ...(c.p && c.p.parts <= CONTAINER_MAX ? [c.p.id] : [])] }),
   ]);
   return {
     id: c.id, decision_type: c.type, decided_at: c.at, subject: c.s, parent: c.p,

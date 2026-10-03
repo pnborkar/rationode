@@ -9,7 +9,7 @@ import type { ViewNode, ViewRel } from "./GraphView";
 const GraphView = dynamic(() => import("./GraphView"), { ssr: false });
 
 type Case = { id: string; decision_type: string; decided_at: string; subject: { id: string; label: string; key: string };
-              parent: { id: string; label: string; key: string } | null; facts: Record<string, unknown>;
+              parent: { id: string; label: string; key: string; parts?: number } | null; facts: Record<string, unknown>;
               options: { option: string; n: number }[]; details: string[]; related: string[] };
 type Proposal = { option: string; amount: number | null; details: Record<string, unknown>; rationale: string };
 type Reveal = { option: string | null; amount: number | null; details: Record<string, unknown> | null; actor: string | null; kind: string | null;
@@ -93,7 +93,9 @@ export default function GenericLive({ workspace }: { workspace: string }) {
     if (!c) return;
     const r = await fetch(`/api/cases/reveal?id=${encodeURIComponent(c.id)}`);
     if (r.ok) setReveal(await r.json());
-    const g = await fetch(`/api/graph/subject?id=${encodeURIComponent(c.parent?.id ?? c.subject.id)}`);
+    // The whole case when the parent is its container (a permit and its declarations); just the subject when the
+    // parent is a large grouping (a budget with thousands of declarations).
+    const g = await fetch(`/api/graph/subject?id=${encodeURIComponent(c.parent && (c.parent.parts ?? 0) <= 20 ? c.parent.id : c.subject.id)}`);
     if (g.ok) setGraph(await g.json());
   }
 

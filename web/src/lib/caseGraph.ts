@@ -1,3 +1,4 @@
+import neo4j from "neo4j-driver";
 import { isType } from "./eventFields";
 import { liveScenario } from "./live";
 import { fraudPolicyTree, query, baseScenario } from "./neo4j";
@@ -244,11 +245,14 @@ async function addPolicyGap(email: string, nodes: GraphNode[], rels: GraphRel[])
 // Any subject's neighbourhood (demo spec §23.8, phase B): the subject (e.g. a loan application), its parent and its
 // parts (PART_OF, e.g. its offers), the decisions about them, what those led to and who decided. The customer graph
 // above is Streamly's view (a Stripe customer); this one works for any domain.
+// Caps for a subject's graph (any domain): enough to read, never thousands of nodes in the browser.
+const GRAPH_MAX_PARTS = 25, GRAPH_MAX_DECISIONS = 200;
+
 export async function subjectGraph(entityId: string) {
   const [r] = await query<{
     subject: { id: string; label: string; key: string; type: string | null };
     parent: { id: string; label: string; key: string } | null;
-    parts: { id: string; label: string; key: string }[];
+    parts: { id: string; label: string; key: string }[]; partCount: number;
     decisions: { id: string; type: string; stage: string; at: string; option: string | null; amount: number | null; about: string;
                  actor: string | null; kind: string | null; rationale: string | null;
                  outcomes: { id: string; type: string; value: number | null; polarity: string | null }[] }[];
@@ -256,7 +260,9 @@ export async function subjectGraph(entityId: string) {
     `MATCH (s:Entity {entity_id: $id})
      OPTIONAL MATCH (s)-[:PART_OF]->(p:Entity)
      OPTIONAL MATCH (c:Entity)-[:PART_OF]->(s)
-     WITH s, p, collect(DISTINCT c) AS parts
+     // Capped, so a subject with thousands of parts (a budget) draws a readable graph instead of freezing the browser.
+     WITH s, p, collect(DISTINCT c) AS allParts
+     WITH s, p, allParts[..$maxParts] AS parts, size(allParts) AS partCount
      CALL (s, parts) {
        UNWIND [s] + parts AS x
        MATCH (d:Decision)-[:ABOUT]->(x)
@@ -270,6 +276,7 @@ export async function subjectGraph(entityId: string) {
        WITH d, x, option, amount, a,
             collect(CASE WHEN out IS NULL THEN null ELSE {id: out.outcome_id, type: out.outcome_type, value: out.value_usd, polarity: out.polarity} END) AS outcomes
        ORDER BY d.decided_at
+       WITH d, x, option, amount, a, outcomes LIMIT $maxDecisions
        RETURN collect({id: d.decision_id, type: d.decision_type, stage: d.stage, at: toString(d.decided_at), about: x.entity_id,
                        rationale: d.rationale, option: option, amount: amount, actor: coalesce(a.name, a.actor_id), kind: a.kind,
                        outcomes: outcomes}) AS decisions
@@ -277,8 +284,8 @@ export async function subjectGraph(entityId: string) {
      RETURN {id: s.entity_id, label: head([l IN labels(s) WHERE l <> 'Entity']), key: s.source_key, type: s.subject_type} AS subject,
             CASE WHEN p IS NULL THEN null ELSE {id: p.entity_id, label: head([l IN labels(p) WHERE l <> 'Entity']), key: p.source_key} END AS parent,
             [c IN parts | {id: c.entity_id, label: head([l IN labels(c) WHERE l <> 'Entity']), key: c.source_key}] AS parts,
-            decisions`,
-    { id: entityId },
+            partCount, decisions`,
+    { id: entityId, maxParts: neo4j.int(GRAPH_MAX_PARTS), maxDecisions: neo4j.int(GRAPH_MAX_DECISIONS) },
   );
   if (!r) return null;
   const short = (key: string) => key.split(":").slice(1).join(":") || key;
@@ -295,6 +302,11 @@ export async function subjectGraph(entityId: string) {
   for (const c of r.parts) {
     nodes.push({ id: c.id, kind: "subject", label: `${c.label} ${short(c.key)}`, detail: c.key });
     rels.push({ id: `${c.id}->part_of`, from: c.id, to: r.subject.id, type: "PART_OF" });
+  }
+  if (r.partCount > r.parts.length) {   // the rest, as one note
+    nodes.push({ id: `${r.subject.id}#more`, kind: "subject", label: `+${(r.partCount - r.parts.length).toLocaleString()} more`,
+                 detail: `${r.partCount.toLocaleString()} parts in all; showing ${r.parts.length}` });
+    rels.push({ id: `${r.subject.id}#more->part_of`, from: `${r.subject.id}#more`, to: r.subject.id, type: "PART_OF" });
   }
   const seen = new Set<string>();
   for (const d of r.decisions) {
