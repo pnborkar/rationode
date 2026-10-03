@@ -28,8 +28,9 @@ export function decisionColor(outcomes: string[] = []): string {
 
 function toNvl(n: ViewNode): Node {
   const isDecision = n.kind === "decision" || n.kind === "precedent";
+  // Decision first (the choice, then its type), so a small node still shows what was decided ("admit normal care").
   const caption = n.kind === "precedent" ? (n.option ?? "").replaceAll("_", " ")
-    : isDecision ? `${n.label}\n${(n.option ?? "").replaceAll("_", " ")}` : n.label;
+    : isDecision ? (n.option ? `${n.option.replaceAll("_", " ")}\n${n.label}` : n.label) : n.label;
   return {
     id: n.id,
     caption,
@@ -38,8 +39,8 @@ function toNvl(n: ViewNode): Node {
           : n.label.startsWith("Refunded") ? "#f59e0b" : "#f87171")
       : (KIND_COLOR[n.kind] ?? "#94a3b8"),
     size: n.kind === "customer" ? 38 : n.kind === "proposal" || n.kind === "final" ? 54 : n.kind === "case" ? 34
-      : n.kind === "precedent" ? 28 : 28,
-    captionSize: 3,
+      : n.kind === "precedent" ? 28 : n.kind === "decision" ? 44 : 28,
+    captionSize: n.kind === "decision" ? 2 : 3,   // generic decisions: smaller text, so the chosen option fits ("admit normal care")
     selected: n.live,
   };
 }

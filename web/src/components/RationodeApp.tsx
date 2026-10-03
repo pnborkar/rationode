@@ -350,7 +350,8 @@ export default function StreamlyLive() {
   // and how many live decisions (gateway + webhook) are recorded for them.
   useEffect(() => {
     let alive = true;
-    fetch(`/api/graph/customer?email=${encodeURIComponent(current.email)}`)
+    // A workspace without Streamly customers has no email to look up (it uses the replay Live).
+    if (current.email) fetch(`/api/graph/customer?email=${encodeURIComponent(current.email)}`)
       .then((res) => (res.ok ? res.json() : null))
       .then((graph) => { if (alive && graph) setBase(graph); });
     fetch(`/api/live?email=${encodeURIComponent(current.email)}`)
