@@ -28,5 +28,8 @@ rationode-demo-spec.md
 # Architecture notes (kept local)
 ARCHITECTURE.md
 
+# Technical specification (kept local)
+TECHNICAL-SPEC.md
+
 # Third-party datasets (downloaded, not committed)
 data/external/
